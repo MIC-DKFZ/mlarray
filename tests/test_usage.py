@@ -4,7 +4,7 @@ from pathlib import Path
 
 import numpy as np
 
-from med_blosc2.med_blosc2 import MedBlosc2, MED_BLOSC2_DEFAULT_PATCH_SIZE
+from med_blosc2 import MedBlosc2, MED_BLOSC2_DEFAULT_PATCH_SIZE
 
 
 def _make_array(shape=(16, 32, 32), seed=0):

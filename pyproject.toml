@@ -16,8 +16,8 @@ classifiers = [
 ]
 keywords = ["copier", "template", "python"]
 dependencies = [
-  "blosc2",
-  "numpy<2",
+  "blosc2>=3",
+  "numpy>=2",
 ]
 dynamic = ["version"]
 
