@@ -6,12 +6,11 @@ build-backend = "setuptools.build_meta"
 name = "med-blosc2"
 description = "A standardized blosc2 image reader and writer for medical images."
 readme = "README.md"
-requires-python = ">= 3.9"
+requires-python = ">= 3.10"
 license = { text = "MIT" }
 authors = [{ name = "Karol Gotkowski", email = "karol.gotkowski@dkfz.de" }]
 classifiers = [
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.9",
   "Operating System :: OS Independent",
 ]
 keywords = ["copier", "template", "python"]
