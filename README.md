@@ -37,7 +37,7 @@ Below are common usage patterns for loading, saving, and working with metadata.
 
 ```python
 import numpy as np
-from med_blosc2 import MedBlosc2
+from med_blosc2 import MedBlosc2, Meta
 
 array = np.random.random((128, 256, 256)).astype(np.float32)
 image = MedBlosc2(array)
@@ -74,16 +74,15 @@ image = MedBlosc2(
     spacing=(1.0, 1.0, 1.5),
     origin=(10.0, 10.0, 30.0),
     direction=[[1, 0, 0], [0, 1, 0], [0, 0, 1]],
-    header={"patient_id": "123", "modality": "CT"},
-    is_seg=False,
+    meta=Meta(image={"patient_id": "123", "modality": "CT"}, is_seg=False),
 )
 
 print(image.spacing)  # [1.0, 1.0, 1.5]
 print(image.origin)  # [10.0, 10.0, 30.0]
-print(image.header)  # {"patient_id": "123", "modality": "CT"}
+print(image.meta.image)  # {"patient_id": "123", "modality": "CT"}
 
 image.spacing[1] = 5.3
-image.header["study_id"] = "study-001"
+image.meta.image["study_id"] = "study-001"
 image.save("with-metadata.mb2nd")
 ```
 
