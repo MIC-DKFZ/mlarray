@@ -13,6 +13,18 @@ Top-level metadata container.
   or other medical imaging formats.
 - Dataclass: None (plain dict).
 
+### spatial
+
+- Description: Spatial metadata for the image.
+- Dataclass: `MetaSpatial`.
+
+| field | type | description |
+| --- | --- | --- |
+| shape | Optional[List[float]] | The shape of the image, length = `ndims`. |
+| spacing | Optional[List[float]] | Voxel spacing per axis, length = `ndims`. |
+| origin | Optional[List[float]] | Origin per axis, length = `ndims`. |
+| direction | Optional[List[List[float]]] | Direction matrix, shape `[ndims][ndims]`. |
+
 ### stats
 
 - Description: Summary statistics for the image.
@@ -45,17 +57,6 @@ Top-level metadata container.
 
 - Description: Whether the image is a segmentation mask.
 - Dataclass: None (boolean).
-
-### spatial
-
-- Description: Spatial metadata for the image.
-- Dataclass: `MetaSpatial`.
-
-| field | type | description |
-| --- | --- | --- |
-| spacing | Optional[List[float]] | Voxel spacing per axis, length = `ndims`. |
-| origin | Optional[List[float]] | Origin per axis, length = `ndims`. |
-| direction | Optional[List[List[float]]] | Direction matrix, shape `[ndims][ndims]`. |
 
 ### _blosc2
 

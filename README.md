@@ -19,6 +19,11 @@ You can install med-blosc2 via [pip](https://pypi.org/project/med-blosc2/):
 pip install med-blosc2
 ```
 
+To enable the `medblosc2_convert` CLI command, install MedBlosc2 with the necessary extra dependencies:
+```bash
+pip install med-blosc2[all]
+```
+
 ## API
 
 See [API.md](API.md) for the full MedBlosc2 api, including argument
@@ -137,6 +142,24 @@ from med_blosc2 import MedBlosc2
 image = MedBlosc2("sample.mb2nd")
 image.save("manual-chunk-block.mb2nd", patch_size=None,
            chunk_size=(1, 128, 128), block_size=(1, 32, 32))
+```
+
+## CLI
+
+### medblosc2_header
+
+Print the metadata header from a `.mb2nd` or `.b2nd` file.
+
+```bash
+medblosc2_header sample.mb2nd
+```
+
+### medblosc2_convert
+
+Convert a NIfTI or NRRD file to MedBlosc2 and copy metadata.
+
+```bash
+medblosc2_convert sample.nii.gz output.mb2nd
 ```
 
 ## Contributing

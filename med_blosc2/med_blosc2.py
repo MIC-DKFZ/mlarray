@@ -79,7 +79,7 @@ class MedBlosc2:
             meta = Meta()
         self.meta = meta
         self.meta._med_blosc2_version = MED_BLOSC2_VERSION
-        meta_spatial = MetaSpatial(spacing, origin, direction)
+        meta_spatial = MetaSpatial(spacing, origin, direction, self.array.shape)
         meta_spatial._validate_and_cast(self.ndims)
         self.meta.spatial = meta_spatial
         

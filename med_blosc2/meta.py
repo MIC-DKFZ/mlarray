@@ -60,6 +60,7 @@ class MetaSpatial:
     spacing: Optional[List] = None
     origin: Optional[List] = None
     direction: Optional[List[List]] = None
+    shape: Optional[List] = None
 
     def __post_init__(self) -> None:
         self._validate_and_cast()
@@ -72,6 +73,7 @@ class MetaSpatial:
             "spacing": self.spacing,
             "origin": self.origin,
             "direction": self.direction,
+            "shape": self.shape
         }
         if not include_none:
             out = {k: v for k, v in out.items() if v is not None}
@@ -87,12 +89,15 @@ class MetaSpatial:
         if self.direction is not None:
             self.direction = _cast_to_list(self.direction, "meta.spatial.direction")
             _validate_float_int_matrix(self.direction, "meta.spatial.direction", ndims)
+        if self.shape is not None:
+            self.shape = _cast_to_list(self.shape, "meta.spatial.shape")
+            _validate_float_int_list(self.shape, "meta.spatial.shape", ndims)
 
     @classmethod
     def from_dict(cls, d: Mapping[str, Any], *, strict: bool = True) -> MetaSpatial:
         if not isinstance(d, Mapping):
             raise TypeError(f"MetaSpatial.from_dict expects a mapping, got {type(d).__name__}")
-        known = {"spacing", "origin", "direction"}
+        known = {"spacing", "origin", "direction", "shape"}
         d = dict(d)
         unknown = set(d.keys()) - known
         if unknown and strict:
@@ -101,6 +106,7 @@ class MetaSpatial:
             spacing=d.get("spacing"),
             origin=d.get("origin"),
             direction=d.get("direction"),
+            shape=d.get("shape"),
         )
 
 
@@ -475,6 +481,8 @@ class Meta:
                 self.spatial.origin = other.spatial.origin
             if self.spatial.direction is None:
                 self.spatial.direction = other.spatial.direction
+            if self.spatial.shape is None:
+                self.spatial.shape = other.spatial.shape
         if self._blosc2 is None:
             self._blosc2 = other._blosc2
         elif other._blosc2 is not None:

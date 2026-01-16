@@ -30,11 +30,18 @@ dev = [
   "twine>=4.0",
   "setuptools_scm[toml]>=8.0",
 ]
+all = [
+  "medvol",
+]
 
 [project.urls]
 Homepage = "https://github.com/Karol-G/med-blosc2"
 Source = "https://github.com/Karol-G/med-blosc2"
 Issues = "https://github.com/Karol-G/med-blosc2/issues"
+
+[project.scripts]
+medblosc2_header = "med_blosc2.cli:cli_print_header"
+medblosc2_convert = "med_blosc2.cli:cli_convert_to_medblosc2"
 
 [tool.setuptools]
 package-dir = { "" = "." }
