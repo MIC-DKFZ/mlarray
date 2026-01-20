@@ -42,29 +42,32 @@ Below are common usage patterns for loading, saving, and working with metadata.
 
 ```python
 import numpy as np
-from med_blosc2 import MedBlosc2, Meta
+from med_blosc2 import MedBlosc2
 
 array = np.random.random((128, 256, 256)).astype(np.float32)
-image = MedBlosc2(array)
+image = MedBlosc2(array)  # Create MedBlosc2 image
 image.save("sample.mb2nd")
+
+image = MedBlosc2("sample.mb2nd")  # Loads image
 ```
 
-### Memory-mapped loading
+### Memory-mapped usage
 
 ```python
 from med_blosc2 import MedBlosc2
+import numpy as np
 
-image = MedBlosc2("sample.mb2nd", mmap=True)
-# image.array is a blosc2.ndarray.NDArray when mmap=True, otherwise a np.ndarray
-```
+# read-only, partial (default)
+image = MedBlosc2().open("sample.mb2nd", mmap='r')  
+crop = image.array[10:20, 50:60]  # Read crop
 
-### Loading and saving
+# read/write, partial
+image = MedBlosc2().open("sample.mb2nd", mmap='r+')  
+image.array[10:20, 50:60] *= 5  # Modify crop in memory and disk
 
-```python
-from med_blosc2 import MedBlosc2
-
-image = MedBlosc2("sample.mb2nd")
-image.save("copy.mb2nd")
+# read/write, partial, create/overwrite
+image = MedBlosc2().open("sample.mb2nd", shape=(128, 256, 256), dtype=np.float32, mmap='w+')  
+image.array[...] = 5  # Modify image in memory and disk
 ```
 
 ### Metadata inspection and manipulation
@@ -79,7 +82,7 @@ image = MedBlosc2(
     spacing=(1.0, 1.0, 1.5),
     origin=(10.0, 10.0, 30.0),
     direction=[[1, 0, 0], [0, 1, 0], [0, 0, 1]],
-    meta=Meta(image={"patient_id": "123", "modality": "CT"}, is_seg=False),
+    meta={"patient_id": "123", "modality": "CT"},  # Any image metadata (for example raw DICOM metadata)
 )
 
 print(image.spacing)  # [1.0, 1.0, 1.5]
@@ -109,6 +112,26 @@ image = MedBlosc2(
 image.save("copied-metadata.mb2nd")
 ```
 
+### Standardized metadata usage
+
+```python
+import numpy as np
+from med_blosc2 import MedBlosc2, Meta
+
+array = np.random.random((64, 128, 128)).astype(np.float32)
+image = MedBlosc2(
+    array,
+    meta=Meta(image={"patient_id": "123", "modality": "CT"}, is_seg=True),  # Add metadata in a pre-defined format
+)
+
+print(image.meta.image)  # {"patient_id": "123", "modality": "CT"}
+print(image.meta.is_seg)  # True
+
+image.meta.image["study_id"] = "study-001"
+image.meta.is_seg = False
+image.save("with-metadata.mb2nd")
+```
+
 ### Patch size variants
 
 Default patch size (192):
@@ -116,7 +139,8 @@ Default patch size (192):
 from med_blosc2 import MedBlosc2
 
 image = MedBlosc2("sample.mb2nd")
-image.save("default-patch.mb2nd")
+image.save("default-patch.mb2nd")  # Default patch_size is 'default' -> Isotropic patch size of 192 pixels
+image.save("default-patch.mb2nd", patch_size='default')
 ```
 
 Custom isotropic patch size (512):
@@ -140,8 +164,16 @@ Manual chunk/block size:
 from med_blosc2 import MedBlosc2
 
 image = MedBlosc2("sample.mb2nd")
-image.save("manual-chunk-block.mb2nd", patch_size=None,
-           chunk_size=(1, 128, 128), block_size=(1, 32, 32))
+image.save("manual-chunk-block.mb2nd", chunk_size=(1, 128, 128), block_size=(1, 32, 32))
+```
+
+Let Blosc2 itself configure chunk/block size:
+```python
+from med_blosc2 import MedBlosc2
+
+image = MedBlosc2("sample.mb2nd")
+# If patch_size, chunk_size and block_size are all None, Blosc2 will auto-configure chunk and block size
+image.save("manual-chunk-block.mb2nd", patch_size=None)
 ```
 
 ## CLI

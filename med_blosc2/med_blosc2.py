@@ -67,7 +67,7 @@ class MedBlosc2:
             filepath: Union[str, Path],
             shape: Optional[Union[List, Tuple, np.ndarray]] = None,
             dtype: Optional[np.dtype] = None,
-            mmap_mode: str = 'r',
+            mmap: str = 'r',
             patch_size: Optional[Union[int, List, Tuple]] = 'default',  # 'default' means that the default of 192 is used. However, if set to 'default', the patch_size will be skipped if self.patch_size is set from a previously loaded MedBlosc2 image. In that case the self.patch_size is used.
             chunk_size: Optional[Union[int, List, Tuple]]= None,
             block_size: Optional[Union[int, List, Tuple]] = None,
@@ -82,9 +82,9 @@ class MedBlosc2:
             raise RuntimeError("Cannot create a new file as a file exists already under that path. Explicitly set shape and dtype only if you intent to create a new file.")
         if (shape is not None and dtype is None) or (shape is None and dtype is not None):
             raise RuntimeError("Both shape and dtype must be set if you intend to create a new file.")
-        if shape is not None and mmap_mode == 'r':
+        if shape is not None and mmap == 'r':
             raise RuntimeError("mmap_mode cannot be 'r' (read-only) if you intend to write a new file. Explicitly set shape and dtype only if you intent to create a new file.")
-        if mmap_mode not in ('r', 'r+', 'w+', 'c'):
+        if mmap not in ('r', 'r+', 'w+', 'c'):
             raise RuntimeError("mmap_mode must be one of the following: 'r', 'r+', 'w+', 'c'")
         
         create_array = shape is not None
@@ -107,9 +107,9 @@ class MedBlosc2:
             dparams = {'nthreads': num_threads}
         
         if create_array:
-            self.array = blosc2.empty(shape=shape, dtype=dtype, urlpath=str(filepath), chunks=self.meta._blosc2.chunk_size, blocks=self.meta._blosc2.block_size, cparams=cparams, dparams=dparams, meta=metadata, mmap_mode=mmap_mode)
+            self.array = blosc2.empty(shape=shape, dtype=dtype, urlpath=str(filepath), chunks=self.meta._blosc2.chunk_size, blocks=self.meta._blosc2.block_size, cparams=cparams, dparams=dparams, meta=metadata, mmap_mode=mmap)
         else:
-            self.array = blosc2.open(urlpath=str(filepath), dparams=dparams, mmap_mode=mmap_mode)
+            self.array = blosc2.open(urlpath=str(filepath), dparams=dparams, mmap_mode=mmap)
             meta = self._load_meta(self.array, filepath)
             self._validate_and_add_meta(meta)
         if self.meta._has_array == True:

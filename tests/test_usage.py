@@ -32,7 +32,7 @@ class TestUsage(unittest.TestCase):
             MedBlosc2(array).save(path)
 
             loaded = MedBlosc2(array)
-            loaded.open(path, mmap_mode="r")
+            loaded.open(path, mmap="r")
             self.assertFalse(isinstance(loaded.array, np.ndarray))
 
     def test_loading_and_saving(self):

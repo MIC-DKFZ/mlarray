@@ -26,6 +26,7 @@ if __name__ == '__main__':
     print("Loading image...")
     image = MedBlosc2(filepath)
     print(json.dumps(image.meta.to_dict(), indent=2, sort_keys=True))
+    print("Image mean value: ", np.mean(image.to_numpy()))
 
     if Path(filepath).is_file():
         os.remove(filepath)
