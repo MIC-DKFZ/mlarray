@@ -31,7 +31,8 @@ class TestUsage(unittest.TestCase):
             path = Path(tmpdir) / "sample.mb2nd"
             MedBlosc2(array).save(path)
 
-            loaded = MedBlosc2(path, mmap=True)
+            loaded = MedBlosc2(array)
+            loaded.open(path, mmap_mode="r")
             self.assertFalse(isinstance(loaded.array, np.ndarray))
 
     def test_loading_and_saving(self):
