@@ -5,7 +5,7 @@ import math
 from typing import Dict, Optional, Union, List, Tuple
 from pathlib import Path
 import os
-from med_blosc2.meta import Meta, MetaSpatial, MetaBlosc2
+from med_blosc2.meta import Meta, MetaBlosc2
 from med_blosc2.utils import is_serializable
 
 MED_BLOSC2_SUFFIX = "mb2nd"
@@ -14,16 +14,15 @@ MED_BLOSC2_DEFAULT_PATCH_SIZE = 192
 
 
 class MedBlosc2:
-    def __init__(self,
-                 array: Union[np.ndarray, str, Path],
-                 spacing: Optional[Union[List, Tuple, np.ndarray]] = None,
-                 origin: Optional[Union[List, Tuple, np.ndarray]] = None,
-                 direction: Optional[Union[List, Tuple, np.ndarray]] = None,
-                 meta: Optional[Union[Dict, Meta]] = None,
-                 mmap: bool = False,
-                 num_threads: int = 1,
-                 mode: str = 'r',
-                 copy: Optional['MedBlosc2'] = None) -> None:
+    def __init__(
+            self,
+            array: Optional[Union[np.ndarray, str, Path]] = None,
+            spacing: Optional[Union[List, Tuple, np.ndarray]] = None,
+            origin: Optional[Union[List, Tuple, np.ndarray]] = None,
+            direction: Optional[Union[List, Tuple, np.ndarray]] = None,
+            meta: Optional[Union[Dict, Meta]] = None,
+            num_threads: int = 1,
+            copy: Optional['MedBlosc2'] = None) -> None:
         """Initializes a MedBlosc2 instance.
 
         The MedBlosc2 file format (".mb2nd") is a Blosc2-compressed container
@@ -45,8 +44,6 @@ class MedBlosc2:
             meta (Optional[Dict | Meta]): Free-form metadata dictionary or Meta
                 instance. Must be JSON-serializable when saving. 
                 If meta is passed as a Dict, it will internally be converted into a Meta object with the dict being interpreted as meta.image metadata.
-            mmap (bool): Whether to keep the loaded array memory-mapped when
-                loading from disk. If true, MedBlosc2.array will be an blosc2.ndarray.NDArray, else np.ndarray.
             num_threads (int): Number of threads for Blosc2 operations.
             mode (str): Blosc2 open mode
                 - 'r': read-only, must exist (Default)
@@ -54,38 +51,180 @@ class MedBlosc2:
                 - 'w': create, overwrite if it exists (Currently not supported)
             copy (Optional[MedBlosc2]): Another MedBlosc2 instance to copy
                 metadata fields from.
-        """
-        if isinstance(array, (str, Path)) and (spacing is not None or origin is not None or direction is not None or meta is not None or copy is not None):
-            raise RuntimeError("Spacing, origin, direction, meta or copy cannot be set if array is a string to load an image.")
-        
-        if mode != 'r':
-            raise NotImplementedError("Currently 'r' is the only supported blosc2 open mode.")
-        
+        """        
         if isinstance(array, (str, Path)):
-            array, meta = self._load(array, num_threads, mode, mmap)
-            spacing = meta.spatial.spacing
-            origin = meta.spatial.origin
-            direction = meta.spatial.direction
+            array, meta = self.load(array, num_threads)
 
         self.array = array
 
-        # Validate meta: Must be None, a dictionary or a Meta object. Convert to Meta object if necessary.
-        if meta is not None:
-            if not isinstance(meta, (dict, Meta)):
-                raise ValueError("Meta must be None, a dict or a Meta object.")
-            if isinstance(meta, dict):
-                meta = Meta(image=meta)
-        else:
-            meta = Meta()
-        self.meta = meta
-        self.meta._med_blosc2_version = MED_BLOSC2_VERSION
-        meta_spatial = MetaSpatial(spacing, origin, direction, self.array.shape)
-        meta_spatial._validate_and_cast(self.ndims)
-        self.meta.spatial = meta_spatial
+        self._validate_and_add_meta(meta, spacing, origin, direction)
         
-        # If copy is set, copy fields from the other Nifti instance
         if copy is not None:
             self.meta.copy_from(copy.meta)
+
+    def open(
+            self,
+            filepath: Union[str, Path],
+            shape: Optional[Union[List, Tuple, np.ndarray]] = None,
+            dtype: Optional[np.dtype] = None,
+            mmap_mode: str = 'r',
+            patch_size: Optional[Union[int, List, Tuple]] = 'default',  # 'default' means that the default of 192 is used. However, if set to 'default', the patch_size will be skipped if self.patch_size is set from a previously loaded MedBlosc2 image. In that case the self.patch_size is used.
+            chunk_size: Optional[Union[int, List, Tuple]]= None,
+            block_size: Optional[Union[int, List, Tuple]] = None,
+            num_threads: int = 1,
+            cparams: Optional[Dict] = None,
+            dparams: Optional[Dict] = None
+        ):
+        if not str(filepath).endswith(".b2nd") and not str(filepath).endswith(f".{MED_BLOSC2_SUFFIX}"):
+            raise RuntimeError(f"MedBlosc2 requires '.b2nd' or '.{MED_BLOSC2_SUFFIX}' as extension.")
+
+        if Path(filepath).is_file() and (shape is not None or dtype is not None):
+            raise RuntimeError("Cannot create a new file as a file exists already under that path. Explicitly set shape and dtype only if you intent to create a new file.")
+        if (shape is not None and dtype is None) or (shape is None and dtype is not None):
+            raise RuntimeError("Both shape and dtype must be set if you intend to create a new file.")
+        if shape is not None and mmap_mode == 'r':
+            raise RuntimeError("mmap_mode cannot be 'r' (read-only) if you intend to write a new file. Explicitly set shape and dtype only if you intent to create a new file.")
+        if mmap_mode not in ('r', 'r+', 'w+', 'c'):
+            raise RuntimeError("mmap_mode must be one of the following: 'r', 'r+', 'w+', 'c'")
+        
+        create_array = shape is not None
+    
+        if create_array:
+            self.meta._blosc2 = self._comp_and_validate_blosc2_meta(self.meta._blosc2, patch_size, chunk_size, block_size, shape)   
+            self.meta._has_array = True     
+        
+        metadata = None
+        if str(filepath).endswith(f".{MED_BLOSC2_SUFFIX}"):
+            metadata = {"med_blosc2": self.meta.to_dict()}
+
+        if not is_serializable(metadata):
+            raise RuntimeError("Metadata is not serializable.")
+
+        blosc2.set_nthreads(num_threads)
+        if cparams is None:
+            cparams = {'codec': blosc2.Codec.ZSTD, 'clevel': 8,}
+        if dparams is None:
+            dparams = {'nthreads': num_threads}
+        
+        if create_array:
+            self.array = blosc2.empty(shape=shape, dtype=dtype, urlpath=str(filepath), chunks=self.meta._blosc2.chunk_size, blocks=self.meta._blosc2.block_size, cparams=cparams, dparams=dparams, meta=metadata, mmap_mode=mmap_mode)
+        else:
+            self.array = blosc2.open(urlpath=str(filepath), dparams=dparams, mmap_mode=mmap_mode)
+            meta = self._load_meta(self.array, filepath)
+            self._validate_and_add_meta(meta)
+        if self.meta._has_array == True:
+            self.meta._blosc2.chunk_size = self.array.chunks
+            self.meta._blosc2.block_size = self.array.blocks
+        
+    def load(
+            self,
+            filepath: Union[str, Path], 
+            num_threads: int = 1,
+        ):
+        """Loads a Blosc2-compressed file. Both MedBlosc2 ('.mb2nd') and Blosc2 ('.b2nd') files are supported.
+
+        WARNING:
+            MedBlosc2 supports both ".b2nd" and ".mb2nd" files. The MedBlosc2
+            format standard and standardized metadata are honored only for
+            ".mb2nd". For ".b2nd", metadata is ignored when loading.
+
+        Args:
+            filepath (Union[str, Path]): Path to the Blosc2 file to be loaded.
+                The filepath needs to have the extension ".b2nd" or ".mb2nd".
+            num_threads (int): Number of threads to use for loading the file.
+            mode (str): Blosc2 open mode (e.g., "r", "a").
+
+        Returns:
+            Tuple[blosc2.ndarray, dict]: Loaded data and its metadata.
+
+        Raises:
+            RuntimeError: If the file extension is not ".b2nd" or ".mb2nd".
+        """
+        if not str(filepath).endswith(".b2nd") and not str(filepath).endswith(f".{MED_BLOSC2_SUFFIX}"):
+            raise RuntimeError(f"MedBlosc2 requires '.b2nd' or '.{MED_BLOSC2_SUFFIX}' as extension.")
+        blosc2.set_nthreads(num_threads)
+        dparams = {'nthreads': num_threads}
+        array = blosc2.open(urlpath=str(filepath), cdparams=dparams, mode='r')
+        meta = self._load_meta(array, filepath)
+        if meta._has_array == True:
+            meta._blosc2.chunk_size = list(array.chunks)
+            meta._blosc2.block_size = list(array.blocks)
+        array = array[...]
+        return array, meta
+
+    def save(
+            self,
+            filepath: Union[str, Path],
+            patch_size: Optional[Union[int, List, Tuple]] = 'default',  # 'default' means that the default of 192 is used. However, if set to 'default', the patch_size will be skipped if self.patch_size is set from a previously loaded MedBlosc2 image. In that case the self.patch_size is used.
+            chunk_size: Optional[Union[int, List, Tuple]]= None,
+            block_size: Optional[Union[int, List, Tuple]] = None,
+            num_threads: int = 1,
+            cparams: Optional[Dict] = None,
+            dparams: Optional[Dict] = None
+        ):
+        """Saves the array to a Blosc2-compressed file. Both MedBlosc2 ('.mb2nd') and Blosc2 ('.b2nd') files are supported.
+
+        WARNING:
+            MedBlosc2 supports both ".b2nd" and ".mb2nd" files. The MedBlosc2
+            format standard and standardized metadata are honored only for
+            ".mb2nd". For ".b2nd", metadata is ignored when saving.
+
+        Args:
+            filepath (Union[str, Path]): Path to save the file. Must end with
+                ".b2nd" or ".mb2nd".
+            patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
+                chunk/block optimization. Provide an int for isotropic sizes or
+                a list/tuple with length equal to the number of dimensions.
+                Use "default" to use the default patch size of 192.
+            chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
+                Provide an int or a tuple/list with length equal to the number
+                of dimensions, or None to let Blosc2 decide. Ignored when
+                patch_size is not None.
+            block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
+                Provide an int or a tuple/list with length equal to the number
+                of dimensions, or None to let Blosc2 decide. Ignored when
+                patch_size is not None.
+            num_threads (int): Number of threads to use for saving the file.
+
+        Raises:
+            RuntimeError: If the file extension is not ".b2nd" or ".mb2nd".
+        """
+        if not str(filepath).endswith(".b2nd") and not str(filepath).endswith(f".{MED_BLOSC2_SUFFIX}"):
+            raise RuntimeError(f"MedBlosc2 requires '.b2nd' or '.{MED_BLOSC2_SUFFIX}' as extension.")
+    
+        if self.array is not None:
+            self.meta._blosc2 = self._comp_and_validate_blosc2_meta(self.meta._blosc2, patch_size, chunk_size, block_size, self.array.shape)
+            self.meta._has_array = True
+        else:
+            self.meta._has_array = False
+        
+        metadata = None
+        if str(filepath).endswith(f".{MED_BLOSC2_SUFFIX}"):
+            metadata = {"med_blosc2": self.meta.to_dict()}
+
+        if not is_serializable(metadata):
+            raise RuntimeError("Metadata is not serializable.")
+
+        blosc2.set_nthreads(num_threads)
+        if cparams is None:
+            cparams = {'codec': blosc2.Codec.ZSTD, 'clevel': 8,}
+        if dparams is None:
+            dparams = {'nthreads': num_threads}
+        
+        if self.array is not None:
+            array = np.ascontiguousarray(self.array[...])
+            self.array = blosc2.asarray(array, urlpath=str(filepath), chunks=self.meta._blosc2.chunk_size, blocks=self.meta._blosc2.block_size, cparams=cparams, dparams=dparams, meta=metadata)
+        else:
+            array = np.empty((0,))
+            self.array = blosc2.asarray(array, urlpath=str(filepath), chunks=self.meta._blosc2.chunk_size, blocks=self.meta._blosc2.block_size, cparams=cparams, dparams=dparams, meta=metadata)
+        if self.meta._has_array == True:
+            self.meta._blosc2.chunk_size = self.array.chunks
+            self.meta._blosc2.block_size = self.array.blocks
+
+    def to_numpy(self):
+        if self.array is None or self.meta._has_array == False:
+            return None
+        return self.array[...]
 
     @property
     def spacing(self):
@@ -123,6 +262,8 @@ class MedBlosc2:
         Returns:
             list: Affine matrix with shape (ndims + 1, ndims + 1).
         """
+        if self.array is None or self.meta._has_array == False:
+            return None
         spacing  = np.array(self.spacing) if self.spacing is not None else np.ones(self.ndims)
         origin  = np.array(self.origin) if self.origin is not None else np.zeros(self.ndims)
         direction = np.array(self.direction) if self.direction is not None else np.eye(self.ndims)
@@ -139,6 +280,8 @@ class MedBlosc2:
             list: Translation vector with length equal to the number of
             dimensions.
         """
+        if self.array is None or self.meta._has_array == False:
+            return None
         return np.array(self.affine)[:-1, -1].tolist()
 
     @property
@@ -149,6 +292,8 @@ class MedBlosc2:
             list: Scaling factors per axis with length equal to the number of
             dimensions.
         """
+        if self.array is None or self.meta._has_array == False:
+            return None
         scales = np.linalg.norm(np.array(self.affine)[:-1, :-1], axis=0)
         return scales.tolist()
 
@@ -159,6 +304,8 @@ class MedBlosc2:
         Returns:
             list: Rotation matrix with shape (ndims, ndims).
         """
+        if self.array is None or self.meta._has_array == False:
+            return None
         rotation_matrix = np.array(self.affine)[:-1, :-1] / np.array(self.scale)
         return rotation_matrix.tolist()
 
@@ -169,6 +316,8 @@ class MedBlosc2:
         Returns:
             list: Shear matrix with shape (ndims, ndims).
         """
+        if self.array is None or self.meta._has_array == False:
+            return None
         scales = np.array(self.scale)
         rotation_matrix = np.array(self.rotation)
         shearing_matrix = np.dot(rotation_matrix.T, np.array(self.affine)[:-1, :-1]) / scales[:, None]
@@ -181,6 +330,8 @@ class MedBlosc2:
         Returns:
             tuple: Shape of the underlying array.
         """
+        if self.array is None or self.meta._has_array == False:
+            return None
         return self.array.shape
     
     @property
@@ -190,127 +341,9 @@ class MedBlosc2:
         Returns:
             int: Number of dimensions of the image (2D, 3D, or 4D).
         """
+        if self.array is None or self.meta._has_array == False:
+            return None
         return len(self.array.shape)
-
-    def _load(
-            self,
-            filepath: Union[str, Path], 
-            num_threads: int = 1,
-            mode: str = 'r',
-            mmap: bool = False
-        ):
-        """Loads a Blosc2-compressed file. Both MedBlosc2 ('.mb2nd') and Blosc2 ('.b2nd') files are supported.
-
-        WARNING:
-            MedBlosc2 supports both ".b2nd" and ".mb2nd" files. The MedBlosc2
-            format standard and standardized metadata are honored only for
-            ".mb2nd". For ".b2nd", metadata is ignored when loading.
-
-        Args:
-            filepath (Union[str, Path]): Path to the Blosc2 file to be loaded.
-                The filepath needs to have the extension ".b2nd" or ".mb2nd".
-            num_threads (int): Number of threads to use for loading the file.
-            mode (str): Blosc2 open mode (e.g., "r", "a").
-            mmap (bool): Whether to keep the array memory-mapped.
-
-        Returns:
-            Tuple[blosc2.ndarray, dict]: Loaded data and its metadata.
-
-        Raises:
-            RuntimeError: If the file extension is not ".b2nd" or ".mb2nd".
-        """
-        if not str(filepath).endswith(".b2nd") and not str(filepath).endswith(f".{MED_BLOSC2_SUFFIX}"):
-            raise RuntimeError(f"MedBlosc2 requires '.b2nd' or '.{MED_BLOSC2_SUFFIX}' as extension.")
-        blosc2.set_nthreads(num_threads)
-        dparams = {'nthreads': num_threads}
-        array = blosc2.open(urlpath=str(filepath), dparams=dparams, mode=mode, mmap_mode=mode)
-        blosc2_metadata = dict(array.schunk.meta)
-        meta = Meta()
-        if str(filepath).endswith(f".{MED_BLOSC2_SUFFIX}"):
-            if "med_blosc2" not in blosc2_metadata:
-                raise RuntimeError(f"The header of the .{MED_BLOSC2_SUFFIX} is missing the 'med_blosc2' attribute.")
-            meta = Meta.from_dict(blosc2_metadata["med_blosc2"])
-        if not mmap:
-            array = array[...]
-        return array, meta
-
-    def save(
-            self,
-            filepath: Union[str, Path],
-            patch_size: Optional[Union[int, List, Tuple]] = 'default',  # 'default' means that the default of 192 is used. However, if set to 'default', the patch_size will be skipped if self.patch_size is set from a previously loaded MedBlosc2 image. In that case the self.patch_size is used.
-            chunk_size: Optional[Union[int, List, Tuple]]= None,
-            block_size: Optional[Union[int, List, Tuple]] = None,
-            clevel: int = 8,
-            codec: blosc2.Codec = blosc2.Codec.ZSTD,
-            num_threads: int = 1
-        ):
-        """Saves the array to a Blosc2-compressed file. Both MedBlosc2 ('.mb2nd') and Blosc2 ('.b2nd') files are supported.
-
-        WARNING:
-            MedBlosc2 supports both ".b2nd" and ".mb2nd" files. The MedBlosc2
-            format standard and standardized metadata are honored only for
-            ".mb2nd". For ".b2nd", metadata is ignored when saving.
-
-        Args:
-            filepath (Union[str, Path]): Path to save the file. Must end with
-                ".b2nd" or ".mb2nd".
-            patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
-                chunk/block optimization. Provide an int for isotropic sizes or
-                a list/tuple with length equal to the number of dimensions.
-                Use "default" to use the default patch size of 192.
-            chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
-                Provide an int or a tuple/list with length equal to the number
-                of dimensions, or None to let Blosc2 decide. Ignored when
-                patch_size is not None.
-            block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
-                Provide an int or a tuple/list with length equal to the number
-                of dimensions, or None to let Blosc2 decide. Ignored when
-                patch_size is not None.
-            clevel (int): Compression level from 0 (no compression) to 9
-                (maximum compression).
-            codec (blosc2.Codec): Compression codec to use.
-            num_threads (int): Number of threads to use for saving the file.
-
-        Raises:
-            RuntimeError: If the file extension is not ".b2nd" or ".mb2nd".
-        """
-        if not str(filepath).endswith(".b2nd") and not str(filepath).endswith(f".{MED_BLOSC2_SUFFIX}"):
-            raise RuntimeError(f"MedBlosc2 requires '.b2nd' or '.{MED_BLOSC2_SUFFIX}' as extension.")
-        blosc2.set_nthreads(num_threads)
-        dparams = {'nthreads': num_threads}
-
-        if patch_size is not None and patch_size != "default" and (self.ndims == 1 or self.ndims > 3):
-            raise NotImplementedError("Chunk and block size optimization based on patch size is only implemented for 2D and 3D images. Please set the chunk and block size manually or set to None for blosc2 to determine a chunk and block size.")
-        if patch_size is not None and patch_size != "default" and (chunk_size is not None or block_size is not None):
-            raise RuntimeError("patch_size and chunk_size / block_size cannot both be explicitly set.")
-
-        if patch_size == "default": 
-            if self.meta._blosc2.patch_size is not None:  # Use previously loaded patch size, when patch size is not explicitly set and a patch size from a previously loaded image exists
-                patch_size = self.meta._blosc2.patch_size
-            else:  # Use default patch size, when patch size is not explicitly set and no patch size from a previously loaded image exists
-                patch_size = [MED_BLOSC2_DEFAULT_PATCH_SIZE] * self.ndims
-
-        patch_size = [patch_size] * self.ndims if isinstance(patch_size, int) else patch_size
-
-        if patch_size is not None:
-            chunk_size, block_size = self.comp_blosc2_params(self.array.shape, patch_size)
-
-        meta_blosc2 = MetaBlosc2(chunk_size, block_size, patch_size)
-        meta_blosc2._validate_and_cast(self.ndims)
-        self.meta._blosc2 = meta_blosc2
-        
-        metadata = None
-        if str(filepath).endswith(f".{MED_BLOSC2_SUFFIX}"):
-            metadata = {"med_blosc2": self.meta.to_dict()}
-
-        if not is_serializable(metadata):
-            raise RuntimeError("Metadata is not serializable.")
-
-        cparams = {'codec': codec, 'clevel': clevel,}
-        self.array = np.ascontiguousarray(self.array[...])  # Needs to overwrite self.array to ensure there is no opened blosc2 overwriting itself
-        if Path(filepath).is_file():
-            os.remove(str(filepath))
-        blosc2.asarray(self.array, urlpath=str(filepath), chunks=self.meta._blosc2.chunk_size, blocks=self.meta._blosc2.block_size, cparams=cparams, dparams=dparams, mmap_mode='w+', meta=metadata)
 
     def comp_blosc2_params(
             self,
@@ -425,3 +458,53 @@ class MedBlosc2:
         chunk_size = chunk_size[num_squeezes:]
 
         return [int(value) for value in chunk_size], [int(value) for value in block_size]
+    
+
+    def _comp_and_validate_blosc2_meta(self, meta_blosc2, patch_size, chunk_size, block_size, shape):
+        if patch_size is not None and patch_size != "default" and (len(shape) == 1 or len(shape) > 3):
+            raise NotImplementedError("Chunk and block size optimization based on patch size is only implemented for 2D and 3D images. Please set the chunk and block size manually or set to None for blosc2 to determine a chunk and block size.")
+        if patch_size is not None and patch_size != "default" and (chunk_size is not None or block_size is not None):
+            raise RuntimeError("patch_size and chunk_size / block_size cannot both be explicitly set.")
+
+        if patch_size == "default": 
+            if meta_blosc2 is not None and meta_blosc2.patch_size is not None:  # Use previously loaded patch size, when patch size is not explicitly set and a patch size from a previously loaded image exists
+                patch_size = meta_blosc2.patch_size
+            else:  # Use default patch size, when patch size is not explicitly set and no patch size from a previously loaded image exists
+                patch_size = [MED_BLOSC2_DEFAULT_PATCH_SIZE] * len(shape)
+
+        patch_size = [patch_size] * len(shape) if isinstance(patch_size, int) else patch_size
+
+        if patch_size is not None:
+            chunk_size, block_size = self.comp_blosc2_params(shape, patch_size)
+
+        meta_blosc2 = MetaBlosc2(chunk_size, block_size, patch_size)
+        meta_blosc2._validate_and_cast(len(shape))
+        return meta_blosc2
+    
+    def _load_meta(self, filehandle, filepath):
+        blosc2_metadata = dict(filehandle.schunk.meta)
+        meta = Meta()
+        if str(filepath).endswith(f".{MED_BLOSC2_SUFFIX}"):
+            if "med_blosc2" not in blosc2_metadata:
+                raise RuntimeError(f"The header of the .{MED_BLOSC2_SUFFIX} is missing the 'med_blosc2' attribute.")
+            meta = Meta.from_dict(blosc2_metadata["med_blosc2"])
+        return meta
+    
+    def _validate_and_add_meta(self, meta, spacing=None, origin=None, direction=None):
+        if meta is not None:
+            if not isinstance(meta, (dict, Meta)):
+                raise ValueError("Meta must be None, a dict or a Meta object.")
+            if isinstance(meta, dict):
+                meta = Meta(image=meta)
+        else:
+            meta = Meta()
+        self.meta = meta
+        self.meta._med_blosc2_version = MED_BLOSC2_VERSION
+        if spacing is not None:
+            self.meta.spatial.spacing = spacing
+        if origin is not None:
+            self.meta.spatial.origin = origin
+        if direction is not None:
+            self.meta.spatial.direction = direction
+        self.meta.spatial.shape = self.shape
+        self.meta.spatial._validate_and_cast(self.ndims)

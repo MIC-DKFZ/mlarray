@@ -6,7 +6,7 @@ from med_blosc2 import MedBlosc2
 
 try:
     from medvol import MedVol
-except:
+except ImportError:
     MedVol = None
 
 
@@ -24,6 +24,8 @@ def print_header(filepath: Union[str, Path]) -> None:
 
 
 def convert_to_medblosc2(load_filepath: Union[str, Path], save_filepath: Union[str, Path]):
+    if MedVol is None:
+        raise RuntimeError("medvol is required for medblosc2_convert; install with 'pip install med-blosc2[all]'.")
     image_medvol = MedVol(load_filepath)
     image_medblosc2 = MedBlosc2(image_medvol.array, spacing=image_medvol.spacing, origin=image_medvol.origin, direction=image_medvol.direction, meta=image_medvol.header)
     image_medblosc2.save(save_filepath)
