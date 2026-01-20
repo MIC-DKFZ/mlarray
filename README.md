@@ -67,7 +67,7 @@ image.array[10:20, 50:60] *= 5  # Modify crop in memory and disk
 
 # read/write, partial access, create/overwrite
 image = MedBlosc2().open("sample.mb2nd", shape=(128, 256, 256), dtype=np.float32, mmap='w+')  
-image.array[...] = 5  # Modify image in memory and disk
+image.array[...] = np.random.random((128, 256, 256)).astype(np.float32)  # Modify image in memory and disk
 ```
 
 ### Metadata inspection and manipulation
