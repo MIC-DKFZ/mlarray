@@ -44,7 +44,7 @@ Below are common usage patterns for loading, saving, and working with metadata.
 import numpy as np
 from med_blosc2 import MedBlosc2
 
-array = np.random.random((128, 256, 256)).astype(np.float32)
+array = np.random.random((128, 256, 256))
 image = MedBlosc2(array)  # Create MedBlosc2 image
 image.save("sample.mb2nd")
 
@@ -66,8 +66,9 @@ image = MedBlosc2().open("sample.mb2nd", mmap='r+')
 image.array[10:20, 50:60] *= 5  # Modify crop in memory and disk
 
 # read/write, partial access, create/overwrite
-image = MedBlosc2().open("sample.mb2nd", shape=(128, 256, 256), dtype=np.float32, mmap='w+')  
-image.array[...] = np.random.random((128, 256, 256)).astype(np.float32)  # Modify image in memory and disk
+array = np.random.random((128, 256, 256))
+image = MedBlosc2().open("sample.mb2nd", shape=array.shape, dtype=array.dtype, mmap='w+')  
+image.array[...] = array  # Modify image in memory and disk
 ```
 
 ### Metadata inspection and manipulation
@@ -76,7 +77,7 @@ image.array[...] = np.random.random((128, 256, 256)).astype(np.float32)  # Modif
 import numpy as np
 from med_blosc2 import MedBlosc2
 
-array = np.random.random((64, 128, 128)).astype(np.float32)
+array = np.random.random((64, 128, 128))
 image = MedBlosc2(
     array,
     spacing=(1.0, 1.0, 1.5),
@@ -101,7 +102,7 @@ import numpy as np
 from med_blosc2 import MedBlosc2
 
 base = MedBlosc2("sample.mb2nd")
-array = np.random.random(base.shape).astype(np.float32)
+array = np.random.random(base.shape)
 
 image = MedBlosc2(
     array,
@@ -118,7 +119,7 @@ image.save("copied-metadata.mb2nd")
 import numpy as np
 from med_blosc2 import MedBlosc2, Meta
 
-array = np.random.random((64, 128, 128)).astype(np.float32)
+array = np.random.random((64, 128, 128))
 image = MedBlosc2(
     array,
     meta=Meta(image={"patient_id": "123", "modality": "CT"}, is_seg=True),  # Add metadata in a pre-defined format
