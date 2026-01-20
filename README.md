@@ -57,15 +57,15 @@ image = MedBlosc2("sample.mb2nd")  # Loads image
 from med_blosc2 import MedBlosc2
 import numpy as np
 
-# read-only, partial (default)
+# read-only, partial access (default)
 image = MedBlosc2().open("sample.mb2nd", mmap='r')  
 crop = image.array[10:20, 50:60]  # Read crop
 
-# read/write, partial
+# read/write, partial access
 image = MedBlosc2().open("sample.mb2nd", mmap='r+')  
 image.array[10:20, 50:60] *= 5  # Modify crop in memory and disk
 
-# read/write, partial, create/overwrite
+# read/write, partial access, create/overwrite
 image = MedBlosc2().open("sample.mb2nd", shape=(128, 256, 256), dtype=np.float32, mmap='w+')  
 image.array[...] = 5  # Modify image in memory and disk
 ```
