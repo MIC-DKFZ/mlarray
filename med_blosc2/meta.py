@@ -474,7 +474,7 @@ class Meta:
             is_seg=d.get("is_seg"),
             spatial=spatial,
             _has_array=d.get("_has_array"),
-            _image_meta_format=d.get("_image_meta_format",)
+            _image_meta_format=d.get("_image_meta_format",),
             _blosc2=_blosc2,
             _med_blosc2_version=d.get("_med_blosc2_version"),            
             extra=extra,
