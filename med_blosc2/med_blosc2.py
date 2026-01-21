@@ -221,7 +221,7 @@ class MedBlosc2:
             self.meta._blosc2.chunk_size = list(self._store.chunks)
             self.meta._blosc2.block_size = list(self._store.blocks)
         self.mmap = None
-        self._write_metadata()
+        self._write_metadata(force=True)
 
     def to_numpy(self):
         if self._store is None or self.meta._has_array == False:
@@ -520,8 +520,8 @@ class MedBlosc2:
             meta = Meta.from_dict(meta)
         self._validate_and_add_meta(meta)
 
-    def _write_metadata(self):
-        if self.support_metadata and isinstance(self._store, blosc2.ndarray.NDArray) and self.mmap in ('r+', 'w+'):
+    def _write_metadata(self, force=False):
+        if self.support_metadata and isinstance(self._store, blosc2.ndarray.NDArray) and (self.mmap in ('r+', 'w+') or force):
             metadata = self.meta.to_dict()
             if not is_serializable(metadata):
                 raise RuntimeError("Metadata is not serializable.")
