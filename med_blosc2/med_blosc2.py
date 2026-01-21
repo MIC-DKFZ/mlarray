@@ -51,13 +51,15 @@ class MedBlosc2:
                 - 'w': create, overwrite if it exists (Currently not supported)
             copy (Optional[MedBlosc2]): Another MedBlosc2 instance to copy
                 metadata fields from.
-        """        
+        """    
+        self.filepath = None
+        self.support_metadata = None   
+        self.mmap = None
         if isinstance(array, (str, Path)):
-            array, meta = self.load(array, num_threads)
-
-        self._store = array
-
-        self._validate_and_add_meta(meta, spacing, origin, direction)
+            self.load(array, num_threads)
+        else:
+            self._store = array
+            self._validate_and_add_meta(meta, spacing, origin, direction)
         
         if copy is not None:
             self.meta.copy_from(copy.meta)
@@ -75,6 +77,7 @@ class MedBlosc2:
             cparams: Optional[Dict] = None,
             dparams: Optional[Dict] = None
         ):
+        self.filepath = str(filepath)
         if not str(filepath).endswith(".b2nd") and not str(filepath).endswith(f".{MED_BLOSC2_SUFFIX}"):
             raise RuntimeError(f"MedBlosc2 requires '.b2nd' or '.{MED_BLOSC2_SUFFIX}' as extension.")
 
@@ -93,12 +96,7 @@ class MedBlosc2:
             self.meta._blosc2 = self._comp_and_validate_blosc2_meta(self.meta._blosc2, patch_size, chunk_size, block_size, shape)   
             self.meta._has_array = True     
         
-        metadata = None
-        if str(filepath).endswith(f".{MED_BLOSC2_SUFFIX}"):
-            metadata = {"med_blosc2": self.meta.to_dict()}
-
-        if not is_serializable(metadata):
-            raise RuntimeError("Metadata is not serializable.")
+        self.support_metadata = str(filepath).endswith(f".{MED_BLOSC2_SUFFIX}")
 
         blosc2.set_nthreads(num_threads)
         if cparams is None:
@@ -107,14 +105,20 @@ class MedBlosc2:
             dparams = {'nthreads': num_threads}
         
         if create_array:
-            self._store = blosc2.empty(shape=shape, dtype=dtype, urlpath=str(filepath), chunks=self.meta._blosc2.chunk_size, blocks=self.meta._blosc2.block_size, cparams=cparams, dparams=dparams, meta=metadata, mmap_mode=mmap)
+            self._store = blosc2.empty(shape=shape, dtype=dtype, urlpath=str(filepath), chunks=self.meta._blosc2.chunk_size, blocks=self.meta._blosc2.block_size, cparams=cparams, dparams=dparams, mmap_mode=mmap)
         else:
             self._store = blosc2.open(urlpath=str(filepath), dparams=dparams, mmap_mode=mmap)
-            meta = self._load_meta(self._store, filepath)
-            self._validate_and_add_meta(meta)
+            self._read_meta()
         if self.meta._has_array == True:
-            self.meta._blosc2.chunk_size = self._store.chunks
-            self.meta._blosc2.block_size = self._store.blocks
+            self.meta._blosc2.chunk_size = list(self._store.chunks)
+            self.meta._blosc2.block_size = list(self._store.blocks)
+        self.mmap = mmap
+        self._write_metadata()
+
+    def close(self):
+        self._write_metadata()
+        self._store = None
+        self.mmap = None
         
     def load(
             self,
@@ -140,17 +144,18 @@ class MedBlosc2:
         Raises:
             RuntimeError: If the file extension is not ".b2nd" or ".mb2nd".
         """
+        self.filepath = str(filepath)
         if not str(filepath).endswith(".b2nd") and not str(filepath).endswith(f".{MED_BLOSC2_SUFFIX}"):
             raise RuntimeError(f"MedBlosc2 requires '.b2nd' or '.{MED_BLOSC2_SUFFIX}' as extension.")
+        self.support_metadata = str(filepath).endswith(f".{MED_BLOSC2_SUFFIX}")
         blosc2.set_nthreads(num_threads)
         dparams = {'nthreads': num_threads}
-        array = blosc2.open(urlpath=str(filepath), cdparams=dparams, mode='r')
-        meta = self._load_meta(array, filepath)
-        if meta._has_array == True:
-            meta._blosc2.chunk_size = list(array.chunks)
-            meta._blosc2.block_size = list(array.blocks)
-        array = array[...]
-        return array, meta
+        self._store = blosc2.open(urlpath=str(filepath), cdparams=dparams, mode='r')
+        self.mmap = None
+        self._read_meta()        
+        if self.meta._has_array == True:
+            self.meta._blosc2.chunk_size = list(self._store.chunks)
+            self.meta._blosc2.block_size = list(self._store.blocks)
 
     def save(
             self,
@@ -197,13 +202,8 @@ class MedBlosc2:
             self.meta._has_array = True
         else:
             self.meta._has_array = False
-        
-        metadata = None
-        if str(filepath).endswith(f".{MED_BLOSC2_SUFFIX}"):
-            metadata = {"med_blosc2": self.meta.to_dict()}
-
-        if not is_serializable(metadata):
-            raise RuntimeError("Metadata is not serializable.")
+    
+        self.support_metadata = str(filepath).endswith(f".{MED_BLOSC2_SUFFIX}")
 
         blosc2.set_nthreads(num_threads)
         if cparams is None:
@@ -213,13 +213,15 @@ class MedBlosc2:
         
         if self._store is not None:
             array = np.ascontiguousarray(self._store[...])
-            self._store = blosc2.asarray(array, urlpath=str(filepath), chunks=self.meta._blosc2.chunk_size, blocks=self.meta._blosc2.block_size, cparams=cparams, dparams=dparams, meta=metadata)
+            self._store = blosc2.asarray(array, urlpath=str(filepath), chunks=self.meta._blosc2.chunk_size, blocks=self.meta._blosc2.block_size, cparams=cparams, dparams=dparams)
         else:
             array = np.empty((0,))
-            self._store = blosc2.asarray(array, urlpath=str(filepath), chunks=self.meta._blosc2.chunk_size, blocks=self.meta._blosc2.block_size, cparams=cparams, dparams=dparams, meta=metadata)
+            self._store = blosc2.asarray(array, urlpath=str(filepath), chunks=self.meta._blosc2.chunk_size, blocks=self.meta._blosc2.block_size, cparams=cparams, dparams=dparams)
         if self.meta._has_array == True:
-            self.meta._blosc2.chunk_size = self._store.chunks
-            self.meta._blosc2.block_size = self._store.blocks
+            self.meta._blosc2.chunk_size = list(self._store.chunks)
+            self.meta._blosc2.block_size = list(self._store.blocks)
+        self.mmap = None
+        self._write_metadata()
 
     def to_numpy(self):
         if self._store is None or self.meta._has_array == False:
@@ -490,7 +492,6 @@ class MedBlosc2:
 
         return [int(value) for value in chunk_size], [int(value) for value in block_size]
     
-
     def _comp_and_validate_blosc2_meta(self, meta_blosc2, patch_size, chunk_size, block_size, shape):
         if patch_size is not None and patch_size != "default" and (len(shape) == 1 or len(shape) > 3):
             raise NotImplementedError("Chunk and block size optimization based on patch size is only implemented for 2D and 3D images. Please set the chunk and block size manually or set to None for blosc2 to determine a chunk and block size.")
@@ -512,14 +513,19 @@ class MedBlosc2:
         meta_blosc2._validate_and_cast(len(shape))
         return meta_blosc2
     
-    def _load_meta(self, filehandle, filepath):
-        blosc2_metadata = dict(filehandle.schunk.meta)
+    def _read_meta(self):
         meta = Meta()
-        if str(filepath).endswith(f".{MED_BLOSC2_SUFFIX}"):
-            if "med_blosc2" not in blosc2_metadata:
-                raise RuntimeError(f"The header of the .{MED_BLOSC2_SUFFIX} is missing the 'med_blosc2' attribute.")
-            meta = Meta.from_dict(blosc2_metadata["med_blosc2"])
-        return meta
+        if self.support_metadata and isinstance(self._store, blosc2.ndarray.NDArray):
+            meta = self._store.vlmeta["med_blosc2"]
+            meta = Meta.from_dict(meta)
+        self._validate_and_add_meta(meta)
+
+    def _write_metadata(self):
+        if self.support_metadata and isinstance(self._store, blosc2.ndarray.NDArray) and self.mmap in ('r+', 'w+'):
+            metadata = self.meta.to_dict()
+            if not is_serializable(metadata):
+                raise RuntimeError("Metadata is not serializable.")
+            self._store.vlmeta["med_blosc2"] = metadata
     
     def _validate_and_add_meta(self, meta, spacing=None, origin=None, direction=None):
         if meta is not None:
@@ -539,3 +545,4 @@ class MedBlosc2:
             self.meta.spatial.direction = direction
         self.meta.spatial.shape = self.shape
         self.meta.spatial._validate_and_cast(self.ndim)
+

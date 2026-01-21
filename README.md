@@ -93,6 +93,11 @@ print(image.meta.image)  # {"patient_id": "123", "modality": "CT"}
 image.spacing[1] = 5.3
 image.meta.image["study_id"] = "study-001"
 image.save("with-metadata.mb2nd")
+
+# Open memory-mapped
+image = MedBlosc2().open("with-metadata.mb2nd", mmap='r+')  
+image.meta.image["study_id"] = "new-study"  # Modify metadata
+image.close()  # Close and save metadata, only necessary to save modified metadata
 ```
 
 ### Copy metadata with overrides

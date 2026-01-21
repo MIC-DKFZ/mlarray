@@ -260,6 +260,7 @@ class Meta:
     is_seg: Optional[bool] = None
     _blosc2: MetaBlosc2 = field(default_factory=MetaBlosc2)
     _has_array: Optional[bool] = None
+    _image_meta_format: Optional[str] = None
     _med_blosc2_version: Optional[str] = None
 
     # controlled escape hatch for future/experimental metadata
@@ -303,6 +304,8 @@ class Meta:
             raise TypeError("meta.is_seg must be a bool or None")
         if self._has_array is not None and not isinstance(self._has_array, bool):
             raise TypeError("meta._has_array must be a bool or None")
+        if self._image_meta_format is not None and not isinstance(self._image_meta_format, str):
+            raise TypeError("meta._image_meta_format must be a str or None")
         if self._med_blosc2_version is not None and not isinstance(self._med_blosc2_version, str):
             raise TypeError("meta._med_blosc2_version must be a str or None")
 
@@ -365,6 +368,11 @@ class Meta:
                 raise TypeError("meta._has_array must be a bool or None")
             setattr(self, key, value)
             return
+        if key == "_image_meta_format":
+            if value is not None and not isinstance(value, bool):
+                raise TypeError("meta._image_meta_format must be a bool or None")
+            setattr(self, key, value)
+            return
         if key == "_med_blosc2_version":
             if value is not None and not isinstance(value, str):
                 raise TypeError("meta._med_blosc2_version must be a str or None")
@@ -390,6 +398,7 @@ class Meta:
             "is_seg": self.is_seg,
             "spatial": self.spatial.to_dict(),
             "_has_array": self._has_array,
+            "_image_meta_format": self._image_meta_format,
             "_blosc2": self._blosc2.to_dict(),
             "_med_blosc2_version": self._med_blosc2_version,
             "extra": self.extra,
@@ -422,7 +431,7 @@ class Meta:
         if not isinstance(d, Mapping):
             raise TypeError(f"from_dict expects a mapping, got {type(d).__name__}")
 
-        known = {"image", "stats", "bbox", "spatial", "_has_array", "_blosc2", "_med_blosc2_version", "is_seg", "extra"}
+        known = {"image", "stats", "bbox", "spatial", "_has_array", "_image_meta_format", "_blosc2", "_med_blosc2_version", "is_seg", "extra"}
         d = dict(d)
         unknown = set(d.keys()) - known
 
@@ -465,6 +474,7 @@ class Meta:
             is_seg=d.get("is_seg"),
             spatial=spatial,
             _has_array=d.get("_has_array"),
+            _image_meta_format=d.get("_image_meta_format",)
             _blosc2=_blosc2,
             _med_blosc2_version=d.get("_med_blosc2_version"),            
             extra=extra,
@@ -495,6 +505,8 @@ class Meta:
                 self.spatial.shape = other.spatial.shape
         if self._has_array is not None:
             self._has_array = other._has_array
+        if self._image_meta_format is not None:
+            self._image_meta_format = other._image_meta_format
         if self._blosc2 is None:
             self._blosc2 = other._blosc2
         elif other._blosc2 is not None:

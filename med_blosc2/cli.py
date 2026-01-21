@@ -26,8 +26,14 @@ def print_header(filepath: Union[str, Path]) -> None:
 def convert_to_medblosc2(load_filepath: Union[str, Path], save_filepath: Union[str, Path]):
     if MedVol is None:
         raise RuntimeError("medvol is required for medblosc2_convert; install with 'pip install med-blosc2[all]'.")
+    image_meta_format = None
+    if str(load_filepath).endswith(f".nii.gz") or str(load_filepath).endswith(f".nii"):
+        image_meta_format = "nifti"
+    elif str(load_filepath).endswith(f".nrrd"):
+        image_meta_format = "nrrd"
     image_medvol = MedVol(load_filepath)
     image_medblosc2 = MedBlosc2(image_medvol.array, spacing=image_medvol.spacing, origin=image_medvol.origin, direction=image_medvol.direction, meta=image_medvol.header)
+    image_medblosc2.meta._image_meta_format = image_meta_format
     image_medblosc2.save(save_filepath)
 
 

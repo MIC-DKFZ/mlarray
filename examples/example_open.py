@@ -23,6 +23,8 @@ if __name__ == '__main__':
     image.open(filepath, shape=array.shape, dtype=array.dtype, mmap='w+')
     print("Saving image...")
     image[...] = array
+    image.meta.is_seg = True
+    image.close()
 
     print("Loading image...")
     image = MedBlosc2()
