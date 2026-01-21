@@ -7,7 +7,8 @@ import json
 
 if __name__ == '__main__':
     print("Creating array...")
-    array = np.random.random((32, 64, 64))
+    array = np.random.random((32, 64, 64, 3))
+    channel_axis = 3
     spacing = np.array((2, 2.5, 4))
     origin = (1, 1, 1)
     direction = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
@@ -19,13 +20,15 @@ if __name__ == '__main__':
         os.remove(filepath)
 
     print("Initializing image...")
-    image = MedBlosc2(spacing=spacing, origin=origin, direction=direction, meta=Meta(image=image_meta, bbox=bboxes))
+    image = MedBlosc2(array, spacing=spacing, origin=origin, direction=direction, channel_axis=channel_axis, meta=Meta(image=image_meta, bbox=bboxes))
     print("Saving image...")
     image.save(filepath)
 
     print("Loading image...")
     image = MedBlosc2(filepath)
     print(json.dumps(image.meta.to_dict(), indent=2, sort_keys=True))
+    print("Image mean value: ", np.mean(image.to_numpy()))
+    print("Some array data: \n", image[:2, :2, 0])
 
     if Path(filepath).is_file():
         os.remove(filepath)

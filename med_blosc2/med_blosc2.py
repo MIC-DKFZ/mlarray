@@ -21,6 +21,7 @@ class MedBlosc2:
             origin: Optional[Union[List, Tuple, np.ndarray]] = None,
             direction: Optional[Union[List, Tuple, np.ndarray]] = None,
             meta: Optional[Union[Dict, Meta]] = None,
+            channel_axis: Optional[int] = None,
             num_threads: int = 1,
             copy: Optional['MedBlosc2'] = None) -> None:
         """Initializes a MedBlosc2 instance.
@@ -59,7 +60,7 @@ class MedBlosc2:
             self.load(array, num_threads)
         else:
             self._store = array
-            self._validate_and_add_meta(meta, spacing, origin, direction)
+            self._validate_and_add_meta(meta, spacing, origin, direction, channel_axis)
         
         if copy is not None:
             self.meta.copy_from(copy.meta)
@@ -69,6 +70,7 @@ class MedBlosc2:
             filepath: Union[str, Path],
             shape: Optional[Union[List, Tuple, np.ndarray]] = None,
             dtype: Optional[np.dtype] = None,
+            channel_axis: Optional[int] = None,
             mmap: str = 'r',
             patch_size: Optional[Union[int, List, Tuple]] = 'default',  # 'default' means that the default of 192 is used. However, if set to 'default', the patch_size will be skipped if self.patch_size is set from a previously loaded MedBlosc2 image. In that case the self.patch_size is used.
             chunk_size: Optional[Union[int, List, Tuple]]= None,
@@ -93,7 +95,7 @@ class MedBlosc2:
         create_array = shape is not None
     
         if create_array:
-            self.meta._blosc2 = self._comp_and_validate_blosc2_meta(self.meta._blosc2, patch_size, chunk_size, block_size, shape)   
+            self.meta._blosc2 = self._comp_and_validate_blosc2_meta(self.meta._blosc2, patch_size, chunk_size, block_size, shape, channel_axis)   
             self.meta._has_array = True     
         
         self.support_metadata = str(filepath).endswith(f".{MED_BLOSC2_SUFFIX}")
@@ -118,6 +120,8 @@ class MedBlosc2:
     def close(self):
         self._write_metadata()
         self._store = None
+        self.filepath = None
+        self.support_metadata = None   
         self.mmap = None
         
     def load(
@@ -198,7 +202,7 @@ class MedBlosc2:
             raise RuntimeError(f"MedBlosc2 requires '.b2nd' or '.{MED_BLOSC2_SUFFIX}' as extension.")
     
         if self._store is not None:
-            self.meta._blosc2 = self._comp_and_validate_blosc2_meta(self.meta._blosc2, patch_size, chunk_size, block_size, self._store.shape)
+            self.meta._blosc2 = self._comp_and_validate_blosc2_meta(self.meta._blosc2, patch_size, chunk_size, block_size, self._store.shape, self.meta.spatial.channel_axis)
             self.meta._has_array = True
         else:
             self.meta._has_array = False
@@ -294,12 +298,12 @@ class MedBlosc2:
         """
         if self._store is None or self.meta._has_array == False:
             return None
-        spacing  = np.array(self.spacing) if self.spacing is not None else np.ones(self.ndim)
-        origin  = np.array(self.origin) if self.origin is not None else np.zeros(self.ndim)
-        direction = np.array(self.direction) if self.direction is not None else np.eye(self.ndim)
-        affine = np.eye(self.ndim + 1)
-        affine[:self.ndim, :self.ndim] = direction @ np.diag(spacing)
-        affine[:self.ndim, self.ndim] = origin
+        spacing  = np.array(self.spacing) if self.spacing is not None else np.ones(self._spatial_ndim)
+        origin  = np.array(self.origin) if self.origin is not None else np.zeros(self._spatial_ndim)
+        direction = np.array(self.direction) if self.direction is not None else np.eye(self._spatial_ndim)
+        affine = np.eye(self._spatial_ndim + 1)
+        affine[:self._spatial_ndim, :self._spatial_ndim] = direction @ np.diag(spacing)
+        affine[:self._spatial_ndim, self._spatial_ndim] = origin
         return affine.tolist()
     
     @property
@@ -377,11 +381,22 @@ class MedBlosc2:
         if self._store is None or self.meta._has_array == False:
             return None
         return len(self._store.shape)
+    
+    @property
+    def _spatial_ndim(self) -> int:
+        """Returns the number of dimensions of the image."""
+        if self._store is None or self.meta._has_array == False:
+            return None
+        ndim = len(self._store.shape)
+        if self.meta.spatial.channel_axis is not None:
+            ndim -= 1
+        return ndim
 
     def comp_blosc2_params(
             self,
-            image_size: Tuple[int, int, int, int],
+            image_size: Union[Tuple[int, int], Tuple[int, int, int], Tuple[int, int, int, int]],
             patch_size: Union[Tuple[int, int], Tuple[int, int, int]],
+            channel_axis: Optional[int] = None,
             bytes_per_pixel: int = 4,  # 4 byte are float32
             l1_cache_size_per_core_in_bytes: int = 32768,  # 1 Kibibyte (KiB) = 2^10 Byte;  32 KiB = 32768 Byte
             l3_cache_size_per_core_in_bytes: int = 1441792, # 1 Mibibyte (MiB) = 2^20 Byte = 1.048.576 Byte; 1.375MiB = 1441792 Byte
@@ -420,16 +435,22 @@ class MedBlosc2:
         Returns:
             Tuple[Tuple[int, ...], Tuple[int, ...]]: Recommended chunk size and block size.
         """
+        def _move_index_list(a, src, dst):
+            a = list(a)
+            x = a.pop(src)
+            a.insert(dst, x)
+            return a
 
         num_squeezes = 0
-
         if len(image_size) == 2:
             image_size = (1, 1, *image_size)
             num_squeezes = 2
-
-        if len(image_size) == 3:
+        elif len(image_size) == 3:
             image_size = (1, *image_size)
             num_squeezes = 1
+
+        if channel_axis is not None:
+            image_size = _move_index_list(image_size, channel_axis+num_squeezes, 0)
 
         if len(image_size) != 4:
             raise RuntimeError("Image size must be 4D.")
@@ -487,30 +508,35 @@ class MedBlosc2:
         # better safe than sorry
         chunk_size = [min(i, j) for i, j in zip(image_size, chunk_size)]
 
+        if channel_axis is not None:
+            block_size = _move_index_list(block_size, 0, channel_axis+num_squeezes)
+            chunk_size = _move_index_list(chunk_size, 0, channel_axis+num_squeezes)
+
         block_size = block_size[num_squeezes:]
         chunk_size = chunk_size[num_squeezes:]
 
         return [int(value) for value in chunk_size], [int(value) for value in block_size]
     
-    def _comp_and_validate_blosc2_meta(self, meta_blosc2, patch_size, chunk_size, block_size, shape):
-        if patch_size is not None and patch_size != "default" and (len(shape) == 1 or len(shape) > 3):
+    def _comp_and_validate_blosc2_meta(self, meta_blosc2, patch_size, chunk_size, block_size, shape, channel_axis):
+        if patch_size is not None and patch_size != "default" and not ((len(shape) == 2 and channel_axis is None) or (len(shape) == 3 and channel_axis is None) or (len(shape) == 4 and channel_axis is not None) or (len(shape) == 4 and channel_axis is not None)):
             raise NotImplementedError("Chunk and block size optimization based on patch size is only implemented for 2D and 3D images. Please set the chunk and block size manually or set to None for blosc2 to determine a chunk and block size.")
         if patch_size is not None and patch_size != "default" and (chunk_size is not None or block_size is not None):
             raise RuntimeError("patch_size and chunk_size / block_size cannot both be explicitly set.")
 
+        ndims = len(shape) if channel_axis is None else len(shape) - 1
         if patch_size == "default": 
             if meta_blosc2 is not None and meta_blosc2.patch_size is not None:  # Use previously loaded patch size, when patch size is not explicitly set and a patch size from a previously loaded image exists
                 patch_size = meta_blosc2.patch_size
             else:  # Use default patch size, when patch size is not explicitly set and no patch size from a previously loaded image exists
-                patch_size = [MED_BLOSC2_DEFAULT_PATCH_SIZE] * len(shape)
+                patch_size = [MED_BLOSC2_DEFAULT_PATCH_SIZE] * ndims
 
         patch_size = [patch_size] * len(shape) if isinstance(patch_size, int) else patch_size
 
         if patch_size is not None:
-            chunk_size, block_size = self.comp_blosc2_params(shape, patch_size)
+            chunk_size, block_size = self.comp_blosc2_params(shape, patch_size, channel_axis)
 
         meta_blosc2 = MetaBlosc2(chunk_size, block_size, patch_size)
-        meta_blosc2._validate_and_cast(len(shape))
+        meta_blosc2._validate_and_cast(len(shape), channel_axis)
         return meta_blosc2
     
     def _read_meta(self):
@@ -527,7 +553,7 @@ class MedBlosc2:
                 raise RuntimeError("Metadata is not serializable.")
             self._store.vlmeta["med_blosc2"] = metadata
     
-    def _validate_and_add_meta(self, meta, spacing=None, origin=None, direction=None):
+    def _validate_and_add_meta(self, meta, spacing=None, origin=None, direction=None, channel_axis=None):
         if meta is not None:
             if not isinstance(meta, (dict, Meta)):
                 raise ValueError("Meta must be None, a dict or a Meta object.")
@@ -543,6 +569,8 @@ class MedBlosc2:
             self.meta.spatial.origin = origin
         if direction is not None:
             self.meta.spatial.direction = direction
+        if channel_axis is not None:
+            self.meta.spatial.channel_axis = channel_axis
         self.meta.spatial.shape = self.shape
-        self.meta.spatial._validate_and_cast(self.ndim)
+        self.meta.spatial._validate_and_cast(self._spatial_ndim)
 

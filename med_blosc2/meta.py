@@ -28,7 +28,7 @@ class MetaBlosc2:
             out = {k: v for k, v in out.items() if v is not None}
         return out
 
-    def _validate_and_cast(self, ndims: Optional[int] = None) -> None:
+    def _validate_and_cast(self, ndims: Optional[int] = None, channel_axis: Optional[int] = None) -> None:
         if self.chunk_size is not None:
             self.chunk_size = _cast_to_list(self.chunk_size, "meta._blosc2.chunk_size")
             _validate_float_int_list(self.chunk_size, f"meta._blosc2.chunk_size", ndims)
@@ -36,8 +36,9 @@ class MetaBlosc2:
             self.block_size = _cast_to_list(self.block_size, "meta._blosc2.block_size")
             _validate_float_int_list(self.block_size, f"meta._blosc2.block_size", ndims)
         if self.patch_size is not None:
+            _ndims = ndims if (ndims is None or channel_axis is None) else ndims-1
             self.patch_size = _cast_to_list(self.patch_size, "meta._blosc2.patch_size")
-            _validate_float_int_list(self.patch_size, f"meta._blosc2.patch_size", ndims)
+            _validate_float_int_list(self.patch_size, f"meta._blosc2.patch_size", _ndims)
 
     @classmethod
     def from_dict(cls, d: Mapping[str, Any], *, strict: bool = True) -> MetaBlosc2:
@@ -61,6 +62,7 @@ class MetaSpatial:
     origin: Optional[List] = None
     direction: Optional[List[List]] = None
     shape: Optional[List] = None
+    channel_axis: Optional[int] = None
 
     def __post_init__(self) -> None:
         self._validate_and_cast()
@@ -73,13 +75,16 @@ class MetaSpatial:
             "spacing": self.spacing,
             "origin": self.origin,
             "direction": self.direction,
-            "shape": self.shape
+            "shape": self.shape,
+            "channel_axis": self.channel_axis
         }
         if not include_none:
             out = {k: v for k, v in out.items() if v is not None}
         return out
 
     def _validate_and_cast(self, ndims: Optional[int] = None) -> None:
+        if self.channel_axis is not None:
+            _validate_int(self.channel_axis, "meta.spatial.channel_axis")
         if self.spacing is not None:
             self.spacing = _cast_to_list(self.spacing, "meta.spatial.spacing")
             _validate_float_int_list(self.spacing, "meta.spatial.spacing", ndims)
@@ -90,14 +95,15 @@ class MetaSpatial:
             self.direction = _cast_to_list(self.direction, "meta.spatial.direction")
             _validate_float_int_matrix(self.direction, "meta.spatial.direction", ndims)
         if self.shape is not None:
+            _ndims = ndims if (ndims is None or self.channel_axis is None) else ndims+1
             self.shape = _cast_to_list(self.shape, "meta.spatial.shape")
-            _validate_float_int_list(self.shape, "meta.spatial.shape", ndims)
+            _validate_float_int_list(self.shape, "meta.spatial.shape", _ndims)
 
     @classmethod
     def from_dict(cls, d: Mapping[str, Any], *, strict: bool = True) -> MetaSpatial:
         if not isinstance(d, Mapping):
             raise TypeError(f"MetaSpatial.from_dict expects a mapping, got {type(d).__name__}")
-        known = {"spacing", "origin", "direction", "shape"}
+        known = {"spacing", "origin", "direction", "shape", "channel_axis"}
         d = dict(d)
         unknown = set(d.keys()) - known
         if unknown and strict:
@@ -107,6 +113,7 @@ class MetaSpatial:
             origin=d.get("origin"),
             direction=d.get("direction"),
             shape=d.get("shape"),
+            channel_axis=d.get("channel_axis")
         )
 
 
@@ -369,8 +376,8 @@ class Meta:
             setattr(self, key, value)
             return
         if key == "_image_meta_format":
-            if value is not None and not isinstance(value, bool):
-                raise TypeError("meta._image_meta_format must be a bool or None")
+            if value is not None and not isinstance(value, str):
+                raise TypeError("meta._image_meta_format must be a str or None")
             setattr(self, key, value)
             return
         if key == "_med_blosc2_version":
@@ -422,7 +429,7 @@ class Meta:
 
         Args:
             d: Mapping with keys in {"image", "stats", "bbox", "spatial",
-                "_blosc2", "_med_blosc2_version", "is_seg", "extra"}.
+                "_blosc2", "_med_blosc2_version", "_image_meta_format", "is_seg", "extra"}.
             strict: If True, unknown keys raise. If False, unknown keys go into extra.
 
         Returns:
@@ -474,7 +481,7 @@ class Meta:
             is_seg=d.get("is_seg"),
             spatial=spatial,
             _has_array=d.get("_has_array"),
-            _image_meta_format=d.get("_image_meta_format",),
+            _image_meta_format=d.get("_image_meta_format"),
             _blosc2=_blosc2,
             _med_blosc2_version=d.get("_med_blosc2_version"),            
             extra=extra,
@@ -539,6 +546,11 @@ def _cast_to_list(value: Any, label: str):
         if isinstance(item, (list, tuple)) or (np is not None and isinstance(item, np.ndarray)):
             out[idx] = _cast_to_list(item, label)
     return out
+
+
+def _validate_int(value: Any, label: str) -> None:
+    if not isinstance(value, int):
+        raise TypeError(f"{label} must be an int")
 
 
 def _validate_float_int_list(value: Any, label: str, ndims: Optional[int] = None) -> None:

@@ -7,7 +7,7 @@ import json
 
 if __name__ == '__main__':
     print("Creating array...")
-    array = np.random.random((128, 512, 512))
+    array = np.random.random((32, 64, 64))
     spacing = np.array((2, 2.5, 4))
     origin = (1, 1, 1)
     direction = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
