@@ -59,16 +59,16 @@ import numpy as np
 
 # read-only, partial access (default)
 image = MedBlosc2().open("sample.mb2nd", mmap='r')  
-crop = image.array[10:20, 50:60]  # Read crop
+crop = image[10:20, 50:60]  # Read crop
 
 # read/write, partial access
 image = MedBlosc2().open("sample.mb2nd", mmap='r+')  
-image.array[10:20, 50:60] *= 5  # Modify crop in memory and disk
+image[10:20, 50:60] *= 5  # Modify crop in memory and disk
 
 # read/write, partial access, create/overwrite
 array = np.random.random((128, 256, 256))
 image = MedBlosc2().open("sample.mb2nd", shape=array.shape, dtype=array.dtype, mmap='w+')  
-image.array[...] = array  # Modify image in memory and disk
+image[...] = array  # Modify image in memory and disk
 ```
 
 ### Metadata inspection and manipulation

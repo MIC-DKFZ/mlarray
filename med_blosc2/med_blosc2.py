@@ -55,7 +55,7 @@ class MedBlosc2:
         if isinstance(array, (str, Path)):
             array, meta = self.load(array, num_threads)
 
-        self.array = array
+        self._store = array
 
         self._validate_and_add_meta(meta, spacing, origin, direction)
         
@@ -107,14 +107,14 @@ class MedBlosc2:
             dparams = {'nthreads': num_threads}
         
         if create_array:
-            self.array = blosc2.empty(shape=shape, dtype=dtype, urlpath=str(filepath), chunks=self.meta._blosc2.chunk_size, blocks=self.meta._blosc2.block_size, cparams=cparams, dparams=dparams, meta=metadata, mmap_mode=mmap)
+            self._store = blosc2.empty(shape=shape, dtype=dtype, urlpath=str(filepath), chunks=self.meta._blosc2.chunk_size, blocks=self.meta._blosc2.block_size, cparams=cparams, dparams=dparams, meta=metadata, mmap_mode=mmap)
         else:
-            self.array = blosc2.open(urlpath=str(filepath), dparams=dparams, mmap_mode=mmap)
-            meta = self._load_meta(self.array, filepath)
+            self._store = blosc2.open(urlpath=str(filepath), dparams=dparams, mmap_mode=mmap)
+            meta = self._load_meta(self._store, filepath)
             self._validate_and_add_meta(meta)
         if self.meta._has_array == True:
-            self.meta._blosc2.chunk_size = self.array.chunks
-            self.meta._blosc2.block_size = self.array.blocks
+            self.meta._blosc2.chunk_size = self._store.chunks
+            self.meta._blosc2.block_size = self._store.blocks
         
     def load(
             self,
@@ -192,8 +192,8 @@ class MedBlosc2:
         if not str(filepath).endswith(".b2nd") and not str(filepath).endswith(f".{MED_BLOSC2_SUFFIX}"):
             raise RuntimeError(f"MedBlosc2 requires '.b2nd' or '.{MED_BLOSC2_SUFFIX}' as extension.")
     
-        if self.array is not None:
-            self.meta._blosc2 = self._comp_and_validate_blosc2_meta(self.meta._blosc2, patch_size, chunk_size, block_size, self.array.shape)
+        if self._store is not None:
+            self.meta._blosc2 = self._comp_and_validate_blosc2_meta(self.meta._blosc2, patch_size, chunk_size, block_size, self._store.shape)
             self.meta._has_array = True
         else:
             self.meta._has_array = False
@@ -211,20 +211,48 @@ class MedBlosc2:
         if dparams is None:
             dparams = {'nthreads': num_threads}
         
-        if self.array is not None:
-            array = np.ascontiguousarray(self.array[...])
-            self.array = blosc2.asarray(array, urlpath=str(filepath), chunks=self.meta._blosc2.chunk_size, blocks=self.meta._blosc2.block_size, cparams=cparams, dparams=dparams, meta=metadata)
+        if self._store is not None:
+            array = np.ascontiguousarray(self._store[...])
+            self._store = blosc2.asarray(array, urlpath=str(filepath), chunks=self.meta._blosc2.chunk_size, blocks=self.meta._blosc2.block_size, cparams=cparams, dparams=dparams, meta=metadata)
         else:
             array = np.empty((0,))
-            self.array = blosc2.asarray(array, urlpath=str(filepath), chunks=self.meta._blosc2.chunk_size, blocks=self.meta._blosc2.block_size, cparams=cparams, dparams=dparams, meta=metadata)
+            self._store = blosc2.asarray(array, urlpath=str(filepath), chunks=self.meta._blosc2.chunk_size, blocks=self.meta._blosc2.block_size, cparams=cparams, dparams=dparams, meta=metadata)
         if self.meta._has_array == True:
-            self.meta._blosc2.chunk_size = self.array.chunks
-            self.meta._blosc2.block_size = self.array.blocks
+            self.meta._blosc2.chunk_size = self._store.chunks
+            self.meta._blosc2.block_size = self._store.blocks
 
     def to_numpy(self):
-        if self.array is None or self.meta._has_array == False:
-            return None
-        return self.array[...]
+        if self._store is None or self.meta._has_array == False:
+            raise TypeError("MedBlosc2 has no array data loaded.")
+        return self._store[...]
+
+    def __getitem__(self, key):
+        if self._store is None or self.meta._has_array == False:
+            raise TypeError("MedBlosc2 has no array data loaded.")
+        return self._store[key]
+
+    def __setitem__(self, key, value):
+        if self._store is None or self.meta._has_array == False:
+            raise TypeError("MedBlosc2 has no array data loaded.")
+        self._store[key] = value
+
+    def __iter__(self):
+        if self._store is None or self.meta._has_array == False:
+            raise TypeError("MedBlosc2 has no array data loaded.")
+        return iter(self._store)
+
+    def __len__(self):
+        if self._store is None or self.meta._has_array == False:
+            return 0
+        return len(self._store)
+
+    def __array__(self, dtype=None):
+        if self._store is None or self.meta._has_array == False:
+            raise TypeError("MedBlosc2 has no array data loaded.")
+        arr = np.asarray(self._store)
+        if dtype is not None:
+            return arr.astype(dtype)
+        return arr
 
     @property
     def spacing(self):
@@ -262,14 +290,14 @@ class MedBlosc2:
         Returns:
             list: Affine matrix with shape (ndims + 1, ndims + 1).
         """
-        if self.array is None or self.meta._has_array == False:
+        if self._store is None or self.meta._has_array == False:
             return None
-        spacing  = np.array(self.spacing) if self.spacing is not None else np.ones(self.ndims)
-        origin  = np.array(self.origin) if self.origin is not None else np.zeros(self.ndims)
-        direction = np.array(self.direction) if self.direction is not None else np.eye(self.ndims)
-        affine = np.eye(self.ndims+1)
-        affine[:self.ndims, :self.ndims] = direction @ np.diag(spacing)
-        affine[:self.ndims, self.ndims] = origin
+        spacing  = np.array(self.spacing) if self.spacing is not None else np.ones(self.ndim)
+        origin  = np.array(self.origin) if self.origin is not None else np.zeros(self.ndim)
+        direction = np.array(self.direction) if self.direction is not None else np.eye(self.ndim)
+        affine = np.eye(self.ndim + 1)
+        affine[:self.ndim, :self.ndim] = direction @ np.diag(spacing)
+        affine[:self.ndim, self.ndim] = origin
         return affine.tolist()
     
     @property
@@ -280,7 +308,7 @@ class MedBlosc2:
             list: Translation vector with length equal to the number of
             dimensions.
         """
-        if self.array is None or self.meta._has_array == False:
+        if self._store is None or self.meta._has_array == False:
             return None
         return np.array(self.affine)[:-1, -1].tolist()
 
@@ -292,7 +320,7 @@ class MedBlosc2:
             list: Scaling factors per axis with length equal to the number of
             dimensions.
         """
-        if self.array is None or self.meta._has_array == False:
+        if self._store is None or self.meta._has_array == False:
             return None
         scales = np.linalg.norm(np.array(self.affine)[:-1, :-1], axis=0)
         return scales.tolist()
@@ -304,7 +332,7 @@ class MedBlosc2:
         Returns:
             list: Rotation matrix with shape (ndims, ndims).
         """
-        if self.array is None or self.meta._has_array == False:
+        if self._store is None or self.meta._has_array == False:
             return None
         rotation_matrix = np.array(self.affine)[:-1, :-1] / np.array(self.scale)
         return rotation_matrix.tolist()
@@ -316,7 +344,7 @@ class MedBlosc2:
         Returns:
             list: Shear matrix with shape (ndims, ndims).
         """
-        if self.array is None or self.meta._has_array == False:
+        if self._store is None or self.meta._has_array == False:
             return None
         scales = np.array(self.scale)
         rotation_matrix = np.array(self.rotation)
@@ -330,20 +358,23 @@ class MedBlosc2:
         Returns:
             tuple: Shape of the underlying array.
         """
-        if self.array is None or self.meta._has_array == False:
+        if self._store is None or self.meta._has_array == False:
             return None
-        return self.array.shape
+        return self._store.shape
+
+    @property
+    def dtype(self):
+        """Returns the dtype of the array."""
+        if self._store is None or self.meta._has_array == False:
+            return None
+        return self._store.dtype
     
     @property
-    def ndims(self) -> int:
-        """Returns the number of dimensions of the image.
-
-        Returns:
-            int: Number of dimensions of the image (2D, 3D, or 4D).
-        """
-        if self.array is None or self.meta._has_array == False:
+    def ndim(self) -> int:
+        """Returns the number of dimensions of the image."""
+        if self._store is None or self.meta._has_array == False:
             return None
-        return len(self.array.shape)
+        return len(self._store.shape)
 
     def comp_blosc2_params(
             self,
@@ -507,4 +538,4 @@ class MedBlosc2:
         if direction is not None:
             self.meta.spatial.direction = direction
         self.meta.spatial.shape = self.shape
-        self.meta.spatial._validate_and_cast(self.ndims)
+        self.meta.spatial._validate_and_cast(self.ndim)

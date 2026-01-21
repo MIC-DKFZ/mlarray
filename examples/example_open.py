@@ -22,13 +22,14 @@ if __name__ == '__main__':
     image = MedBlosc2(spacing=spacing, origin=origin, direction=direction, meta=Meta(image=image_meta, bbox=bboxes))
     image.open(filepath, shape=array.shape, dtype=array.dtype, mmap='w+')
     print("Saving image...")
-    image.array[...] = array
+    image[...] = array
 
     print("Loading image...")
     image = MedBlosc2()
     image.open(filepath)
     print(json.dumps(image.meta.to_dict(), indent=2, sort_keys=True))
     print("Image mean value: ", np.mean(image.to_numpy()))
+    print("Some array data: \n", image[:2, :2, 0])
 
     if Path(filepath).is_file():
         os.remove(filepath)

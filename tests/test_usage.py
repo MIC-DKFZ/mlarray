@@ -33,7 +33,7 @@ class TestUsage(unittest.TestCase):
 
             loaded = MedBlosc2(array)
             loaded.open(path, mmap="r")
-            self.assertFalse(isinstance(loaded.array, np.ndarray))
+            self.assertFalse(isinstance(loaded._store, np.ndarray))
 
     def test_loading_and_saving(self):
         with tempfile.TemporaryDirectory() as tmpdir:
