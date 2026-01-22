@@ -5,15 +5,15 @@ import math
 from typing import Dict, Optional, Union, List, Tuple
 from pathlib import Path
 import os
-from med_blosc2.meta import Meta, MetaBlosc2
-from med_blosc2.utils import is_serializable
+from mlarray.meta import Meta, MetaBlosc2
+from mlarray.utils import is_serializable
 
-MED_BLOSC2_SUFFIX = "mb2nd"
-MED_BLOSC2_VERSION = "v0"
-MED_BLOSC2_DEFAULT_PATCH_SIZE = 192
+MLARRAY_SUFFIX = "mb2nd"
+MLARRAY_VERSION = "v0"
+MLARRAY_DEFAULT_PATCH_SIZE = 192
 
 
-class MedBlosc2:
+class MLArray:
     def __init__(
             self,
             array: Optional[Union[np.ndarray, str, Path]] = None,
@@ -23,10 +23,10 @@ class MedBlosc2:
             meta: Optional[Union[Dict, Meta]] = None,
             channel_axis: Optional[int] = None,
             num_threads: int = 1,
-            copy: Optional['MedBlosc2'] = None) -> None:
-        """Initializes a MedBlosc2 instance.
+            copy: Optional['MLArray'] = None) -> None:
+        """Initializes a MLArray instance.
 
-        The MedBlosc2 file format (".mb2nd") is a Blosc2-compressed container
+        The MLArray file format (".mb2nd") is a Blosc2-compressed container
         with standardized metadata support for N-dimensional medical images.
 
         Args:
@@ -50,7 +50,7 @@ class MedBlosc2:
                 - 'r': read-only, must exist (Default)
                 - 'a': read/write, create if doesn't exist (Currently not supported)
                 - 'w': create, overwrite if it exists (Currently not supported)
-            copy (Optional[MedBlosc2]): Another MedBlosc2 instance to copy
+            copy (Optional[MLArray]): Another MLArray instance to copy
                 metadata fields from.
         """    
         self.filepath = None
@@ -72,7 +72,7 @@ class MedBlosc2:
             dtype: Optional[np.dtype] = None,
             channel_axis: Optional[int] = None,
             mmap: str = 'r',
-            patch_size: Optional[Union[int, List, Tuple]] = 'default',  # 'default' means that the default of 192 is used. However, if set to 'default', the patch_size will be skipped if self.patch_size is set from a previously loaded MedBlosc2 image. In that case the self.patch_size is used.
+            patch_size: Optional[Union[int, List, Tuple]] = 'default',  # 'default' means that the default of 192 is used. However, if set to 'default', the patch_size will be skipped if self.patch_size is set from a previously loaded MLArray image. In that case the self.patch_size is used.
             chunk_size: Optional[Union[int, List, Tuple]]= None,
             block_size: Optional[Union[int, List, Tuple]] = None,
             num_threads: int = 1,
@@ -80,8 +80,8 @@ class MedBlosc2:
             dparams: Optional[Dict] = None
         ):
         self.filepath = str(filepath)
-        if not str(filepath).endswith(".b2nd") and not str(filepath).endswith(f".{MED_BLOSC2_SUFFIX}"):
-            raise RuntimeError(f"MedBlosc2 requires '.b2nd' or '.{MED_BLOSC2_SUFFIX}' as extension.")
+        if not str(filepath).endswith(".b2nd") and not str(filepath).endswith(f".{MLARRAY_SUFFIX}"):
+            raise RuntimeError(f"MLArray requires '.b2nd' or '.{MLARRAY_SUFFIX}' as extension.")
 
         if Path(filepath).is_file() and (shape is not None or dtype is not None):
             raise RuntimeError("Cannot create a new file as a file exists already under that path. Explicitly set shape and dtype only if you intent to create a new file.")
@@ -98,7 +98,7 @@ class MedBlosc2:
             self.meta._blosc2 = self._comp_and_validate_blosc2_meta(self.meta._blosc2, patch_size, chunk_size, block_size, shape, channel_axis)   
             self.meta._has_array = True     
         
-        self.support_metadata = str(filepath).endswith(f".{MED_BLOSC2_SUFFIX}")
+        self.support_metadata = str(filepath).endswith(f".{MLARRAY_SUFFIX}")
 
         blosc2.set_nthreads(num_threads)
         if cparams is None:
@@ -129,10 +129,10 @@ class MedBlosc2:
             filepath: Union[str, Path], 
             num_threads: int = 1,
         ):
-        """Loads a Blosc2-compressed file. Both MedBlosc2 ('.mb2nd') and Blosc2 ('.b2nd') files are supported.
+        """Loads a Blosc2-compressed file. Both MLArray ('.mb2nd') and Blosc2 ('.b2nd') files are supported.
 
         WARNING:
-            MedBlosc2 supports both ".b2nd" and ".mb2nd" files. The MedBlosc2
+            MLArray supports both ".b2nd" and ".mb2nd" files. The MLArray
             format standard and standardized metadata are honored only for
             ".mb2nd". For ".b2nd", metadata is ignored when loading.
 
@@ -149,9 +149,9 @@ class MedBlosc2:
             RuntimeError: If the file extension is not ".b2nd" or ".mb2nd".
         """
         self.filepath = str(filepath)
-        if not str(filepath).endswith(".b2nd") and not str(filepath).endswith(f".{MED_BLOSC2_SUFFIX}"):
-            raise RuntimeError(f"MedBlosc2 requires '.b2nd' or '.{MED_BLOSC2_SUFFIX}' as extension.")
-        self.support_metadata = str(filepath).endswith(f".{MED_BLOSC2_SUFFIX}")
+        if not str(filepath).endswith(".b2nd") and not str(filepath).endswith(f".{MLARRAY_SUFFIX}"):
+            raise RuntimeError(f"MLArray requires '.b2nd' or '.{MLARRAY_SUFFIX}' as extension.")
+        self.support_metadata = str(filepath).endswith(f".{MLARRAY_SUFFIX}")
         blosc2.set_nthreads(num_threads)
         dparams = {'nthreads': num_threads}
         self._store = blosc2.open(urlpath=str(filepath), cdparams=dparams, mode='r')
@@ -164,17 +164,17 @@ class MedBlosc2:
     def save(
             self,
             filepath: Union[str, Path],
-            patch_size: Optional[Union[int, List, Tuple]] = 'default',  # 'default' means that the default of 192 is used. However, if set to 'default', the patch_size will be skipped if self.patch_size is set from a previously loaded MedBlosc2 image. In that case the self.patch_size is used.
+            patch_size: Optional[Union[int, List, Tuple]] = 'default',  # 'default' means that the default of 192 is used. However, if set to 'default', the patch_size will be skipped if self.patch_size is set from a previously loaded MLArray image. In that case the self.patch_size is used.
             chunk_size: Optional[Union[int, List, Tuple]]= None,
             block_size: Optional[Union[int, List, Tuple]] = None,
             num_threads: int = 1,
             cparams: Optional[Dict] = None,
             dparams: Optional[Dict] = None
         ):
-        """Saves the array to a Blosc2-compressed file. Both MedBlosc2 ('.mb2nd') and Blosc2 ('.b2nd') files are supported.
+        """Saves the array to a Blosc2-compressed file. Both MLArray ('.mb2nd') and Blosc2 ('.b2nd') files are supported.
 
         WARNING:
-            MedBlosc2 supports both ".b2nd" and ".mb2nd" files. The MedBlosc2
+            MLArray supports both ".b2nd" and ".mb2nd" files. The MLArray
             format standard and standardized metadata are honored only for
             ".mb2nd". For ".b2nd", metadata is ignored when saving.
 
@@ -198,8 +198,8 @@ class MedBlosc2:
         Raises:
             RuntimeError: If the file extension is not ".b2nd" or ".mb2nd".
         """
-        if not str(filepath).endswith(".b2nd") and not str(filepath).endswith(f".{MED_BLOSC2_SUFFIX}"):
-            raise RuntimeError(f"MedBlosc2 requires '.b2nd' or '.{MED_BLOSC2_SUFFIX}' as extension.")
+        if not str(filepath).endswith(".b2nd") and not str(filepath).endswith(f".{MLARRAY_SUFFIX}"):
+            raise RuntimeError(f"MLArray requires '.b2nd' or '.{MLARRAY_SUFFIX}' as extension.")
     
         if self._store is not None:
             self.meta._blosc2 = self._comp_and_validate_blosc2_meta(self.meta._blosc2, patch_size, chunk_size, block_size, self._store.shape, self.meta.spatial.channel_axis)
@@ -207,7 +207,7 @@ class MedBlosc2:
         else:
             self.meta._has_array = False
     
-        self.support_metadata = str(filepath).endswith(f".{MED_BLOSC2_SUFFIX}")
+        self.support_metadata = str(filepath).endswith(f".{MLARRAY_SUFFIX}")
 
         blosc2.set_nthreads(num_threads)
         if cparams is None:
@@ -229,22 +229,22 @@ class MedBlosc2:
 
     def to_numpy(self):
         if self._store is None or self.meta._has_array == False:
-            raise TypeError("MedBlosc2 has no array data loaded.")
+            raise TypeError("MLArray has no array data loaded.")
         return self._store[...]
 
     def __getitem__(self, key):
         if self._store is None or self.meta._has_array == False:
-            raise TypeError("MedBlosc2 has no array data loaded.")
+            raise TypeError("MLArray has no array data loaded.")
         return self._store[key]
 
     def __setitem__(self, key, value):
         if self._store is None or self.meta._has_array == False:
-            raise TypeError("MedBlosc2 has no array data loaded.")
+            raise TypeError("MLArray has no array data loaded.")
         self._store[key] = value
 
     def __iter__(self):
         if self._store is None or self.meta._has_array == False:
-            raise TypeError("MedBlosc2 has no array data loaded.")
+            raise TypeError("MLArray has no array data loaded.")
         return iter(self._store)
 
     def __len__(self):
@@ -254,7 +254,7 @@ class MedBlosc2:
 
     def __array__(self, dtype=None):
         if self._store is None or self.meta._has_array == False:
-            raise TypeError("MedBlosc2 has no array data loaded.")
+            raise TypeError("MLArray has no array data loaded.")
         arr = np.asarray(self._store)
         if dtype is not None:
             return arr.astype(dtype)
@@ -528,7 +528,7 @@ class MedBlosc2:
             if meta_blosc2 is not None and meta_blosc2.patch_size is not None:  # Use previously loaded patch size, when patch size is not explicitly set and a patch size from a previously loaded image exists
                 patch_size = meta_blosc2.patch_size
             else:  # Use default patch size, when patch size is not explicitly set and no patch size from a previously loaded image exists
-                patch_size = [MED_BLOSC2_DEFAULT_PATCH_SIZE] * ndims
+                patch_size = [MLARRAY_DEFAULT_PATCH_SIZE] * ndims
 
         patch_size = [patch_size] * len(shape) if isinstance(patch_size, int) else patch_size
 
@@ -542,7 +542,7 @@ class MedBlosc2:
     def _read_meta(self):
         meta = Meta()
         if self.support_metadata and isinstance(self._store, blosc2.ndarray.NDArray):
-            meta = self._store.vlmeta["med_blosc2"]
+            meta = self._store.vlmeta["mlarray"]
             meta = Meta.from_dict(meta)
         self._validate_and_add_meta(meta)
 
@@ -551,7 +551,7 @@ class MedBlosc2:
             metadata = self.meta.to_dict()
             if not is_serializable(metadata):
                 raise RuntimeError("Metadata is not serializable.")
-            self._store.vlmeta["med_blosc2"] = metadata
+            self._store.vlmeta["mlarray"] = metadata
     
     def _validate_and_add_meta(self, meta, spacing=None, origin=None, direction=None, channel_axis=None):
         if meta is not None:
@@ -562,7 +562,7 @@ class MedBlosc2:
         else:
             meta = Meta()
         self.meta = meta
-        self.meta._med_blosc2_version = MED_BLOSC2_VERSION
+        self.meta._mlarray_version = MLARRAY_VERSION
         if spacing is not None:
             self.meta.spatial.spacing = spacing
         if origin is not None:

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Mapping, Optional, Union
 import numpy as np
-from med_blosc2.utils import is_serializable
+from mlarray.utils import is_serializable
 
 
 @dataclass(slots=True)
@@ -268,7 +268,7 @@ class Meta:
     _blosc2: MetaBlosc2 = field(default_factory=MetaBlosc2)
     _has_array: Optional[bool] = None
     _image_meta_format: Optional[str] = None
-    _med_blosc2_version: Optional[str] = None
+    _mlarray_version: Optional[str] = None
 
     # controlled escape hatch for future/experimental metadata
     extra: Dict[str, Any] = field(default_factory=dict)
@@ -313,8 +313,8 @@ class Meta:
             raise TypeError("meta._has_array must be a bool or None")
         if self._image_meta_format is not None and not isinstance(self._image_meta_format, str):
             raise TypeError("meta._image_meta_format must be a str or None")
-        if self._med_blosc2_version is not None and not isinstance(self._med_blosc2_version, str):
-            raise TypeError("meta._med_blosc2_version must be a str or None")
+        if self._mlarray_version is not None and not isinstance(self._mlarray_version, str):
+            raise TypeError("meta._mlarray_version must be a str or None")
 
         if not isinstance(self.extra, dict):
             raise TypeError(f"meta.extra must be a dict, got {type(self.extra).__name__}")
@@ -329,7 +329,7 @@ class Meta:
         Set a known meta section explicitly (typos raise).
         Ensures the provided value is JSON-serializable.
         """
-        if not hasattr(self, key) and key not in {"_blosc2", "_med_blosc2_version"}:
+        if not hasattr(self, key) and key not in {"_blosc2", "_mlarray_version"}:
             raise AttributeError(f"Unknown meta section: {key!r}")
         if key == "extra":
             raise AttributeError("Use meta.extra[...] to add to extra")
@@ -380,10 +380,10 @@ class Meta:
                 raise TypeError("meta._image_meta_format must be a str or None")
             setattr(self, key, value)
             return
-        if key == "_med_blosc2_version":
+        if key == "_mlarray_version":
             if value is not None and not isinstance(value, str):
-                raise TypeError("meta._med_blosc2_version must be a str or None")
-            self._med_blosc2_version = value
+                raise TypeError("meta._mlarray_version must be a str or None")
+            self._mlarray_version = value
             return
 
         value_dict = dict(value)
@@ -407,7 +407,7 @@ class Meta:
             "_has_array": self._has_array,
             "_image_meta_format": self._image_meta_format,
             "_blosc2": self._blosc2.to_dict(),
-            "_med_blosc2_version": self._med_blosc2_version,
+            "_mlarray_version": self._mlarray_version,
             "extra": self.extra,
         }
 
@@ -429,7 +429,7 @@ class Meta:
 
         Args:
             d: Mapping with keys in {"image", "stats", "bbox", "spatial",
-                "_blosc2", "_med_blosc2_version", "_image_meta_format", "is_seg", "extra"}.
+                "_blosc2", "_mlarray_version", "_image_meta_format", "is_seg", "extra"}.
             strict: If True, unknown keys raise. If False, unknown keys go into extra.
 
         Returns:
@@ -438,7 +438,7 @@ class Meta:
         if not isinstance(d, Mapping):
             raise TypeError(f"from_dict expects a mapping, got {type(d).__name__}")
 
-        known = {"image", "stats", "bbox", "spatial", "_has_array", "_image_meta_format", "_blosc2", "_med_blosc2_version", "is_seg", "extra"}
+        known = {"image", "stats", "bbox", "spatial", "_has_array", "_image_meta_format", "_blosc2", "_mlarray_version", "is_seg", "extra"}
         d = dict(d)
         unknown = set(d.keys()) - known
 
@@ -483,7 +483,7 @@ class Meta:
             _has_array=d.get("_has_array"),
             _image_meta_format=d.get("_image_meta_format"),
             _blosc2=_blosc2,
-            _med_blosc2_version=d.get("_med_blosc2_version"),            
+            _mlarray_version=d.get("_mlarray_version"),            
             extra=extra,
         )
 
@@ -523,8 +523,8 @@ class Meta:
                 self._blosc2.block_size = other._blosc2.block_size
             if self._blosc2.patch_size is None:
                 self._blosc2.patch_size = other._blosc2.patch_size
-        if self._med_blosc2_version is None:
-            self._med_blosc2_version = other._med_blosc2_version
+        if self._mlarray_version is None:
+            self._mlarray_version = other._mlarray_version
         if self.extra == {}:
             self.extra = other.extra
 

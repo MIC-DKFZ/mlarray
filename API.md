@@ -1,13 +1,13 @@
-# MedBlosc2 Public API
+# MLArray Public API
 
-This document lists the public API surface of `MedBlosc2`.
+This document lists the public API surface of `MLArray`.
 
-## Class: `MedBlosc2`
+## Class: `MLArray`
 
 ### Constructor
 
 ```python
-MedBlosc2(
+MLArray(
     array: Union[np.ndarray, str, Path],
     spacing: Optional[Union[List, Tuple, np.ndarray]] = None,
     origin: Optional[Union[List, Tuple, np.ndarray]] = None,
@@ -16,7 +16,7 @@ MedBlosc2(
     mmap: bool = False,
     num_threads: int = 1,
     mode: str = "r",
-    copy: Optional["MedBlosc2"] = None,
+    copy: Optional["MLArray"] = None,
 )
 ```
 
@@ -27,10 +27,10 @@ MedBlosc2(
 | origin | Optional[Union[List, Tuple, np.ndarray]] | Origin per axis. Provide a list/tuple/ndarray with length equal to the number of dimensions. |
 | direction | Optional[Union[List, Tuple, np.ndarray]] | Direction cosine matrix. Provide a 2D list/tuple/ndarray with shape (ndims, ndims). |
 | meta | Optional[Union[Dict, Meta]] | Free-form metadata dictionary or Meta instance. Must be JSON-serializable when saving. If meta is passed as a Dict, it will internally be converted into a Meta object with the dict being interpreted as meta.image metadata. |
-| mmap | bool | Whether to keep the loaded array memory-mapped when loading from disk. If true, MedBlosc2.array will be an blosc2.ndarray.NDArray, else np.ndarray. |
+| mmap | bool | Whether to keep the loaded array memory-mapped when loading from disk. If true, MLArray.array will be an blosc2.ndarray.NDArray, else np.ndarray. |
 | num_threads | int | Number of threads for Blosc2 operations. |
 | mode | str | Blosc2 open mode: 'r' read-only (default), 'a' read/write create if doesn't exist (not supported), 'w' create overwrite if exists (not supported). |
-| copy | Optional[MedBlosc2] | Another MedBlosc2 instance to copy metadata fields from. |
+| copy | Optional[MLArray] | Another MLArray instance to copy metadata fields from. |
 
 ### Properties
 

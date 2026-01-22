@@ -1,7 +1,7 @@
 import numpy as np
 import os
 from pathlib import Path
-from med_blosc2 import MedBlosc2, Meta
+from mlarray import MLArray, Meta
 import json
 
 
@@ -19,12 +19,12 @@ if __name__ == '__main__':
         os.remove(filepath)
 
     print("Initializing image...")
-    image = MedBlosc2(spacing=spacing, origin=origin, direction=direction, meta=Meta(image=image_meta, bbox=bboxes))
+    image = MLArray(spacing=spacing, origin=origin, direction=direction, meta=Meta(image=image_meta, bbox=bboxes))
     print("Saving image...")
     image.save(filepath)
 
     print("Loading image...")
-    image = MedBlosc2(filepath)
+    image = MLArray(filepath)
     print(json.dumps(image.meta.to_dict(), indent=2, sort_keys=True))
 
     if Path(filepath).is_file():

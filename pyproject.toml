@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "setuptools_scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "med-blosc2"
+name = "mlarray"
 description = "A standardized blosc2 image reader and writer for medical images."
 readme = "README.md"
 requires-python = ">= 3.10"
@@ -35,20 +35,20 @@ all = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Karol-G/med-blosc2"
-Source = "https://github.com/Karol-G/med-blosc2"
-Issues = "https://github.com/Karol-G/med-blosc2/issues"
+Homepage = "https://github.com/Karol-G/mlarray"
+Source = "https://github.com/Karol-G/mlarray"
+Issues = "https://github.com/Karol-G/mlarray/issues"
 
 [project.scripts]
-medblosc2_header = "med_blosc2.cli:cli_print_header"
-medblosc2_convert = "med_blosc2.cli:cli_convert_to_medblosc2"
+mlarray_header = "mlarray.cli:cli_print_header"
+mlarray_convert = "mlarray.cli:cli_convert_to_mlarray"
 
 [tool.setuptools]
 package-dir = { "" = "." }
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["med_blosc2*"]
+include = ["mlarray*"]
 
 [tool.setuptools_scm]
 fallback_version = "0.0.0"

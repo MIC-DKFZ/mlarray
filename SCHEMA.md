@@ -1,6 +1,6 @@
-# MedBlosc2 Metadata Schema
+# MLArray Metadata Schema
 
-This document defines the MedBlosc2 metadata schema.
+This document defines the MLArray metadata schema.
 
 ## Meta
 
@@ -69,9 +69,9 @@ Top-level metadata container.
 | block_size | Optional[List[float]] | Block size per axis, length = `ndims`. |
 | patch_size | Optional[List[float]] | Patch size per axis, length = `ndims`. |
 
-### _med_blosc2_version
+### _mlarray_version
 
-- Description: MedBlosc2 version string used to write the file.
+- Description: MLArray version string used to write the file.
 - Dataclass: None (string).
 
 ### extra
