@@ -19,7 +19,7 @@ class TestUsage(unittest.TestCase):
             array = _make_array()
             image = MLArray(array)
 
-            path = Path(tmpdir) / "sample.mb2nd"
+            path = Path(tmpdir) / "sample.mla"
             image.save(path)
 
             loaded = MLArray(path)
@@ -28,7 +28,7 @@ class TestUsage(unittest.TestCase):
     def test_mmap_loading(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             array = _make_array()
-            path = Path(tmpdir) / "sample.mb2nd"
+            path = Path(tmpdir) / "sample.mla"
             MLArray(array).save(path)
 
             loaded = MLArray(array)
@@ -38,8 +38,8 @@ class TestUsage(unittest.TestCase):
     def test_loading_and_saving(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             array = _make_array()
-            src = Path(tmpdir) / "sample.mb2nd"
-            dst = Path(tmpdir) / "copy.mb2nd"
+            src = Path(tmpdir) / "sample.mla"
+            dst = Path(tmpdir) / "copy.mla"
 
             MLArray(array).save(src)
             MLArray(src).save(dst)
@@ -59,7 +59,7 @@ class TestUsage(unittest.TestCase):
             image.spacing[1] = 5.3
             image.meta.image["study_id"] = "study-001"
 
-            path = Path(tmpdir) / "with-metadata.mb2nd"
+            path = Path(tmpdir) / "with-metadata.mla"
             image.save(path)
 
             loaded = MLArray(path)
@@ -77,7 +77,7 @@ class TestUsage(unittest.TestCase):
                 direction=[[1, 0, 0], [0, 1, 0], [0, 0, 1]],
                 meta=Meta(image={"source": "base"}, is_seg=True),
             )
-            base_path = Path(tmpdir) / "base.mb2nd"
+            base_path = Path(tmpdir) / "base.mla"
             base.save(base_path)
 
             base_loaded = MLArray(base_path)
@@ -93,7 +93,7 @@ class TestUsage(unittest.TestCase):
     def test_patch_size_default(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             array = _make_array()
-            path = Path(tmpdir) / "default-patch.mb2nd"
+            path = Path(tmpdir) / "default-patch.mla"
             MLArray(array).save(path)
 
             loaded = MLArray(path)
@@ -105,7 +105,7 @@ class TestUsage(unittest.TestCase):
     def test_patch_size_isotropic(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             array = _make_array()
-            path = Path(tmpdir) / "patch-64.mb2nd"
+            path = Path(tmpdir) / "patch-64.mla"
             MLArray(array).save(path, patch_size=64)
 
             loaded = MLArray(path)
@@ -114,7 +114,7 @@ class TestUsage(unittest.TestCase):
     def test_patch_size_non_isotropic(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             array = _make_array()
-            path = Path(tmpdir) / "patch-non-iso.mb2nd"
+            path = Path(tmpdir) / "patch-non-iso.mla"
             MLArray(array).save(path, patch_size=[16, 24, 32])
 
             loaded = MLArray(path)
@@ -123,7 +123,7 @@ class TestUsage(unittest.TestCase):
     def test_manual_chunk_and_block(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             array = _make_array()
-            path = Path(tmpdir) / "manual-chunk-block.mb2nd"
+            path = Path(tmpdir) / "manual-chunk-block.mla"
             MLArray(array).save(
                 path,
                 patch_size=None,

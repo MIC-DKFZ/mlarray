@@ -8,7 +8,7 @@ import os
 from mlarray.meta import Meta, MetaBlosc2
 from mlarray.utils import is_serializable
 
-MLARRAY_SUFFIX = "mb2nd"
+MLARRAY_SUFFIX = "mla"
 MLARRAY_VERSION = "v0"
 MLARRAY_DEFAULT_PATCH_SIZE = 192
 
@@ -26,13 +26,13 @@ class MLArray:
             copy: Optional['MLArray'] = None) -> None:
         """Initializes a MLArray instance.
 
-        The MLArray file format (".mb2nd") is a Blosc2-compressed container
+        The MLArray file format (".mla") is a Blosc2-compressed container
         with standardized metadata support for N-dimensional medical images.
 
         Args:
             array (Union[np.ndarray, str, Path]): Input data or file path. Use
                 a numpy ndarray for in-memory arrays. Use a string or Path to
-                load a ".b2nd" or ".mb2nd" file.
+                load a ".b2nd" or ".mla" file.
             spacing (Optional[Union[List, Tuple, np.ndarray]]): Spacing per
                 axis. Provide a list/tuple/ndarray with length equal to the
                 number of dimensions (e.g., [sx, sy, sz]).
@@ -129,16 +129,16 @@ class MLArray:
             filepath: Union[str, Path], 
             num_threads: int = 1,
         ):
-        """Loads a Blosc2-compressed file. Both MLArray ('.mb2nd') and Blosc2 ('.b2nd') files are supported.
+        """Loads a Blosc2-compressed file. Both MLArray ('.mla') and Blosc2 ('.b2nd') files are supported.
 
         WARNING:
-            MLArray supports both ".b2nd" and ".mb2nd" files. The MLArray
+            MLArray supports both ".b2nd" and ".mla" files. The MLArray
             format standard and standardized metadata are honored only for
-            ".mb2nd". For ".b2nd", metadata is ignored when loading.
+            ".mla". For ".b2nd", metadata is ignored when loading.
 
         Args:
             filepath (Union[str, Path]): Path to the Blosc2 file to be loaded.
-                The filepath needs to have the extension ".b2nd" or ".mb2nd".
+                The filepath needs to have the extension ".b2nd" or ".mla".
             num_threads (int): Number of threads to use for loading the file.
             mode (str): Blosc2 open mode (e.g., "r", "a").
 
@@ -146,7 +146,7 @@ class MLArray:
             Tuple[blosc2.ndarray, dict]: Loaded data and its metadata.
 
         Raises:
-            RuntimeError: If the file extension is not ".b2nd" or ".mb2nd".
+            RuntimeError: If the file extension is not ".b2nd" or ".mla".
         """
         self.filepath = str(filepath)
         if not str(filepath).endswith(".b2nd") and not str(filepath).endswith(f".{MLARRAY_SUFFIX}"):
@@ -171,16 +171,16 @@ class MLArray:
             cparams: Optional[Dict] = None,
             dparams: Optional[Dict] = None
         ):
-        """Saves the array to a Blosc2-compressed file. Both MLArray ('.mb2nd') and Blosc2 ('.b2nd') files are supported.
+        """Saves the array to a Blosc2-compressed file. Both MLArray ('.mla') and Blosc2 ('.b2nd') files are supported.
 
         WARNING:
-            MLArray supports both ".b2nd" and ".mb2nd" files. The MLArray
+            MLArray supports both ".b2nd" and ".mla" files. The MLArray
             format standard and standardized metadata are honored only for
-            ".mb2nd". For ".b2nd", metadata is ignored when saving.
+            ".mla". For ".b2nd", metadata is ignored when saving.
 
         Args:
             filepath (Union[str, Path]): Path to save the file. Must end with
-                ".b2nd" or ".mb2nd".
+                ".b2nd" or ".mla".
             patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
                 chunk/block optimization. Provide an int for isotropic sizes or
                 a list/tuple with length equal to the number of dimensions.
@@ -196,7 +196,7 @@ class MLArray:
             num_threads (int): Number of threads to use for saving the file.
 
         Raises:
-            RuntimeError: If the file extension is not ".b2nd" or ".mb2nd".
+            RuntimeError: If the file extension is not ".b2nd" or ".mla".
         """
         if not str(filepath).endswith(".b2nd") and not str(filepath).endswith(f".{MLARRAY_SUFFIX}"):
             raise RuntimeError(f"MLArray requires '.b2nd' or '.{MLARRAY_SUFFIX}' as extension.")

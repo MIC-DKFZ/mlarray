@@ -22,7 +22,7 @@ MLArray(
 
 | argument | type | description |
 | --- | --- | --- |
-| array | Union[np.ndarray, str, Path] | Input data or file path. Use a numpy ndarray for in-memory arrays. Use a string or Path to load a ".b2nd" or ".mb2nd" file. |
+| array | Union[np.ndarray, str, Path] | Input data or file path. Use a numpy ndarray for in-memory arrays. Use a string or Path to load a ".b2nd" or ".mla" file. |
 | spacing | Optional[Union[List, Tuple, np.ndarray]] | Spacing per axis. Provide a list/tuple/ndarray with length equal to the number of dimensions (e.g., [sx, sy, sz]). |
 | origin | Optional[Union[List, Tuple, np.ndarray]] | Origin per axis. Provide a list/tuple/ndarray with length equal to the number of dimensions. |
 | direction | Optional[Union[List, Tuple, np.ndarray]] | Direction cosine matrix. Provide a 2D list/tuple/ndarray with shape (ndims, ndims). |
@@ -51,14 +51,14 @@ MLArray(
 
 | name | signature | description |
 | --- | --- | --- |
-| save | `save(filepath, patch_size="default", chunk_size=None, block_size=None, clevel=8, codec=blosc2.Codec.ZSTD, num_threads=1)` | Save to `.b2nd` or `.mb2nd`. |
+| save | `save(filepath, patch_size="default", chunk_size=None, block_size=None, clevel=8, codec=blosc2.Codec.ZSTD, num_threads=1)` | Save to `.b2nd` or `.mla`. |
 | comp_blosc2_params | `comp_blosc2_params(image_size, patch_size, bytes_per_pixel=4, l1_cache_size_per_core_in_bytes=32768, l3_cache_size_per_core_in_bytes=1441792, safety_factor=0.8)` | Compute recommended chunk/block sizes. |
 
 #### save arguments
 
 | argument | type | description |
 | --- | --- | --- |
-| filepath | Union[str, Path] | Path to save the file. Must end with ".b2nd" or ".mb2nd". |
+| filepath | Union[str, Path] | Path to save the file. Must end with ".b2nd" or ".mla". |
 | patch_size | Optional[Union[int, List, Tuple]] | Patch size hint for chunk/block optimization. Provide an int for isotropic sizes or a list/tuple with length equal to the number of dimensions. Use "default" to use the default patch size of 192. |
 | chunk_size | Optional[Union[int, List, Tuple]] | Explicit chunk size. Provide an int or a tuple/list with length equal to the number of dimensions, or None to let Blosc2 decide. Ignored when patch_size is not None. |
 | block_size | Optional[Union[int, List, Tuple]] | Explicit block size. Provide an int or a tuple/list with length equal to the number of dimensions, or None to let Blosc2 decide. Ignored when patch_size is not None. |

@@ -11,7 +11,7 @@
 </p>
 
 A standardized Blosc2 image reader and writer for medical images. The MLArray
-file format (".mb2nd") is a Blosc2-compressed container with standardized
+file format (".mla") is a Blosc2-compressed container with standardized
 metadata support for N-dimensional medical images. Plain ".b2nd" files are also
 supported, but they do not participate in the MLArray metadata standard.
 
@@ -49,9 +49,9 @@ from mlarray import MLArray
 
 array = np.random.random((128, 256, 256))
 image = MLArray(array)  # Create MLArray image
-image.save("sample.mb2nd")
+image.save("sample.mla")
 
-image = MLArray("sample.mb2nd")  # Loads image
+image = MLArray("sample.mla")  # Loads image
 ```
 
 ### Memory-mapped usage
@@ -61,16 +61,16 @@ from mlarray import MLArray
 import numpy as np
 
 # read-only, partial access (default)
-image = MLArray().open("sample.mb2nd", mmap='r')  
+image = MLArray().open("sample.mla", mmap='r')  
 crop = image[10:20, 50:60]  # Read crop
 
 # read/write, partial access
-image = MLArray().open("sample.mb2nd", mmap='r+')  
+image = MLArray().open("sample.mla", mmap='r+')  
 image[10:20, 50:60] *= 5  # Modify crop in memory and disk
 
 # read/write, partial access, create/overwrite
 array = np.random.random((128, 256, 256))
-image = MLArray().open("sample.mb2nd", shape=array.shape, dtype=array.dtype, mmap='w+')  
+image = MLArray().open("sample.mla", shape=array.shape, dtype=array.dtype, mmap='w+')  
 image[...] = array  # Modify image in memory and disk
 ```
 
@@ -95,10 +95,10 @@ print(image.meta.image)  # {"patient_id": "123", "modality": "CT"}
 
 image.spacing[1] = 5.3
 image.meta.image["study_id"] = "study-001"
-image.save("with-metadata.mb2nd")
+image.save("with-metadata.mla")
 
 # Open memory-mapped
-image = MLArray().open("with-metadata.mb2nd", mmap='r+')  
+image = MLArray().open("with-metadata.mla", mmap='r+')  
 image.meta.image["study_id"] = "new-study"  # Modify metadata
 image.close()  # Close and save metadata, only necessary to save modified metadata
 ```
@@ -109,7 +109,7 @@ image.close()  # Close and save metadata, only necessary to save modified metada
 import numpy as np
 from mlarray import MLArray
 
-base = MLArray("sample.mb2nd")
+base = MLArray("sample.mla")
 array = np.random.random(base.shape)
 
 image = MLArray(
@@ -118,7 +118,7 @@ image = MLArray(
     copy=base,  # Copies all non-explicitly set arguments from base
 )
 
-image.save("copied-metadata.mb2nd")
+image.save("copied-metadata.mla")
 ```
 
 ### Standardized metadata usage
@@ -138,7 +138,7 @@ print(image.meta.is_seg)  # True
 
 image.meta.image["study_id"] = "study-001"
 image.meta.is_seg = False
-image.save("with-metadata.mb2nd")
+image.save("with-metadata.mla")
 ```
 
 ### Patch size variants
@@ -147,52 +147,52 @@ Default patch size (192):
 ```python
 from mlarray import MLArray
 
-image = MLArray("sample.mb2nd")
-image.save("default-patch.mb2nd")  # Default patch_size is 'default' -> Isotropic patch size of 192 pixels
-image.save("default-patch.mb2nd", patch_size='default')
+image = MLArray("sample.mla")
+image.save("default-patch.mla")  # Default patch_size is 'default' -> Isotropic patch size of 192 pixels
+image.save("default-patch.mla", patch_size='default')
 ```
 
 Custom isotropic patch size (512):
 ```python
 from mlarray import MLArray
 
-image = MLArray("sample.mb2nd")
-image.save("patch-512.mb2nd", patch_size=512)
+image = MLArray("sample.mla")
+image.save("patch-512.mla", patch_size=512)
 ```
 
 Custom non-isotropic patch size:
 ```python
 from mlarray import MLArray
 
-image = MLArray("sample.mb2nd")
-image.save("patch-non-iso.mb2nd", patch_size=(128, 192, 256))
+image = MLArray("sample.mla")
+image.save("patch-non-iso.mla", patch_size=(128, 192, 256))
 ```
 
 Manual chunk/block size:
 ```python
 from mlarray import MLArray
 
-image = MLArray("sample.mb2nd")
-image.save("manual-chunk-block.mb2nd", chunk_size=(1, 128, 128), block_size=(1, 32, 32))
+image = MLArray("sample.mla")
+image.save("manual-chunk-block.mla", chunk_size=(1, 128, 128), block_size=(1, 32, 32))
 ```
 
 Let Blosc2 itself configure chunk/block size:
 ```python
 from mlarray import MLArray
 
-image = MLArray("sample.mb2nd")
+image = MLArray("sample.mla")
 # If patch_size, chunk_size and block_size are all None, Blosc2 will auto-configure chunk and block size
-image.save("manual-chunk-block.mb2nd", patch_size=None)
+image.save("manual-chunk-block.mla", patch_size=None)
 ```
 
 ## CLI
 
 ### mlarray_header
 
-Print the metadata header from a `.mb2nd` or `.b2nd` file.
+Print the metadata header from a `.mla` or `.b2nd` file.
 
 ```bash
-mlarray_header sample.mb2nd
+mlarray_header sample.mla
 ```
 
 ### mlarray_convert
@@ -200,7 +200,7 @@ mlarray_header sample.mb2nd
 Convert a NIfTI or NRRD file to MLArray and copy metadata.
 
 ```bash
-mlarray_convert sample.nii.gz output.mb2nd
+mlarray_convert sample.nii.gz output.mla
 ```
 
 ## Contributing

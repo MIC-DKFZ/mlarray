@@ -14,7 +14,7 @@ if __name__ == '__main__':
     direction = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
     image_meta = {"tmp1": "This is an image", "tmp2": 5, "tmp3": {"test1": 16.4587, "test2": [1, 2, 3, 4, 5, 6]}}
     bboxes = [[[0, 1], [0, 1], [0, 1]]]
-    filepath = "tmp.mb2nd"
+    filepath = "tmp.mla"
 
     if Path(filepath).is_file():
         os.remove(filepath)

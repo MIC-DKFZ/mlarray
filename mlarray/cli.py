@@ -14,7 +14,7 @@ def print_header(filepath: Union[str, Path]) -> None:
     """Print the MLArray metadata header for a file.
 
     Args:
-        filepath: Path to a ".mb2nd" or ".b2nd" file.
+        filepath: Path to a ".mla" or ".b2nd" file.
     """
     meta = MLArray(filepath).meta
     if meta is None:
@@ -42,7 +42,7 @@ def cli_print_header() -> None:
         prog="mlarray_header",
         description="Print the MLArray metadata header for a file.",
     )
-    parser.add_argument("filepath", help="Path to a .mb2nd or .b2nd file.")
+    parser.add_argument("filepath", help="Path to a .mla or .b2nd file.")
     args = parser.parse_args()
     print_header(args.filepath)
 
@@ -53,6 +53,6 @@ def cli_convert_to_mlarray() -> None:
         description="Convert a NiFTi or NRRD file to MLArray and copy all metadata.",
     )
     parser.add_argument("load_filepath", help="Path to the NiFTi (.nii.gz, .nii) or NRRD (.nrrd) file to load.")
-    parser.add_argument("save_filepath", help="Path to the MLArray (.mb2nd) file to save.")
+    parser.add_argument("save_filepath", help="Path to the MLArray (.mla) file to save.")
     args = parser.parse_args()
     convert_to_mlarray(args.load_filepath, args.save_filepath)
