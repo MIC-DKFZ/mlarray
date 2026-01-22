@@ -8,17 +8,28 @@ from mlarray.utils import is_serializable
 
 @dataclass(slots=True)
 class MetaBlosc2:
+    """Blosc2 storage metadata for chunking, blocking, and patch hints."""
     chunk_size: Optional[list] = None
     block_size: Optional[list] = None
     patch_size: Optional[list] = None
 
     def __post_init__(self) -> None:
+        """Validate and normalize any provided sizes."""
         self._validate_and_cast()
 
     def __repr__(self) -> str:
+        """Return a repr using the dict form for readability."""
         return repr(self.to_dict())
 
     def to_dict(self, *, include_none: bool = True) -> Dict[str, Any]:
+        """Serialize to a JSON-compatible dict.
+
+        Args:
+            include_none (bool): If False, keys with None values are omitted.
+
+        Returns:
+            Dict[str, Any]: Serialized metadata.
+        """
         out: Dict[str, Any] = {
             "chunk_size": self.chunk_size,
             "block_size": self.block_size,
@@ -29,6 +40,13 @@ class MetaBlosc2:
         return out
 
     def _validate_and_cast(self, ndims: Optional[int] = None, channel_axis: Optional[int] = None) -> None:
+        """Validate and cast sizes to list form.
+
+        Args:
+            ndims (Optional[int]): Expected number of array dimensions.
+            channel_axis (Optional[int]): Channel axis index for patch size
+                validation when channels are present.
+        """
         if self.chunk_size is not None:
             self.chunk_size = _cast_to_list(self.chunk_size, "meta._blosc2.chunk_size")
             _validate_float_int_list(self.chunk_size, f"meta._blosc2.chunk_size", ndims)
@@ -42,6 +60,15 @@ class MetaBlosc2:
 
     @classmethod
     def from_dict(cls, d: Mapping[str, Any], *, strict: bool = True) -> MetaBlosc2:
+        """Create a MetaBlosc2 instance from a mapping.
+
+        Args:
+            d (Mapping[str, Any]): Source mapping.
+            strict (bool): If True, unknown keys raise a KeyError.
+
+        Returns:
+            MetaBlosc2: Parsed instance.
+        """
         if not isinstance(d, Mapping):
             raise TypeError(f"MetaBlosc2.from_dict expects a mapping, got {type(d).__name__}")
         known = {"chunk_size", "block_size", "patch_size"}
@@ -58,6 +85,7 @@ class MetaBlosc2:
 
 @dataclass(slots=True)
 class MetaSpatial:
+    """Spatial metadata describing array geometry in physical space."""
     spacing: Optional[List] = None
     origin: Optional[List] = None
     direction: Optional[List[List]] = None
@@ -65,12 +93,22 @@ class MetaSpatial:
     channel_axis: Optional[int] = None
 
     def __post_init__(self) -> None:
+        """Validate and normalize spatial fields."""
         self._validate_and_cast()
 
     def __repr__(self) -> str:
+        """Return a repr using the dict form for readability."""
         return repr(self.to_dict())
 
     def to_dict(self, *, include_none: bool = True) -> Dict[str, Any]:
+        """Serialize to a JSON-compatible dict.
+
+        Args:
+            include_none (bool): If False, keys with None values are omitted.
+
+        Returns:
+            Dict[str, Any]: Serialized metadata.
+        """
         out: Dict[str, Any] = {
             "spacing": self.spacing,
             "origin": self.origin,
@@ -83,6 +121,11 @@ class MetaSpatial:
         return out
 
     def _validate_and_cast(self, ndims: Optional[int] = None) -> None:
+        """Validate and cast spatial fields to list form.
+
+        Args:
+            ndims (Optional[int]): Expected number of spatial dimensions.
+        """
         if self.channel_axis is not None:
             _validate_int(self.channel_axis, "meta.spatial.channel_axis")
         if self.spacing is not None:
@@ -101,6 +144,15 @@ class MetaSpatial:
 
     @classmethod
     def from_dict(cls, d: Mapping[str, Any], *, strict: bool = True) -> MetaSpatial:
+        """Create a MetaSpatial instance from a mapping.
+
+        Args:
+            d (Mapping[str, Any]): Source mapping.
+            strict (bool): If True, unknown keys raise a KeyError.
+
+        Returns:
+            MetaSpatial: Parsed instance.
+        """
         if not isinstance(d, Mapping):
             raise TypeError(f"MetaSpatial.from_dict expects a mapping, got {type(d).__name__}")
         known = {"spacing", "origin", "direction", "shape", "channel_axis"}
@@ -119,6 +171,7 @@ class MetaSpatial:
 
 @dataclass(slots=True)
 class MetaStatistics:
+    """Summary statistics for an array or image."""
     min: Optional[float] = None
     max: Optional[float] = None
     mean: Optional[float] = None
@@ -131,12 +184,22 @@ class MetaStatistics:
     percentile_std: Optional[float] = None
 
     def __post_init__(self) -> None:
+        """Validate that all provided values are numeric."""
         self._validate_and_cast()
 
     def __repr__(self) -> str:
+        """Return a repr using the dict form for readability."""
         return repr(self.to_dict())
 
     def to_dict(self, *, include_none: bool = True) -> Dict[str, Any]:
+        """Serialize to a JSON-compatible dict.
+
+        Args:
+            include_none (bool): If False, keys with None values are omitted.
+
+        Returns:
+            Dict[str, Any]: Serialized metadata.
+        """
         out: Dict[str, Any] = {
             "min": self.min,
             "max": self.max,
@@ -154,6 +217,7 @@ class MetaStatistics:
         return out
 
     def _validate_and_cast(self) -> None:
+        """Validate that all statistic fields are float or int."""
         for name in (
             "min",
             "max",
@@ -172,6 +236,15 @@ class MetaStatistics:
 
     @classmethod
     def from_dict(cls, d: Mapping[str, Any], *, strict: bool = True) -> MetaStatistics:
+        """Create a MetaStatistics instance from a mapping.
+
+        Args:
+            d (Mapping[str, Any]): Source mapping.
+            strict (bool): If True, unknown keys raise a KeyError.
+
+        Returns:
+            MetaStatistics: Parsed instance.
+        """
         if not isinstance(d, Mapping):
             raise TypeError(f"MetaStatistics.from_dict expects a mapping, got {type(d).__name__}")
         known = {
@@ -206,34 +279,47 @@ class MetaStatistics:
 
 @dataclass(slots=True)
 class MetaBbox:
+    """Bounding boxes stored as per-dimension min/max pairs."""
     bboxes: Optional[List[List[List[int]]]] = None
 
     def __post_init__(self) -> None:
+        """Validate and normalize bounding box lists."""
         self._validate_and_cast()
 
     def __iter__(self):
+        """Iterate over bounding boxes."""
         return iter(self.bboxes or [])
 
     def __getitem__(self, index):
+        """Return the bbox at ``index``."""
         if self.bboxes is None:
             raise TypeError("meta.bbox is None")
         return self.bboxes[index]
 
     def __setitem__(self, index, value):
+        """Set the bbox at ``index``."""
         if self.bboxes is None:
             raise TypeError("meta.bbox is None")
         self.bboxes[index] = value
 
     def __len__(self):
+        """Return the number of bounding boxes."""
         return len(self.bboxes or [])
 
     def __repr__(self) -> str:
+        """Return a repr of the bounding box list."""
         return repr(self.bboxes)
 
     def to_list(self) -> Optional[List[List[List[int]]]]:
+        """Return the raw bbox list."""
         return self.bboxes
 
     def _validate_and_cast(self, ndims: Optional[int] = None) -> None:
+        """Validate bbox structure and cast to list form.
+
+        Args:
+            ndims (Optional[int]): Expected number of spatial dimensions.
+        """
         if self.bboxes is None:
             return
         self.bboxes = _cast_to_list(self.bboxes, "meta.bbox.bboxes")
@@ -255,11 +341,21 @@ class MetaBbox:
 
     @classmethod
     def from_list(cls, bboxes: Any) -> MetaBbox:
+        """Create a MetaBbox instance from a list-like object.
+
+        Args:
+            bboxes (Any): List-like structure shaped as
+                [[ [min,max], [min,max], ...], ...].
+
+        Returns:
+            MetaBbox: Parsed instance.
+        """
         return cls(bboxes=bboxes)
 
 
 @dataclass(slots=True)
 class Meta:
+    """Container for MLArray metadata sections."""
     image: Optional[Dict[str, Any]] = None
     spatial: MetaSpatial = field(default_factory=MetaSpatial)
     stats: Optional[Union[dict, MetaStatistics]] = None
@@ -274,6 +370,7 @@ class Meta:
     extra: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
+        """Validate and normalize metadata sections."""
         # Validate anything passed in the constructor
         for name in ("image",):
             val = getattr(self, name)
@@ -322,12 +419,21 @@ class Meta:
             raise TypeError("meta.extra is not JSON-serializable")
 
     def __repr__(self) -> str:
+        """Return a repr using the dict form for readability."""
         return repr(self.to_dict())
 
     def set(self, key: str, value: Any) -> None:
-        """
-        Set a known meta section explicitly (typos raise).
-        Ensures the provided value is JSON-serializable.
+        """Set a known meta section explicitly.
+
+        Args:
+            key (str): Name of the meta section (e.g., "image", "spatial",
+                "stats", "bbox", "_blosc2", "is_seg").
+            value (Any): Value to set. Must be JSON-serializable for dict
+                sections.
+
+        Raises:
+            AttributeError: If ``key`` is unknown or disallowed.
+            TypeError: If the value has an unexpected type.
         """
         if not hasattr(self, key) and key not in {"_blosc2", "_mlarray_version"}:
             raise AttributeError(f"Unknown meta section: {key!r}")
@@ -394,9 +500,14 @@ class Meta:
         setattr(self, key, value_dict)
 
     def to_dict(self, *, include_none: bool = True) -> Dict[str, Any]:
-        """
-        Convert to a plain dict. All entries are guaranteed JSON-serializable
-        due to validation in __post_init__ and set().
+        """Convert to a JSON-serializable dict.
+
+        Args:
+            include_none (bool): If False, keys with None (and empty extra) are
+                omitted.
+
+        Returns:
+            Dict[str, Any]: Serialized metadata.
         """
         out: Dict[str, Any] = {
             "image": self.image,
@@ -417,6 +528,11 @@ class Meta:
         return out
 
     def _validate_and_cast(self, ndims: int) -> None:
+        """Validate and normalize metadata with a known dimensionality.
+
+        Args:
+            ndims (int): Number of spatial dimensions.
+        """
         self.spatial._validate_and_cast(ndims)
         if self.bbox is not None:
             self.bbox._validate_and_cast(ndims)
@@ -424,16 +540,17 @@ class Meta:
 
     @classmethod
     def from_dict(cls, d: Mapping[str, Any], *, strict: bool = True) -> Meta:
-        """
-        Construct Meta from a dict.
+        """Construct Meta from a mapping.
 
         Args:
-            d: Mapping with keys in {"image", "stats", "bbox", "spatial",
-                "_blosc2", "_mlarray_version", "_image_meta_format", "is_seg", "extra"}.
-            strict: If True, unknown keys raise. If False, unknown keys go into extra.
+            d (Mapping[str, Any]): Mapping with keys in {"image", "stats",
+                "bbox", "spatial", "_blosc2", "_mlarray_version",
+                "_image_meta_format", "_has_array", "is_seg", "extra"}.
+            strict (bool): If True, unknown keys raise. If False, unknown keys
+                are added to ``extra``.
 
         Returns:
-            Meta instance (validated).
+            Meta: Parsed instance.
         """
         if not isinstance(d, Mapping):
             raise TypeError(f"from_dict expects a mapping, got {type(d).__name__}")
@@ -488,8 +605,10 @@ class Meta:
         )
 
     def copy_from(self, other: Meta) -> None:
-        """
-        Copy fields from another Meta if they are not set on this instance.
+        """Copy fields from another Meta where this instance is missing data.
+
+        Args:
+            other (Meta): Source Meta instance.
         """
         if self.image is None:
             self.image = other.image
@@ -530,6 +649,15 @@ class Meta:
 
 
 def _cast_to_list(value: Any, label: str):
+    """Cast a list/tuple/ndarray to a Python list (recursively).
+
+    Args:
+        value (Any): Input value to cast.
+        label (str): Label used in error messages.
+
+    Returns:
+        list: List representation of the input value.
+    """
     if isinstance(value, list):
         out = value
     elif isinstance(value, tuple):
@@ -549,11 +677,24 @@ def _cast_to_list(value: Any, label: str):
 
 
 def _validate_int(value: Any, label: str) -> None:
+    """Validate that a value is an int.
+
+    Args:
+        value (Any): Value to validate.
+        label (str): Label used in error messages.
+    """
     if not isinstance(value, int):
         raise TypeError(f"{label} must be an int")
 
 
 def _validate_float_int_list(value: Any, label: str, ndims: Optional[int] = None) -> None:
+    """Validate a list of float/int values with optional length.
+
+    Args:
+        value (Any): Value to validate.
+        label (str): Label used in error messages.
+        ndims (Optional[int]): Required length if provided.
+    """
     if not isinstance(value, list):
         raise TypeError(f"{label} must be a list")
     if ndims is not None and len(value) != ndims:
@@ -564,6 +705,13 @@ def _validate_float_int_list(value: Any, label: str, ndims: Optional[int] = None
 
 
 def _validate_float_int_matrix(value: Any, label: str, ndims: Optional[int] = None) -> None:
+    """Validate a 2D list of float/int values with optional shape.
+
+    Args:
+        value (Any): Value to validate.
+        label (str): Label used in error messages.
+        ndims (Optional[int]): Required square dimension if provided.
+    """
     if not isinstance(value, list):
         raise TypeError(f"{label} must be a list of lists")
     if ndims is not None and len(value) != ndims:
