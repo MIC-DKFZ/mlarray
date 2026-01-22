@@ -45,6 +45,10 @@ mlarray_convert = "mlarray.cli:cli_convert_to_mlarray"
 
 [tool.setuptools]
 package-dir = { "" = "." }
+include-package-data = true
+
+[tool.setuptools.data-files]
+"mlarray/assets" = ["assets/*"]
 
 [tool.setuptools.packages.find]
 where = ["."]
