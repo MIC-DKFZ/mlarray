@@ -3,12 +3,11 @@
 </p>
 
 <p align="center">
-  <a href="https://pypi.org/project/mlarray/" style="text-decoration: none;">
-    <img src="https://img.shields.io/pypi/v/mlarray?logo=pypi&color=brightgreen&cacheSeconds=300&v=2026-01-22" alt="PyPI" />
-  </a>
-  <img src="https://img.shields.io/pypi/pyversions/mlarray?logo=python&cacheSeconds=300&v=2026-01-22" alt="Python Version" />
-  <img src="https://img.shields.io/github/actions/workflow/status/Karol-G/mlarray/workflow.yml?branch=main&logo=github" alt="Tests" />
-  <img src="https://img.shields.io/github/license/Karol-G/mlarray" alt="License" />
+  <a href="https://pypi.org/project/mlarray/"><img src="https://img.shields.io/pypi/v/mlarray?logo=pypi&color=brightgreen&cacheSeconds=300&v=2026-01-22" alt="PyPI" align="middle" /></a>
+  <a href="https://pypi.org/project/mlarray/"><img src="https://img.shields.io/pypi/pyversions/mlarray?logo=python&cacheSeconds=300&v=2026-01-22" alt="Python Version" align="middle" /></a>
+  <a href="https://github.com/Karol-G/mlarray/actions"><img src="https://img.shields.io/github/actions/workflow/status/Karol-G/mlarray/workflow.yml?branch=main&logo=github" alt="Tests" align="middle" /></a>
+  <a href="https://github.com/copier-org/copier"><img src="https://img.shields.io/badge/template-copier-2ebd59?logo=jinja" alt="Copier Template" align="middle" /></a>
+  <a href="https://github.com/Karol-G/mlarray/blob/main/LICENSE"><img src="https://img.shields.io/github/license/Karol-G/mlarray" alt="License" align="middle" /></a>
 </p>
 
 **tl;dr:** Using large, medical or scientific images for Machine Learning? => Use MLArray
