@@ -30,28 +30,29 @@ class MLArray:
         with standardized metadata support for N-dimensional medical images.
 
         Args:
-            array (Union[np.ndarray, str, Path]): Input data or file path. Use
-                a numpy ndarray for in-memory arrays. Use a string or Path to
-                load a ".b2nd" or ".mla" file.
+            array (Optional[Union[np.ndarray, str, Path]]): Input data or file
+                path. Use a numpy ndarray for in-memory arrays, or a string/Path
+                to load a ".b2nd" or ".mla" file. If None, an empty MLArray
+                instance is created.
             spacing (Optional[Union[List, Tuple, np.ndarray]]): Spacing per
-                axis. Provide a list/tuple/ndarray with length equal to the
-                number of dimensions (e.g., [sx, sy, sz]).
+                spatial axis. Provide a list/tuple/ndarray with length equal to
+                the number of spatial dimensions (e.g., [sx, sy, sz]).
             origin (Optional[Union[List, Tuple, np.ndarray]]): Origin per axis.
                 Provide a list/tuple/ndarray with length equal to the number of
-                dimensions.
+                spatial dimensions.
             direction (Optional[Union[List, Tuple, np.ndarray]]): Direction
                 cosine matrix. Provide a 2D list/tuple/ndarray with shape
-                (ndims, ndims).
+                (ndims, ndims) for spatial dimensions.
             meta (Optional[Dict | Meta]): Free-form metadata dictionary or Meta
                 instance. Must be JSON-serializable when saving. 
                 If meta is passed as a Dict, it will internally be converted into a Meta object with the dict being interpreted as meta.image metadata.
+            channel_axis (Optional[int]): Axis index that represents channels
+                in the array (e.g., 0 for CHW or -1 for HWC). If None, the array
+                is treated as purely spatial.
             num_threads (int): Number of threads for Blosc2 operations.
-            mode (str): Blosc2 open mode
-                - 'r': read-only, must exist (Default)
-                - 'a': read/write, create if doesn't exist (Currently not supported)
-                - 'w': create, overwrite if it exists (Currently not supported)
-            copy (Optional[MLArray]): Another MLArray instance to copy
-                metadata fields from.
+            copy (Optional[MLArray]): Another MLArray instance to copy metadata
+                fields from. If provided, its metadata overrides any metadata
+                set via arguments.
         """    
         self.filepath = None
         self.support_metadata = None   
@@ -79,6 +80,48 @@ class MLArray:
             cparams: Optional[Dict] = None,
             dparams: Optional[Dict] = None
         ):
+        """Open an existing Blosc2 file or create a new one with memory mapping.
+
+        This method supports both MLArray (".mla") and plain Blosc2 (".b2nd")
+        files. When creating a new file, both ``shape`` and ``dtype`` must be
+        provided.
+
+        WARNING:
+            MLArray supports both ".b2nd" and ".mla" files. The MLArray
+            format standard and standardized metadata are honored only for
+            ".mla". For ".b2nd", metadata is ignored when loading.
+
+        Args:
+            filepath (Union[str, Path]): Target file path. Must end with
+                ".b2nd" or ".mla".
+            shape (Optional[Union[List, Tuple, np.ndarray]]): Shape of the array
+                to create. If provided, a new file is created. Length must match
+                the full array dimensionality (including channels if present).
+            dtype (Optional[np.dtype]): Numpy dtype for a newly created array.
+            channel_axis (Optional[int]): Axis index for channels in the array.
+                Used for patch/chunk/block calculations.
+            mmap (str): Blosc2 mmap mode. One of "r", "r+", "w+", "c".
+            patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
+                chunk/block optimization. Provide an int for isotropic sizes or
+                a list/tuple with length equal to the number of spatial
+                dimensions. Use "default" to use the default patch size of 192.
+            chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
+                Provide an int or tuple/list with length equal to the array
+                dimensions. Ignored when ``patch_size`` is provided.
+            block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
+                Provide an int or tuple/list with length equal to the array
+                dimensions. Ignored when ``patch_size`` is provided.
+            num_threads (int): Number of threads for Blosc2 operations.
+            cparams (Optional[Dict]): Blosc2 compression parameters.
+            dparams (Optional[Dict]): Blosc2 decompression parameters.
+
+        Returns:
+            MLArray: The current instance (for chaining).
+
+        Raises:
+            RuntimeError: If the file extension is invalid, if shape/dtype are
+                inconsistent, or if mmap mode is invalid for creation.
+        """
         self.filepath = str(filepath)
         if not str(filepath).endswith(".b2nd") and not str(filepath).endswith(f".{MLARRAY_SUFFIX}"):
             raise RuntimeError(f"MLArray requires '.b2nd' or '.{MLARRAY_SUFFIX}' as extension.")
@@ -119,6 +162,10 @@ class MLArray:
         return self
 
     def close(self):
+        """Flush metadata and close the underlying store.
+
+        After closing, the MLArray instance no longer has an attached array.
+        """
         self._write_metadata()
         self._store = None
         self.filepath = None
@@ -141,10 +188,6 @@ class MLArray:
             filepath (Union[str, Path]): Path to the Blosc2 file to be loaded.
                 The filepath needs to have the extension ".b2nd" or ".mla".
             num_threads (int): Number of threads to use for loading the file.
-            mode (str): Blosc2 open mode (e.g., "r", "a").
-
-        Returns:
-            Tuple[blosc2.ndarray, dict]: Loaded data and its metadata.
 
         Raises:
             RuntimeError: If the file extension is not ".b2nd" or ".mla".
@@ -229,31 +272,85 @@ class MLArray:
         self._write_metadata(force=True)
 
     def to_numpy(self):
+        """Return the underlying data as a NumPy array.
+
+        Returns:
+            np.ndarray: A NumPy view or copy of the stored array data.
+
+        Raises:
+            TypeError: If no array data is loaded.
+        """
         if self._store is None or self.meta._has_array == False:
             raise TypeError("MLArray has no array data loaded.")
         return self._store[...]
 
     def __getitem__(self, key):
+        """Return a slice or element from the underlying array.
+
+        Args:
+            key (Any): Any valid NumPy/Blosc2 indexing key (slices, ints, tuples,
+                boolean arrays).
+
+        Returns:
+            Any: The indexed value or subarray.
+
+        Raises:
+            TypeError: If no array data is loaded.
+        """
         if self._store is None or self.meta._has_array == False:
             raise TypeError("MLArray has no array data loaded.")
         return self._store[key]
 
     def __setitem__(self, key, value):
+        """Assign to a slice or element in the underlying array.
+
+        Args:
+            key (Any): Any valid NumPy/Blosc2 indexing key.
+            value (Any): Value(s) to assign. Must be broadcastable to the
+                selected region.
+
+        Raises:
+            TypeError: If no array data is loaded.
+        """
         if self._store is None or self.meta._has_array == False:
             raise TypeError("MLArray has no array data loaded.")
         self._store[key] = value
 
     def __iter__(self):
+        """Iterate over the first axis of the underlying array.
+
+        Returns:
+            Iterator: Iterator over the array's first dimension.
+
+        Raises:
+            TypeError: If no array data is loaded.
+        """
         if self._store is None or self.meta._has_array == False:
             raise TypeError("MLArray has no array data loaded.")
         return iter(self._store)
 
     def __len__(self):
+        """Return the length of the first array dimension.
+
+        Returns:
+            int: Size of axis 0, or 0 if no array is loaded.
+        """
         if self._store is None or self.meta._has_array == False:
             return 0
         return len(self._store)
 
     def __array__(self, dtype=None):
+        """NumPy array interface for implicit conversion.
+
+        Args:
+            dtype (Optional[np.dtype]): Optional dtype to cast to.
+
+        Returns:
+            np.ndarray: The underlying data as a NumPy array.
+
+        Raises:
+            TypeError: If no array data is loaded.
+        """
         if self._store is None or self.meta._has_array == False:
             raise TypeError("MLArray has no array data loaded.")
         arr = np.asarray(self._store)
@@ -266,8 +363,8 @@ class MLArray:
         """Returns the image spacing.
 
         Returns:
-            list: The image spacing with length equal to the number of
-            dimensions.
+            list: Spacing per spatial axis with length equal to the number of
+            spatial dimensions.
         """
         return self.meta.spatial.spacing
     
@@ -276,8 +373,8 @@ class MLArray:
         """Returns the image origin.
 
         Returns:
-            list: The image origin with length equal to the number of
-            dimensions.
+            list: Origin per spatial axis with length equal to the number of
+            spatial dimensions.
         """
         return self.meta.spatial.origin
     
@@ -286,7 +383,7 @@ class MLArray:
         """Returns the image direction.
 
         Returns:
-            list: The image direction with shape (ndims, ndims).
+            list: Direction cosine matrix with shape (ndims, ndims).
         """
         return self.meta.spatial.direction
 
@@ -295,7 +392,8 @@ class MLArray:
         """Computes the affine transformation matrix for the image.
 
         Returns:
-            list: Affine matrix with shape (ndims + 1, ndims + 1).
+            list: Affine matrix with shape (ndims + 1, ndims + 1), or None if
+                no array is loaded.
         """
         if self._store is None or self.meta._has_array == False:
             return None
@@ -312,8 +410,8 @@ class MLArray:
         """Extracts the translation vector from the affine matrix.
 
         Returns:
-            list: Translation vector with length equal to the number of
-            dimensions.
+            list: Translation vector with length equal to the number of spatial
+                dimensions, or None if no array is loaded.
         """
         if self._store is None or self.meta._has_array == False:
             return None
@@ -325,7 +423,7 @@ class MLArray:
 
         Returns:
             list: Scaling factors per axis with length equal to the number of
-            dimensions.
+                spatial dimensions, or None if no array is loaded.
         """
         if self._store is None or self.meta._has_array == False:
             return None
@@ -337,7 +435,8 @@ class MLArray:
         """Extracts the rotation matrix from the affine matrix.
 
         Returns:
-            list: Rotation matrix with shape (ndims, ndims).
+            list: Rotation matrix with shape (ndims, ndims), or None if no array
+                is loaded.
         """
         if self._store is None or self.meta._has_array == False:
             return None
@@ -349,7 +448,8 @@ class MLArray:
         """Computes the shear matrix from the affine matrix.
 
         Returns:
-            list: Shear matrix with shape (ndims, ndims).
+            list: Shear matrix with shape (ndims, ndims), or None if no array is
+                loaded.
         """
         if self._store is None or self.meta._has_array == False:
             return None
@@ -363,7 +463,7 @@ class MLArray:
         """Returns the shape of the array.
 
         Returns:
-            tuple: Shape of the underlying array.
+            tuple: Shape of the underlying array, or None if no array is loaded.
         """
         if self._store is None or self.meta._has_array == False:
             return None
@@ -371,21 +471,36 @@ class MLArray:
 
     @property
     def dtype(self):
-        """Returns the dtype of the array."""
+        """Returns the dtype of the array.
+
+        Returns:
+            np.dtype: Dtype of the underlying array, or None if no array is
+                loaded.
+        """
         if self._store is None or self.meta._has_array == False:
             return None
         return self._store.dtype
     
     @property
     def ndim(self) -> int:
-        """Returns the number of dimensions of the image."""
+        """Returns the number of dimensions of the array.
+
+        Returns:
+            int: Number of dimensions, or None if no array is loaded.
+        """
         if self._store is None or self.meta._has_array == False:
             return None
         return len(self._store.shape)
     
     @property
     def _spatial_ndim(self) -> int:
-        """Returns the number of dimensions of the image."""
+        """Returns the number of spatial dimensions.
+
+        If ``channel_axis`` is set, the channel dimension is excluded.
+
+        Returns:
+            int: Number of spatial dimensions, or None if no array is loaded.
+        """
         if self._store is None or self.meta._has_array == False:
             return None
         ndim = len(self._store.shape)
@@ -422,11 +537,15 @@ class MLArray:
         We haven't further optimized for modern CPUs with larger caches, as our data must still be compatible with the older systems.
 
         Args:
-            image_size (Tuple[int, int, int, int]): Image shape. Use a 2D, 3D,
-                or 4D size; 2D/3D inputs are internally expanded.
+            image_size (Union[Tuple[int, int], Tuple[int, int, int], Tuple[int, int, int, int]]):
+                Image shape. Use a 2D, 3D, or 4D size; 2D/3D inputs are
+                internally expanded to 4D (with channels first).
             patch_size (Union[Tuple[int, int], Tuple[int, int, int]]): Patch
                 size for spatial dimensions. Use a 2-tuple (x, y) or 3-tuple
                 (x, y, z).
+            channel_axis (Optional[int]): Axis index for channels in the
+                original array. If set, the size is moved to channels-first
+                for cache calculations.
             bytes_per_pixel (int): Number of bytes per element. Defaults to 4
                 for float32.
             l1_cache_size_per_core_in_bytes (int): L1 cache per core in bytes.
@@ -434,7 +553,7 @@ class MLArray:
             safety_factor (float): Safety factor to avoid filling caches.
 
         Returns:
-            Tuple[Tuple[int, ...], Tuple[int, ...]]: Recommended chunk size and block size.
+            Tuple[List[int], List[int]]: Recommended chunk size and block size.
         """
         def _move_index_list(a, src, dst):
             a = list(a)
@@ -519,6 +638,22 @@ class MLArray:
         return [int(value) for value in chunk_size], [int(value) for value in block_size]
     
     def _comp_and_validate_blosc2_meta(self, meta_blosc2, patch_size, chunk_size, block_size, shape, channel_axis):
+        """Compute and validate Blosc2 chunk/block metadata.
+
+        Args:
+            meta_blosc2 (Optional[MetaBlosc2]): Existing Blosc2 metadata to use
+                as defaults.
+            patch_size (Optional[Union[int, List, Tuple, str]]): Patch size hint
+                or "default". See ``open``/``save`` for expected shapes.
+            chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
+            block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
+            shape (Union[List, Tuple, np.ndarray]): Full array shape including
+                channels if present.
+            channel_axis (Optional[int]): Channel axis index, if any.
+
+        Returns:
+            MetaBlosc2: Validated Blosc2 metadata instance.
+        """
         if patch_size is not None and patch_size != "default" and not ((len(shape) == 2 and channel_axis is None) or (len(shape) == 3 and channel_axis is None) or (len(shape) == 4 and channel_axis is not None) or (len(shape) == 4 and channel_axis is not None)):
             raise NotImplementedError("Chunk and block size optimization based on patch size is only implemented for 2D and 3D images. Please set the chunk and block size manually or set to None for blosc2 to determine a chunk and block size.")
         if patch_size is not None and patch_size != "default" and (chunk_size is not None or block_size is not None):
@@ -541,6 +676,7 @@ class MLArray:
         return meta_blosc2
     
     def _read_meta(self):
+        """Read MLArray metadata from the underlying store, if available."""
         meta = Meta()
         if self.support_metadata and isinstance(self._store, blosc2.ndarray.NDArray):
             meta = self._store.vlmeta["mlarray"]
@@ -548,6 +684,11 @@ class MLArray:
         self._validate_and_add_meta(meta)
 
     def _write_metadata(self, force=False):
+        """Write MLArray metadata to the underlying store if supported.
+
+        Args:
+            force (bool): If True, write even when mmap mode is read-only.
+        """
         if self.support_metadata and isinstance(self._store, blosc2.ndarray.NDArray) and (self.mmap in ('r+', 'w+') or force):
             metadata = self.meta.to_dict()
             if not is_serializable(metadata):
@@ -555,6 +696,22 @@ class MLArray:
             self._store.vlmeta["mlarray"] = metadata
     
     def _validate_and_add_meta(self, meta, spacing=None, origin=None, direction=None, channel_axis=None):
+        """Validate and attach metadata to the MLArray instance.
+
+        Args:
+            meta (Optional[Union[dict, Meta]]): Metadata to attach. Dicts are
+                interpreted as ``meta.image`` fields.
+            spacing (Optional[Union[List, Tuple, np.ndarray]]): Spacing per
+                spatial axis.
+            origin (Optional[Union[List, Tuple, np.ndarray]]): Origin per
+                spatial axis.
+            direction (Optional[Union[List, Tuple, np.ndarray]]): Direction
+                cosine matrix with shape (ndims, ndims).
+            channel_axis (Optional[int]): Channel axis index, if any.
+
+        Raises:
+            ValueError: If ``meta`` is not None, dict, or Meta.
+        """
         if meta is not None:
             if not isinstance(meta, (dict, Meta)):
                 raise ValueError("Meta must be None, a dict or a Meta object.")
@@ -574,4 +731,3 @@ class MLArray:
             self.meta.spatial.channel_axis = channel_axis
         self.meta.spatial.shape = self.shape
         self.meta.spatial._validate_and_cast(self._spatial_ndim)
-
