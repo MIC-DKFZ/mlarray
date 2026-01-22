@@ -12,10 +12,7 @@
 
 **tl;dr:** Using large, medical or scientific images for Machine Learning? => Use MLArray
 
-A standardized Blosc2 image reader and writer for medical images. The MLArray
-file format (".mla") is a Blosc2-compressed container with standardized
-metadata support for N-dimensional medical images. Plain ".b2nd" files are also
-supported, but they do not participate in the MLArray metadata standard.
+MLArray is a purpose‑built format for N-dimensional medical and scientific data used in Machine Learning. It replaces the patchwork of source formats and late‑stage conversions to NumPy/Zarr/Blosc2 by adding standardized metadata on top of a Blosc2 backend, enabling a shared ecosystem for training, analysis, and visualization (including Napari and MITK).
 
 ## Installation
 
