@@ -30,6 +30,11 @@ dev = [
   "twine>=4.0",
   "setuptools_scm[toml]>=8.0",
 ]
+docs = [
+  "mkdocs-material>=9.5",
+  "mkdocstrings[python]>=0.25",
+  "pymdown-extensions>=10.0",
+]
 all = [
   "medvol",
 ]

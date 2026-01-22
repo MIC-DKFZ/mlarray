@@ -1,0 +1,31 @@
+site_name: MLArray
+site_description: MLArray documentation
+
+theme:
+  name: material
+
+nav:
+  - Home: index.md
+  - Schema: schema.md
+  - API: api.md
+
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.superfences
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_root_heading: true
+            show_source: false
+            show_signature_annotations: true
+            separate_signature: true
+            merge_init_into_class: true
+            filters:
+              - "!^_"
