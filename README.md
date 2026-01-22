@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/github/license/Karol-G/mlarray" alt="License" />
 </p>
 
-**tl;dr:** Using large, medical or scientific images for Machine Learning? -> Use MLArray
+**tl;dr:** Using large, medical or scientific images for Machine Learning? => Use MLArray
 
 A standardized Blosc2 image reader and writer for medical images. The MLArray
 file format (".mla") is a Blosc2-compressed container with standardized
