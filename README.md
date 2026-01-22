@@ -3,7 +3,9 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/pypi/v/mlarray?logo=pypi&color=brightgreen&cacheSeconds=300&v=2026-01-22" alt="PyPI" />
+  <a href="https://pypi.org/project/mlarray/">
+    <img src="https://img.shields.io/pypi/v/mlarray?logo=pypi&color=brightgreen&cacheSeconds=300&v=2026-01-22" alt="PyPI" />
+  </a>
   <img src="https://img.shields.io/pypi/pyversions/mlarray?logo=python&cacheSeconds=300&v=2026-01-22" alt="Python Version" />
   <img src="https://img.shields.io/github/actions/workflow/status/Karol-G/mlarray/workflow.yml?branch=main&logo=github" alt="Tests" />
   <img src="https://img.shields.io/github/license/Karol-G/mlarray" alt="License" />
