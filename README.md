@@ -31,7 +31,7 @@ pip install mlarray[all]
 
 ## Documentaion
 
-See the documentation for the [API reference](docs/api.md), the [metadata schema](docs/schema.md), [usage examples](docs/usage.md) or [CLI usage](docs/cli.md).
+See the [documentation](https://karol-g.github.io/mlarray/) for the [API reference](https://karol-g.github.io/mlarray/api/), the [metadata schema](https://karol-g.github.io/mlarray/schema/), [usage examples](https://karol-g.github.io/mlarray/usage/) or [CLI usage](https://karol-g.github.io/mlarray/cli/).
 
 ## Usage
 
