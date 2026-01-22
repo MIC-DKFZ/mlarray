@@ -204,6 +204,13 @@ Contributions are welcome! Please open a pull request with clear changes and add
 
 Found a bug or have a request? Open an issue at https://github.com/Karol-G/mlarray/issues.
 
-## License
+## Acknowledgments
 
-Distributed under the MIT license. See `LICENSE` for details.
+<p align="left">
+  <img src="https://github.com/MIC-DKFZ/vidata/raw/main/imgs/Logos/HI_Logo.png" width="150"> &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="https://github.com/MIC-DKFZ/vidata/raw/main/imgs/Logos/DKFZ_Logo.png" width="500">
+</p>
+
+This repository is developed and maintained by the Applied Computer Vision Lab (ACVL)
+of [Helmholtz Imaging](https://www.helmholtz-imaging.de/) and the
+[Division of Medical Image Computing](https://www.dkfz.de/en/medical-image-computing) at DKFZ.
