@@ -32,6 +32,7 @@ dev = [
 ]
 docs = [
   "mkdocs-material>=9.5",
+  "mkdocs-include-markdown-plugin>=6.0",
   "mkdocstrings[python]>=0.25",
   "pymdown-extensions>=10.0",
 ]
