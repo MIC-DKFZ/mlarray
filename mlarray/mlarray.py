@@ -116,6 +116,7 @@ class MLArray:
             self.meta._blosc2.block_size = list(self._store.blocks)
         self.mmap = mmap
         self._write_metadata()
+        return self
 
     def close(self):
         self._write_metadata()
