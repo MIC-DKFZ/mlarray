@@ -6,6 +6,8 @@ theme:
 
 nav:
   - Home: index.md
+  - Usage: usage.md
+  - CLI: cli.md
   - Schema: schema.md
   - API: api.md
 

@@ -1,43 +1,8 @@
-<p align="center">
-  <img src="https://raw.githubusercontent.com/Karol-G/mlarray/main/assets/banner.png" alt="{ML Array} banner" width="700" />
-</p>
-
-<p align="center">
-  <a href="https://pypi.org/project/mlarray/"><img src="https://img.shields.io/pypi/v/mlarray?logo=pypi&color=brightgreen&cacheSeconds=300&v" alt="PyPI" align="middle" /></a>
-  <a href="https://pypi.org/project/mlarray/"><img src="https://img.shields.io/pypi/pyversions/mlarray?logo=python&cacheSeconds=300&v" alt="Python Version" align="middle" /></a>
-  <a href="https://github.com/Karol-G/mlarray/actions"><img src="https://img.shields.io/github/actions/workflow/status/Karol-G/mlarray/workflow.yml?branch=main&logo=github" alt="Tests" align="middle" /></a>
-  <a href="https://github.com/copier-org/copier"><img src="https://img.shields.io/badge/template-copier-2ebd59?logo=jinja" alt="Copier Template" align="middle" /></a>
-  <a href="https://github.com/Karol-G/mlarray/blob/main/LICENSE"><img src="https://img.shields.io/github/license/Karol-G/mlarray" alt="License" align="middle" /></a>
-</p>
-
-**tl;dr:** Using large, medical or scientific images for Machine Learning? => Use MLArray
-
-A standardized Blosc2 image reader and writer for medical images. The MLArray
-file format (".mla") is a Blosc2-compressed container with standardized
-metadata support for N-dimensional medical images. Plain ".b2nd" files are also
-supported, but they do not participate in the MLArray metadata standard.
-
-## Installation
-
-You can install mlarray via [pip](https://pypi.org/project/mlarray/):
-```bash
-pip install mlarray
-```
-
-To enable the `mlarray_convert` CLI command, install MLArray with the necessary extra dependencies:
-```bash
-pip install mlarray[all]
-```
-
-## Documentaion
-
-See the documentation for the [API reference](docs/api.md), the [metadata schema](docs/schema.md), [usage examples](docs/usage.md) or [CLI usage](docs/cli.md).
-
-## Usage
+# Usage
 
 Below are common usage patterns for loading, saving, and working with metadata.
 
-### Default usage
+## Default usage
 
 ```python
 import numpy as np
@@ -50,7 +15,7 @@ image.save("sample.mla")
 image = MLArray("sample.mla")  # Loads image
 ```
 
-### Memory-mapped usage
+## Memory-mapped usage
 
 ```python
 from mlarray import MLArray
@@ -70,7 +35,7 @@ image = MLArray().open("sample.mla", shape=array.shape, dtype=array.dtype, mmap=
 image[...] = array  # Modify image in memory and disk
 ```
 
-### Metadata inspection and manipulation
+## Metadata inspection and manipulation
 
 ```python
 import numpy as np
@@ -99,7 +64,7 @@ image.meta.image["study_id"] = "new-study"  # Modify metadata
 image.close()  # Close and save metadata, only necessary to save modified metadata
 ```
 
-### Copy metadata with overrides
+## Copy metadata with overrides
 
 ```python
 import numpy as np
@@ -117,7 +82,7 @@ image = MLArray(
 image.save("copied-metadata.mla")
 ```
 
-### Standardized metadata usage
+## Standardized metadata usage
 
 ```python
 import numpy as np
@@ -137,7 +102,7 @@ image.meta.is_seg = False
 image.save("with-metadata.mla")
 ```
 
-### Patch size variants
+## Patch size variants
 
 Default patch size (192):
 ```python
@@ -180,33 +145,3 @@ image = MLArray("sample.mla")
 # If patch_size, chunk_size and block_size are all None, Blosc2 will auto-configure chunk and block size
 image.save("manual-chunk-block.mla", patch_size=None)
 ```
-
-## CLI
-
-### mlarray_header
-
-Print the metadata header from a `.mla` or `.b2nd` file.
-
-```bash
-mlarray_header sample.mla
-```
-
-### mlarray_convert
-
-Convert a NIfTI or NRRD file to MLArray and copy metadata.
-
-```bash
-mlarray_convert sample.nii.gz output.mla
-```
-
-## Contributing
-
-Contributions are welcome! Please open a pull request with clear changes and add tests when appropriate.
-
-## Issues
-
-Found a bug or have a request? Open an issue at https://github.com/Karol-G/mlarray/issues.
-
-## License
-
-Distributed under the MIT license. See `LICENSE` for details.

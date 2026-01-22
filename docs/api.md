@@ -1,10 +1,10 @@
 # API Reference
 
-## MLArray
+## MLArray Module
 
 ::: mlarray.mlarray.MLArray
 
-## Metadata
+## Metadata Module
 
 ::: mlarray.meta.Meta
 
