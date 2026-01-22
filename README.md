@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/banner.png" alt="{ML Array} banner" width="700" />
+  <img src="https://raw.githubusercontent.com/Karol-G/mlarray/main/assets/banner.png" alt="{ML Array} banner" width="700" />
 </p>
 
 <p align="center">
