@@ -13,6 +13,13 @@ Top-level metadata container.
   or other medical imaging formats.
 - Dataclass: None (plain dict).
 
+### extra
+
+- Description: Flexible container for arbitrary, JSON-serializable metadata
+  when no schema exists. Intended for experimental or application-specific
+  fields that are not part of the standard.
+- Dataclass: None (plain dict).
+
 ### spatial
 
 - Description: Spatial metadata for the image.
@@ -20,10 +27,16 @@ Top-level metadata container.
 
 | field | type | description |
 | --- | --- | --- |
-| shape | Optional[List[float]] | The shape of the image, length = `ndims`. |
-| spacing | Optional[List[float]] | Voxel spacing per axis, length = `ndims`. |
-| origin | Optional[List[float]] | Origin per axis, length = `ndims`. |
+| spacing | Optional[List[float]] | Voxel spacing per spatial axis, length = `ndims`. |
+| origin | Optional[List[float]] | Origin per spatial axis, length = `ndims`. |
 | direction | Optional[List[List[float]]] | Direction matrix, shape `[ndims][ndims]`. |
+| shape | Optional[List[float]] | Array shape. If `channel_axis` is set, length = `ndims + 1`, otherwise length = `ndims`. |
+| channel_axis | Optional[int] | Index of channel dimension in the full array, if present. |
+
+### is_seg
+
+- Description: Whether the image is a segmentation mask.
+- Dataclass: None (boolean).
 
 ### stats
 
@@ -47,16 +60,23 @@ Top-level metadata container.
 
 - Description: Bounding boxes for objects/regions in the image.
 - Dataclass: `MetaBbox`.
-- Structure: List of bboxes, each bbox is a list with length equal to image `ndims`, and each entry is `[min, max]`.
+- Structure: List of bboxes, each bbox is a list with length equal to image `ndims`,
+  and each entry is `[min, max]`.
 
 | field | type | description |
 | --- | --- | --- |
 | bboxes | Optional[List[List[List[int]]]] | Bounding boxes shaped `[num_bboxes][ndims][2]` (min/max), ints only. |
 
-### is_seg
+### _has_array
 
-- Description: Whether the image is a segmentation mask.
+- Description: Whether this metadata instance represents an on-disk array.
 - Dataclass: None (boolean).
+
+### _image_meta_format
+
+- Description: Source format identifier for the `image` metadata (e.g., "dicom",
+  "nifti", "nrrd"). This is advisory and application-defined.
+- Dataclass: None (string).
 
 ### _blosc2
 
@@ -65,18 +85,11 @@ Top-level metadata container.
 
 | field | type | description |
 | --- | --- | --- |
-| chunk_size | Optional[List[float]] | Chunk size per axis, length = `ndims`. |
-| block_size | Optional[List[float]] | Block size per axis, length = `ndims`. |
-| patch_size | Optional[List[float]] | Patch size per axis, length = `ndims`. |
+| chunk_size | Optional[List[float]] | Chunk size per axis, length = full array `ndims` (including channels). |
+| block_size | Optional[List[float]] | Block size per axis, length = full array `ndims` (including channels). |
+| patch_size | Optional[List[float]] | Patch size per spatial axis, length = `ndims` (channels excluded). |
 
 ### _mlarray_version
 
 - Description: MLArray version string used to write the file.
 - Dataclass: None (string).
-
-### extra
-
-- Description: Flexible container for arbitrary, JSON-serializable metadata
-  when no schema exists. Intended for experimental or application-specific
-  fields that are not part of the standard.
-- Dataclass: None (plain dict).
