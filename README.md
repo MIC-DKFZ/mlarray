@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://pypi.org/project/mlarray/">
+  <a href="https://pypi.org/project/mlarray/" style="text-decoration: none;">
     <img src="https://img.shields.io/pypi/v/mlarray?logo=pypi&color=brightgreen&cacheSeconds=300&v=2026-01-22" alt="PyPI" />
   </a>
   <img src="https://img.shields.io/pypi/pyversions/mlarray?logo=python&cacheSeconds=300&v=2026-01-22" alt="Python Version" />
