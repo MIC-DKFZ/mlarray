@@ -1,11 +1,14 @@
-MLArray
-=========
+<p align="center">
+  <img src="assets/banner.png" alt="{ML Array} banner" width="700" />
+</p>
 
-![PyPI](https://img.shields.io/pypi/v/mlarray?logo=pypi&color=brightgreen)
-![Python Version](https://img.shields.io/pypi/pyversions/mlarray?logo=python)
-![Tests](https://img.shields.io/github/actions/workflow/status/Karol-G/mlarray/workflow.yml?branch=main&logo=github)
-![Copier Template](https://img.shields.io/badge/copier-template-blue?logo=jinja)
-![License](https://img.shields.io/github/license/Karol-G/mlarray)
+<p align="center">
+  <img src="https://img.shields.io/pypi/v/mlarray?logo=pypi&color=brightgreen" alt="PyPI" />
+  <img src="https://img.shields.io/pypi/pyversions/mlarray?logo=python" alt="Python Version" />
+  <img src="https://img.shields.io/github/actions/workflow/status/Karol-G/mlarray/workflow.yml?branch=main&logo=github" alt="Tests" />
+  <img src="https://img.shields.io/badge/copier-template-blue?logo=jinja" alt="Copier Template" />
+  <img src="https://img.shields.io/github/license/Karol-G/mlarray" alt="License" />
+</p>
 
 A standardized Blosc2 image reader and writer for medical images. The MLArray
 file format (".mb2nd") is a Blosc2-compressed container with standardized
