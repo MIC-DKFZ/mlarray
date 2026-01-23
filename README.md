@@ -10,9 +10,9 @@
   <a href="https://github.com/Karol-G/mlarray/blob/main/LICENSE"><img src="https://img.shields.io/github/license/Karol-G/mlarray" alt="License" align="middle" /></a>
 </p>
 
-**tl;dr:** Using large, medical or scientific images for Machine Learning? => Use MLArray
+**tl;dr:** Working with large medical or scientific images for machine learning? -> Use MLArray.
 
-MLArray is a purpose‑built format for N-dimensional medical and scientific data used in Machine Learning. It replaces the patchwork of source formats and late‑stage conversions to NumPy/Zarr/Blosc2 by adding standardized metadata on top of a Blosc2 backend, enabling a shared ecosystem for training, analysis, and visualization (including [Napari](https://napari.org) and [MITK](https://www.mitk.org/wiki/The_Medical_Imaging_Interaction_Toolkit_(MITK))).
+MLArray is a purpose-built file format for *N*-dimensional medical and scientific array data in machine learning workflows. It replaces the usual patchwork of source formats and late-stage conversions to NumPy/Zarr/Blosc2 by layering **standardized metadata** on top of a **Blosc2-backed** storage layout, so the same files work reliably across training, analysis, and visualization tools (including [Napari](https://napari.org) and [MITK](https://www.mitk.org/wiki/The_Medical_Imaging_Interaction_Toolkit_%28MITK%29)).
 
 ## Installation
 
