@@ -200,10 +200,6 @@ mlarray_convert sample.nii.gz output.mla
 
 Contributions are welcome! Please open a pull request with clear changes and add tests when appropriate.
 
-## Issues
-
-Found a bug or have a request? Open an issue at https://github.com/Karol-G/mlarray/issues.
-
 ## Acknowledgments
 
 <p align="left">
