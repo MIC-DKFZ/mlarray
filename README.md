@@ -6,7 +6,7 @@
   <a href="https://pypi.org/project/mlarray/"><img src="https://img.shields.io/pypi/v/mlarray?logo=pypi&color=brightgreen&cacheSeconds=300&v" alt="PyPI" align="middle" /></a>
   <a href="https://pypi.org/project/mlarray/"><img src="https://img.shields.io/pypi/pyversions/mlarray?logo=python&cacheSeconds=300&v" alt="Python Version" align="middle" /></a>
   <a href="https://github.com/Karol-G/mlarray/actions"><img src="https://img.shields.io/github/actions/workflow/status/Karol-G/mlarray/workflow.yml?branch=main&logo=github" alt="Tests" align="middle" /></a>
-  <a href="https://karol-g.github.io/mlarray/"><img src="https://img.shields.io/badge/docs-mlarray-blue?logo=readthedocs&logoColor=white" alt="Docs" align="middle" /></a>
+  <a href="https://MIC-DKFZ.github.io/mlarray/"><img src="https://img.shields.io/badge/docs-mlarray-blue?logo=readthedocs&logoColor=white" alt="Docs" align="middle" /></a>
   <a href="https://github.com/Karol-G/mlarray/blob/main/LICENSE"><img src="https://img.shields.io/github/license/Karol-G/mlarray" alt="License" align="middle" /></a>
 </p>
 
@@ -28,7 +28,7 @@ pip install mlarray[all]
 
 ## Documentaion
 
-See the [documentation](https://karol-g.github.io/mlarray/) for the [API reference](https://karol-g.github.io/mlarray/api/), the [metadata schema](https://karol-g.github.io/mlarray/schema/), [usage examples](https://karol-g.github.io/mlarray/usage/) or [CLI usage](https://karol-g.github.io/mlarray/cli/).
+See the [documentation](https://MIC-DKFZ.github.io/mlarray/) for the [API reference](https://MIC-DKFZ.github.io/mlarray/api/), the [metadata schema](https://MIC-DKFZ.github.io/mlarray/schema/), [usage examples](https://MIC-DKFZ.github.io/mlarray/usage/) or [CLI usage](https://MIC-DKFZ.github.io/mlarray/cli/).
 
 ## Usage
 

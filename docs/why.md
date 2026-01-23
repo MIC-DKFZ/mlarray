@@ -48,4 +48,4 @@ This can be useful when you want a standardized interface for accessing these an
 
 MLArray uses **Blosc2** as its storage backend, which provides several properties that are particularly well-suited for machine learning and deep learning workloads.
 
-For details, see: [ML Optimization](https://karol-g.github.io/mlarray/optimization/)
+For details, see: [ML Optimization](https://MIC-DKFZ.github.io/mlarray/optimization/)
