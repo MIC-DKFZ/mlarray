@@ -41,9 +41,9 @@ all = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Karol-G/mlarray"
-Source = "https://github.com/Karol-G/mlarray"
-Issues = "https://github.com/Karol-G/mlarray/issues"
+Homepage = "https://github.com/MIC-DKFZ/mlarray"
+Source = "https://github.com/MIC-DKFZ/mlarray"
+Issues = "https://github.com/MIC-DKFZ/mlarray/issues"
 
 [project.scripts]
 mlarray_header = "mlarray.cli:cli_print_header"

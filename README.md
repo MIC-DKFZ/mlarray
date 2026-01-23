@@ -1,13 +1,13 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Karol-G/mlarray/main/assets/banner.png" alt="{ML Array} banner" width="700" />
+  <img src="https://raw.githubusercontent.com/MIC-DKFZ/mlarray/main/assets/banner.png" alt="{ML Array} banner" width="700" />
 </p>
 
 <p align="center">
   <a href="https://pypi.org/project/mlarray/"><img src="https://img.shields.io/pypi/v/mlarray?logo=pypi&color=brightgreen&cacheSeconds=300&v" alt="PyPI" align="middle" /></a>
   <a href="https://pypi.org/project/mlarray/"><img src="https://img.shields.io/pypi/pyversions/mlarray?logo=python&cacheSeconds=300&v" alt="Python Version" align="middle" /></a>
-  <a href="https://github.com/Karol-G/mlarray/actions"><img src="https://img.shields.io/github/actions/workflow/status/Karol-G/mlarray/workflow.yml?branch=main&logo=github" alt="Tests" align="middle" /></a>
+  <a href="https://github.com/MIC-DKFZ/mlarray/actions"><img src="https://img.shields.io/github/actions/workflow/status/MIC-DKFZ/mlarray/workflow.yml?branch=main&logo=github" alt="Tests" align="middle" /></a>
   <a href="https://MIC-DKFZ.github.io/mlarray/"><img src="https://img.shields.io/badge/docs-mlarray-blue?logo=readthedocs&logoColor=white" alt="Docs" align="middle" /></a>
-  <a href="https://github.com/Karol-G/mlarray/blob/main/LICENSE"><img src="https://img.shields.io/github/license/Karol-G/mlarray" alt="License" align="middle" /></a>
+  <a href="https://github.com/MIC-DKFZ/mlarray/blob/main/LICENSE"><img src="https://img.shields.io/github/license/MIC-DKFZmlarray" alt="License" align="middle" /></a>
 </p>
 
 **tl;dr:** Working with large medical or scientific images for machine learning? -> Use MLArray.
