@@ -53,10 +53,13 @@ class MLArray:
             copy (Optional[MLArray]): Another MLArray instance to copy metadata
                 fields from. If provided, its metadata overrides any metadata
                 set via arguments.
-        """    
+        """
         self.filepath = None
         self.support_metadata = None   
         self.mmap = None
+        self.meta = None
+        if isinstance(array, (str, Path)) and (spacing is not None or origin is not None or direction is not None or meta is not None or channel_axis is not None or copy is not None):
+            raise ("Spacing, origin, direction, meta, channel_axis or copy cannot be set when array is a filepath.")
         if isinstance(array, (str, Path)):
             self.load(array, num_threads)
         else:
@@ -130,12 +133,14 @@ class MLArray:
             raise RuntimeError("Cannot create a new file as a file exists already under that path. Explicitly set shape and dtype only if you intent to create a new file.")
         if (shape is not None and dtype is None) or (shape is None and dtype is not None):
             raise RuntimeError("Both shape and dtype must be set if you intend to create a new file.")
-        if shape is not None and mmap == 'r':
-            raise RuntimeError("mmap_mode cannot be 'r' (read-only) if you intend to write a new file. Explicitly set shape and dtype only if you intent to create a new file.")
+        if shape is not None and mmap != 'w+':
+            raise RuntimeError("mmap must be 'w+' (create/overwrite) if you intend to write a new file. Explicitly set shape and dtype only if you intent to create a new file.")
+        if (shape is None or dtype is None) and mmap == 'w+':
+            raise RuntimeError("Shape and dtype must be set explicitly when mmap is 'w+'. Explicitly set shape and dtype only if you intent to create a new file.")
         if mmap not in ('r', 'r+', 'w+', 'c'):
-            raise RuntimeError("mmap_mode must be one of the following: 'r', 'r+', 'w+', 'c'")
+            raise RuntimeError("mmap must be one of the following: 'r', 'r+', 'w+', 'c'")
         
-        create_array = shape is not None
+        create_array = mmap == 'w+'
     
         if create_array:
             self.meta._blosc2 = self._comp_and_validate_blosc2_meta(self.meta._blosc2, patch_size, chunk_size, block_size, shape, channel_axis)   
@@ -171,6 +176,7 @@ class MLArray:
         self.filepath = None
         self.support_metadata = None   
         self.mmap = None
+        self.meta = None
         
     def load(
             self,
