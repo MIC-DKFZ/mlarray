@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mlarray"
-description = "A standardized blosc2 image reader and writer for medical images."
+description = "Array format specialized for Machine Learning with Blosc2 backend and standardized metadata."
 readme = "README.md"
 requires-python = ">= 3.10"
 license = { text = "MIT" }
