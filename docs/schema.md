@@ -53,7 +53,7 @@ This section stores the information needed to interpret the array in physical sp
 | spacing      | Optional[List[float]]       | Voxel spacing per spatial axis, length = `ndims`.                                        |
 | origin       | Optional[List[float]]       | Origin per spatial axis, length = `ndims`.                                               |
 | direction    | Optional[List[List[float]]] | Direction matrix, shape `[ndims][ndims]`.                                                |
-| shape        | Optional[List[float]]       | Array shape. If `channel_axis` is set, length = `ndims + 1`, otherwise length = `ndims`. |
+| shape        | Optional[List[int]]       | Array shape. If `channel_axis` is set, length = `ndims + 1`, otherwise length = `ndims`. |
 | channel_axis | Optional[int]               | Index of channel dimension in the full array, if present.                                |
 
 ---
