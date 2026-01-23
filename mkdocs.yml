@@ -6,10 +6,12 @@ theme:
 
 nav:
   - Home: index.md
+  - Why MLArray: why.md
   - Usage: usage.md
-  - CLI: cli.md
+  - ML Optimization: optimization.md
   - Schema: schema.md
   - API: api.md
+  - CLI: cli.md
 
 markdown_extensions:
   - admonition
