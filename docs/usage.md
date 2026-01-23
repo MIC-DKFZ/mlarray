@@ -1,8 +1,16 @@
 # Usage
 
-Below are common usage patterns for loading, saving, and working with metadata.
+This section shows common usage patterns for **creating**, **saving**, and **loading** MLArray files, as well as working with **memory mapping** and **metadata**.
+
+MLArray is designed to feel natural in Python workflows: you can construct an `MLArray` directly from a NumPy array, save it to disk, and later load it again with a single line. For large images, MLArray also supports **memory-mapped access**, allowing you to read and modify *only small regions* of an image without loading the full array into RAM. In addition, MLArray exposes a consistent metadata interface, so you can store and retrieve both **standardized metadata** (e.g., spacing, origin) and **arbitrary custom metadata** (e.g., raw DICOM tags, experiment info).
+
+Below are practical examples that cover the most common workflows.
+
+---
 
 ## Default usage
+
+The simplest workflow: create an `MLArray` from a NumPy array, save it to disk, and load it back later.
 
 ```python
 import numpy as np
@@ -15,7 +23,11 @@ image.save("sample.mla")
 image = MLArray("sample.mla")  # Loads image
 ```
 
+---
+
 ## Memory-mapped usage
+
+Memory mapping allows you to access large arrays on disk *without loading everything into memory*. This is ideal for patch-based training, interactive visualization, or working with multi-GB/ TB-scale volumes.
 
 ```python
 from mlarray import MLArray
@@ -35,7 +47,11 @@ image = MLArray().open("sample.mla", shape=array.shape, dtype=array.dtype, mmap=
 image[...] = array  # Modify image in memory and disk
 ```
 
+---
+
 ## Metadata inspection and manipulation
+
+MLArray provides first-class support for common image metadata (spacing, origin, direction), and also lets you attach arbitrary metadata via `meta=...` (e.g., raw DICOM fields, acquisition parameters, dataset identifiers).
 
 ```python
 import numpy as np
@@ -64,7 +80,11 @@ image.meta.image["study_id"] = "new-study"  # Modify metadata
 image.close()  # Close and save metadata, only necessary to save modified metadata
 ```
 
+---
+
 ## Copy metadata with overrides
+
+This pattern is useful when you want to generate derived data (e.g., predictions, augmentations, resampled images) while keeping most metadata consistent with a reference image, but selectively overriding specific fields like spacing.
 
 ```python
 import numpy as np
@@ -82,7 +102,11 @@ image = MLArray(
 image.save("copied-metadata.mla")
 ```
 
+---
+
 ## Standardized metadata usage
+
+For structured workflows, MLArray supports a standardized metadata container via `Meta`. This makes metadata access explicit and predictable, while still allowing flexible extensions when needed.
 
 ```python
 import numpy as np
@@ -102,9 +126,16 @@ image.meta.is_seg = False
 image.save("with-metadata.mla")
 ```
 
+---
+
 ## Patch size variants
 
-Default patch size (192):
+MLArray stores arrays in a chunked layout to enable efficient partial reads. You can control how data is chunked using `patch_size` (recommended in most cases), or manually specify chunk and block sizes when you need full control.
+
+### Default patch size (192)
+
+Uses the default patch configuration, optimized for typical ML patch-based access patterns.
+
 ```python
 from mlarray import MLArray
 
@@ -113,7 +144,10 @@ image.save("default-patch.mla")  # Default patch_size is 'default' -> Isotropic 
 image.save("default-patch.mla", patch_size='default')
 ```
 
-Custom isotropic patch size (512):
+### Custom isotropic patch size (512)
+
+A larger patch size can improve throughput when you typically load large regions at once (at the cost of slightly less granular random access).
+
 ```python
 from mlarray import MLArray
 
@@ -121,7 +155,10 @@ image = MLArray("sample.mla")
 image.save("patch-512.mla", patch_size=512)
 ```
 
-Custom non-isotropic patch size:
+### Custom non-isotropic patch size
+
+Non-isotropic patches are useful when one axis behaves differently (e.g., fewer slices in Z, anisotropic voxel spacing, or slice-wise training).
+
 ```python
 from mlarray import MLArray
 
@@ -129,7 +166,10 @@ image = MLArray("sample.mla")
 image.save("patch-non-iso.mla", patch_size=(128, 192, 256))
 ```
 
-Manual chunk/block size:
+### Manual chunk/block size
+
+For advanced use cases, you can explicitly define the chunk and block size used by the storage backend.
+
 ```python
 from mlarray import MLArray
 
@@ -137,7 +177,10 @@ image = MLArray("sample.mla")
 image.save("manual-chunk-block.mla", chunk_size=(1, 128, 128), block_size=(1, 32, 32))
 ```
 
-Let Blosc2 itself configure chunk/block size:
+### Let Blosc2 itself configure chunk/block size
+
+If you disable MLArray patch sizing, Blosc2 can choose chunk and block sizes automatically. This can be helpful when experimenting or when you want to rely entirely on backend heuristics.
+
 ```python
 from mlarray import MLArray
 
