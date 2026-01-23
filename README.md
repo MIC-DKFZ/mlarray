@@ -7,7 +7,7 @@
   <a href="https://pypi.org/project/mlarray/"><img src="https://img.shields.io/pypi/pyversions/mlarray?logo=python&cacheSeconds=300&v" alt="Python Version" align="middle" /></a>
   <a href="https://github.com/MIC-DKFZ/mlarray/actions"><img src="https://img.shields.io/github/actions/workflow/status/MIC-DKFZ/mlarray/workflow.yml?branch=main&logo=github" alt="Tests" align="middle" /></a>
   <a href="https://MIC-DKFZ.github.io/mlarray/"><img src="https://img.shields.io/badge/docs-mlarray-blue?logo=readthedocs&logoColor=white" alt="Docs" align="middle" /></a>
-  <a href="https://github.com/MIC-DKFZ/mlarray/blob/main/LICENSE"><img src="https://img.shields.io/github/license/MIC-DKFZmlarray" alt="License" align="middle" /></a>
+  <a href="https://github.com/MIC-DKFZ/mlarray/blob/main/LICENSE"><img src="https://img.shields.io/github/license/MIC-DKFZ/mlarray" alt="License" align="middle" /></a>
 </p>
 
 **tl;dr:** Working with large medical or scientific images for machine learning? -> Use MLArray.
