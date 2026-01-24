@@ -96,7 +96,7 @@ For large files, you typically want **mmap reads** so random patches don’t req
 from mlarray import MLArray
 
 # read-only mmap: fast random access without loading the full volume
-image = MLArray().open("patch-non-iso.mla", mmap='r')
+image = MLArray.open("patch-non-iso.mla", mmap='r')
 
 patch = image[10:20, 50:60]  # Read a crop/patch (partial read)
 ```
@@ -119,7 +119,7 @@ You can modify regions in-place with `mmap='r+'`. This is useful for workflows l
 ```python
 from mlarray import MLArray
 
-image = MLArray().open("patch-non-iso.mla", mmap='r+')
+image = MLArray.open("patch-non-iso.mla", mmap='r+')
 image[10:20, 50:60] *= 5  # Modify crop in memory and on disk
 image.close()
 ```
@@ -137,7 +137,7 @@ from mlarray import MLArray
 shape = (128, 256, 256)
 dtype = np.float32
 
-image = MLArray().open(
+image = MLArray.open(
     "streamed-write.mla",
     shape=shape,
     dtype=dtype,

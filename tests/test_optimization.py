@@ -43,7 +43,7 @@ class TestOptimizationExamples(unittest.TestCase):
 
             MLArray(array).save(path, patch_size=(8, 16, 16))
 
-            image = MLArray().open(path, mmap="r")
+            image = MLArray.open(path, mmap="r")
             patch = image[10:20, 5:15, 7:17]
 
             self.assertEqual(patch.shape, (10, 10, 10))
@@ -55,7 +55,7 @@ class TestOptimizationExamples(unittest.TestCase):
 
             MLArray(array).save(path, patch_size=(8, 16, 16))
 
-            image = MLArray().open(path, mmap="r+")
+            image = MLArray.open(path, mmap="r+")
             image[0:2, 0:2, 0:2] *= 0.0
             image.close()
 
@@ -68,7 +68,7 @@ class TestOptimizationExamples(unittest.TestCase):
             dtype = np.float32
             path = Path(tmpdir) / "streamed-write.mla"
 
-            image = MLArray().open(
+            image = MLArray.open(
                 path,
                 shape=shape,
                 dtype=dtype,

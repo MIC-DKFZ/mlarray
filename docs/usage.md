@@ -34,16 +34,16 @@ from mlarray import MLArray
 import numpy as np
 
 # read-only, partial access (default)
-image = MLArray().open("sample.mla", mmap='r')  
+image = MLArray.open("sample.mla", mmap='r')  
 crop = image[10:20, 50:60]  # Read crop
 
 # read/write, partial access
-image = MLArray().open("sample.mla", mmap='r+')  
+image = MLArray.open("sample.mla", mmap='r+')  
 image[10:20, 50:60] *= 5  # Modify crop in memory and disk
 
 # read/write, partial access, create/overwrite
 array = np.random.random((128, 256, 256))
-image = MLArray().open("sample.mla", shape=array.shape, dtype=array.dtype, mmap='w+')  
+image = MLArray.open("sample.mla", shape=array.shape, dtype=array.dtype, mmap='w+')  
 image[...] = array  # Modify image in memory and disk
 ```
 
@@ -75,7 +75,7 @@ image.meta.image["study_id"] = "study-001"
 image.save("with-metadata.mla")
 
 # Open memory-mapped
-image = MLArray().open("with-metadata.mla", mmap='r+')  
+image = MLArray.open("with-metadata.mla", mmap='r+')  
 image.meta.image["study_id"] = "new-study"  # Modify metadata
 image.close()  # Close and save metadata, only necessary to save modified metadata
 ```

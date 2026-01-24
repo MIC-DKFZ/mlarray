@@ -55,22 +55,22 @@ class MLArray:
                 set via arguments.
         """
         self.filepath = None
-        self.support_metadata = None   
+        self.support_metadata = None
         self.mmap = None
         self.meta = None
         if isinstance(array, (str, Path)) and (spacing is not None or origin is not None or direction is not None or meta is not None or channel_axis is not None or copy is not None):
             raise ("Spacing, origin, direction, meta, channel_axis or copy cannot be set when array is a filepath.")
         if isinstance(array, (str, Path)):
-            self.load(array, num_threads)
+            self._load(array, num_threads)
         else:
             self._store = array
-            self._validate_and_add_meta(meta, spacing, origin, direction, channel_axis)
-        
-        if copy is not None:
-            self.meta.copy_from(copy.meta)
+            self._validate_and_add_meta(meta, spacing, origin, direction, channel_axis)        
+            if copy is not None:
+                self.meta.copy_from(copy.meta)
 
+    @classmethod
     def open(
-            self,
+            cls,
             filepath: Union[str, Path],
             shape: Optional[Union[List, Tuple, np.ndarray]] = None,
             dtype: Optional[np.dtype] = None,
@@ -84,6 +84,66 @@ class MLArray:
             dparams: Optional[Dict] = None
         ):
         """Open an existing Blosc2 file or create a new one with memory mapping.
+
+        This method supports both MLArray (".mla") and plain Blosc2 (".b2nd")
+        files. When creating a new file, both ``shape`` and ``dtype`` must be
+        provided.
+
+        WARNING:
+            MLArray supports both ".b2nd" and ".mla" files. The MLArray
+            format standard and standardized metadata are honored only for
+            ".mla". For ".b2nd", metadata is ignored when loading.
+
+        Args:
+            filepath (Union[str, Path]): Target file path. Must end with
+                ".b2nd" or ".mla".
+            shape (Optional[Union[List, Tuple, np.ndarray]]): Shape of the array
+                to create. If provided, a new file is created. Length must match
+                the full array dimensionality (including channels if present).
+            dtype (Optional[np.dtype]): Numpy dtype for a newly created array.
+            channel_axis (Optional[int]): Axis index for channels in the array.
+                Used for patch/chunk/block calculations.
+            mmap (str): Blosc2 mmap mode. One of "r", "r+", "w+", "c".
+            patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
+                chunk/block optimization. Provide an int for isotropic sizes or
+                a list/tuple with length equal to the number of spatial
+                dimensions. Use "default" to use the default patch size of 192.
+            chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
+                Provide an int or tuple/list with length equal to the array
+                dimensions. Ignored when ``patch_size`` is provided.
+            block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
+                Provide an int or tuple/list with length equal to the array
+                dimensions. Ignored when ``patch_size`` is provided.
+            num_threads (int): Number of threads for Blosc2 operations.
+            cparams (Optional[Dict]): Blosc2 compression parameters.
+            dparams (Optional[Dict]): Blosc2 decompression parameters.
+
+        Returns:
+            MLArray: The current instance (for chaining).
+
+        Raises:
+            RuntimeError: If the file extension is invalid, if shape/dtype are
+                inconsistent, or if mmap mode is invalid for creation.
+        """
+        class_instance = cls()
+        class_instance._open(filepath, shape, dtype, channel_axis, mmap, patch_size, chunk_size, block_size, num_threads, cparams, dparams)
+        return class_instance
+
+    def _open(
+            self,
+            filepath: Union[str, Path],
+            shape: Optional[Union[List, Tuple, np.ndarray]] = None,
+            dtype: Optional[np.dtype] = None,
+            channel_axis: Optional[int] = None,
+            mmap: str = 'r',
+            patch_size: Optional[Union[int, List, Tuple]] = 'default',  # 'default' means that the default of 192 is used. However, if set to 'default', the patch_size will be skipped if self.patch_size is set from a previously loaded MLArray image. In that case the self.patch_size is used.
+            chunk_size: Optional[Union[int, List, Tuple]]= None,
+            block_size: Optional[Union[int, List, Tuple]] = None,
+            num_threads: int = 1,
+            cparams: Optional[Dict] = None,
+            dparams: Optional[Dict] = None
+        ):
+        """Internal open method. Open an existing Blosc2 file or create a new one with memory mapping.
 
         This method supports both MLArray (".mla") and plain Blosc2 (".b2nd")
         files. When creating a new file, both ``shape`` and ``dtype`` must be
@@ -164,7 +224,6 @@ class MLArray:
             self.meta._blosc2.block_size = list(self._store.blocks)
         self.mmap = mmap
         self._write_metadata()
-        return self
 
     def close(self):
         """Flush metadata and close the underlying store.
@@ -177,13 +236,38 @@ class MLArray:
         self.support_metadata = None   
         self.mmap = None
         self.meta = None
-        
+
+    @classmethod
     def load(
-            self,
+            cls,
             filepath: Union[str, Path], 
             num_threads: int = 1,
         ):
         """Loads a Blosc2-compressed file. Both MLArray ('.mla') and Blosc2 ('.b2nd') files are supported.
+
+        WARNING:
+            MLArray supports both ".b2nd" and ".mla" files. The MLArray
+            format standard and standardized metadata are honored only for
+            ".mla". For ".b2nd", metadata is ignored when loading.
+
+        Args:
+            filepath (Union[str, Path]): Path to the Blosc2 file to be loaded.
+                The filepath needs to have the extension ".b2nd" or ".mla".
+            num_threads (int): Number of threads to use for loading the file.
+
+        Raises:
+            RuntimeError: If the file extension is not ".b2nd" or ".mla".
+        """
+        class_instance = cls()
+        class_instance._load(filepath, num_threads)
+        return class_instance
+    
+    def _load(
+            self,
+            filepath: Union[str, Path], 
+            num_threads: int = 1,
+        ):
+        """Internal MLArray load method. Loads a Blosc2-compressed file. Both MLArray ('.mla') and Blosc2 ('.b2nd') files are supported.
 
         WARNING:
             MLArray supports both ".b2nd" and ".mla" files. The MLArray

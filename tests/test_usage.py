@@ -31,8 +31,7 @@ class TestUsage(unittest.TestCase):
             path = Path(tmpdir) / "sample.mla"
             MLArray(array).save(path)
 
-            loaded = MLArray(array)
-            loaded.open(path, mmap="r")
+            loaded = MLArray.open(path, mmap="r")
             self.assertFalse(isinstance(loaded._store, np.ndarray))
 
     def test_loading_and_saving(self):
