@@ -51,7 +51,7 @@ class TestMetadataStorage(unittest.TestCase):
             self.assertEqual(loaded.meta.image, {"patient_id": "p-002"})
             self.assertTrue(loaded.meta.is_seg)
             self.assertEqual(loaded.meta.stats.to_dict(), stats.to_dict())
-            self.assertEqual(loaded.meta.bbox.to_list(), bbox.to_list())
+            self.assertEqual(loaded.meta.bbox.to_dict(), bbox.to_dict())
             self.assertEqual(loaded.meta.extra, {"pipeline": "v1"})
 
     def test_metadata_mmap_readonly_no_write(self):

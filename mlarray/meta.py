@@ -286,33 +286,25 @@ class MetaBbox:
         """Validate and normalize bounding box lists."""
         self._validate_and_cast()
 
-    def __iter__(self):
-        """Iterate over bounding boxes."""
-        return iter(self.bboxes or [])
-
-    def __getitem__(self, index):
-        """Return the bbox at ``index``."""
-        if self.bboxes is None:
-            raise TypeError("meta.bbox is None")
-        return self.bboxes[index]
-
-    def __setitem__(self, index, value):
-        """Set the bbox at ``index``."""
-        if self.bboxes is None:
-            raise TypeError("meta.bbox is None")
-        self.bboxes[index] = value
-
-    def __len__(self):
-        """Return the number of bounding boxes."""
-        return len(self.bboxes or [])
-
     def __repr__(self) -> str:
-        """Return a repr of the bounding box list."""
-        return repr(self.bboxes)
+        """Return a repr using the dict form for readability."""
+        return repr(self.to_dict())
 
-    def to_list(self) -> Optional[List[List[List[int]]]]:
-        """Return the raw bbox list."""
-        return self.bboxes
+    def to_dict(self, *, include_none: bool = True) -> Dict[str, Any]:
+        """Serialize to a JSON-compatible dict.
+
+        Args:
+            include_none (bool): If False, keys with None values are omitted.
+
+        Returns:
+            Dict[str, Any]: Serialized metadata.
+        """
+        out: Dict[str, Any] = {
+            "bboxes": self.bboxes,
+        }
+        if not include_none:
+            out = {k: v for k, v in out.items() if v is not None}
+        return out
 
     def _validate_and_cast(self, ndims: Optional[int] = None) -> None:
         """Validate bbox structure and cast to list form.
@@ -340,17 +332,24 @@ class MetaBbox:
                         raise TypeError("meta.bbox.bboxes must contain only ints")
 
     @classmethod
-    def from_list(cls, bboxes: Any) -> MetaBbox:
-        """Create a MetaBbox instance from a list-like object.
+    def from_dict(cls, d: Mapping[str, Any], *, strict: bool = True) -> MetaBbox:
+        """Create a MetaBbox instance from a mapping.
 
         Args:
-            bboxes (Any): List-like structure shaped as
-                [[ [min,max], [min,max], ...], ...].
+            d (Mapping[str, Any]): Source mapping.
+            strict (bool): If True, unknown keys raise a KeyError.
 
         Returns:
             MetaBbox: Parsed instance.
         """
-        return cls(bboxes=bboxes)
+        if not isinstance(d, Mapping):
+            raise TypeError(f"MetaBbox.from_dict expects a mapping, got {type(d).__name__}")
+        known = {"bboxes"}
+        d = dict(d)
+        unknown = set(d.keys()) - known
+        if unknown and strict:
+            raise KeyError(f"Unknown MetaBbox keys in from_dict: {sorted(unknown)}")
+        return cls(bboxes=d.get("bboxes"))
 
 
 @dataclass(slots=True)
@@ -389,10 +388,12 @@ class Meta:
         if self.bbox is not None:
             if isinstance(self.bbox, MetaBbox):
                 pass
+            elif isinstance(self.bbox, Mapping):
+                self.bbox = MetaBbox.from_dict(self.bbox, strict=False)
             elif isinstance(self.bbox, (list, tuple)) or (np is not None and isinstance(self.bbox, np.ndarray)):
                 self.bbox = MetaBbox(bboxes=self.bbox)
             else:
-                raise TypeError(f"meta.bbox must be a MetaBbox or list-like, got {type(self.bbox).__name__}")
+                raise TypeError(f"meta.bbox must be a MetaBbox, mapping, or list-like, got {type(self.bbox).__name__}")
 
         if self.spatial is None:
             self.spatial = MetaSpatial()
@@ -459,10 +460,13 @@ class Meta:
             if isinstance(value, MetaBbox):
                 self.bbox = value
                 return
+            if isinstance(value, Mapping):
+                self.bbox = MetaBbox.from_dict(value, strict=False)
+                return
             if isinstance(value, (list, tuple)) or (np is not None and isinstance(value, np.ndarray)):
                 self.bbox = MetaBbox(bboxes=value)
                 return
-            raise TypeError("meta.bbox must be a MetaBbox or list-like")
+            raise TypeError("meta.bbox must be a MetaBbox, mapping, or list-like")
         if key == "_blosc2":
             if isinstance(value, MetaBlosc2):
                 self._blosc2 = value
@@ -512,7 +516,7 @@ class Meta:
         out: Dict[str, Any] = {
             "image": self.image,
             "stats": self.stats.to_dict() if self.stats is not None else None,
-            "bbox": self.bbox.to_list() if self.bbox is not None else None,
+            "bbox": self.bbox.to_dict() if self.bbox is not None else None,
             "is_seg": self.is_seg,
             "spatial": self.spatial.to_dict(),
             "_has_array": self._has_array,
@@ -582,8 +586,10 @@ class Meta:
         bbox = d.get("bbox")
         if bbox is None:
             bbox = None
+        elif isinstance(bbox, Mapping):
+            bbox = MetaBbox.from_dict(bbox, strict=strict)
         else:
-            bbox = MetaBbox.from_list(bbox)
+            bbox = MetaBbox(bboxes=bbox)
 
         _blosc2 = d.get("_blosc2")
         if _blosc2 is None:
