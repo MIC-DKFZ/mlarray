@@ -19,15 +19,15 @@ Top-level metadata container.
 
 ### Overview
 
-`Meta` is the root object that groups all metadata into well-defined namespaces. Some namespaces are **standardized** (e.g., `spatial`, `stats`), while others are intentionally **free-form** (`image`, `extra`) to support arbitrary metadata and long-term extensibility.
+`Meta` is the root object that groups all metadata into well-defined namespaces. Some namespaces are **standardized** (e.g., `spatial`, `stats`), while others are intentionally **free-form** (`original`, `extra`) to support arbitrary metadata and long-term extensibility.
 
 ---
 
-### image
+### original
 
-* **Description:** Arbitrary JSON-serializable dictionary for image-level metadata.
-  Stores information from medical image sources such as DICOM, NIfTI, NRRD,
-  or other medical imaging formats.
+* **Description:** Arbitrary JSON-serializable dictionary for metadata from the original image source.
+  Stores information from image sources such as DICOM, NIfTI, NRRD,
+  or other imaging formats.
 * **Dataclass:** None (plain dict).
 
 ---

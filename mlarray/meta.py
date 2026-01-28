@@ -602,8 +602,8 @@ class MetaBbox(SingleKeyBaseMeta):
 
 
 @dataclass(slots=True)
-class MetaImage(SingleKeyBaseMeta):
-    """Image-specific metadata stored as JSON-serializable dict.
+class MetaOriginal(SingleKeyBaseMeta):
+    """Image metadata from the origin source stored as JSON-serializable dict.
 
     Attributes:
         data: Arbitrary JSON-serializable metadata.
@@ -700,7 +700,7 @@ class Meta(BaseMeta):
     """Top-level metadata container for mlarray.
 
     Attributes:
-        image: Image-specific metadata (JSON-serializable dict).
+        original: Image metadata from the origin source (JSON-serializable dict).
         extra: Additional metadata (JSON-serializable dict).
         spatial: Spatial metadata (spacing, origin, direction, shape).
         stats: Summary statistics.
@@ -711,7 +711,7 @@ class Meta(BaseMeta):
         _image_meta_format: Image metadata format identifier.
         _mlarray_version: Version string for mlarray.
     """
-    image: "MetaImage" = field(default_factory=lambda: MetaImage())
+    original: "MetaOriginal" = field(default_factory=lambda: MetaOriginal())
     extra: "MetaExtra" = field(default_factory=lambda: MetaExtra())
     spatial: "MetaSpatial" = field(default_factory=lambda: MetaSpatial())
     stats: "MetaStatistics" = field(default_factory=lambda: MetaStatistics())
@@ -729,7 +729,7 @@ class Meta(BaseMeta):
             ndims: Number of spatial dimensions for context-aware validation.
             **_: Unused extra context.
         """
-        self.image = MetaImage.ensure(self.image)
+        self.original = MetaOriginal.ensure(self.original)
         self.extra = MetaExtra.ensure(self.extra)
         self.spatial = MetaSpatial.ensure(self.spatial)
         self.stats = MetaStatistics.ensure(self.stats)

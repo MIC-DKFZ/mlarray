@@ -53,10 +53,10 @@ class TestUsage(unittest.TestCase):
                 spacing=(1.0, 1.0, 1.5),
                 origin=(10.0, 10.0, 30.0),
                 direction=[[1, 0, 0], [0, 1, 0], [0, 0, 1]],
-                meta=Meta(image={"patient_id": "123", "modality": "CT"}, is_seg=False),
+                meta=Meta(original={"patient_id": "123", "modality": "CT"}, is_seg=False),
             )
             image.spacing[1] = 5.3
-            image.meta.image["study_id"] = "study-001"
+            image.meta.original["study_id"] = "study-001"
 
             path = Path(tmpdir) / "with-metadata.mla"
             image.save(path)
@@ -64,7 +64,7 @@ class TestUsage(unittest.TestCase):
             loaded = MLArray(path)
             self.assertEqual(loaded.spacing, [1.0, 5.3, 1.5])
             self.assertEqual(loaded.origin, [10.0, 10.0, 30.0])
-            self.assertEqual(loaded.meta.image["study_id"], "study-001")
+            self.assertEqual(loaded.meta.original["study_id"], "study-001")
 
     def test_copy_metadata_with_override(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -74,7 +74,7 @@ class TestUsage(unittest.TestCase):
                 spacing=(1.0, 1.0, 1.0),
                 origin=(1.0, 2.0, 3.0),
                 direction=[[1, 0, 0], [0, 1, 0], [0, 0, 1]],
-                meta=Meta(image={"source": "base"}, is_seg=True),
+                meta=Meta(original={"source": "base"}, is_seg=True),
             )
             base_path = Path(tmpdir) / "base.mla"
             base.save(base_path)
@@ -87,7 +87,7 @@ class TestUsage(unittest.TestCase):
             self.assertEqual(image.origin, base_loaded.origin)
             self.assertEqual(image.direction, base_loaded.direction)
             self.assertEqual(image.meta.is_seg, base_loaded.meta.is_seg)
-            self.assertEqual(image.meta.image, base_loaded.meta.image)
+            self.assertEqual(image.meta.original, base_loaded.meta.original)
 
     def test_patch_size_default(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -143,7 +143,7 @@ class TestUsage(unittest.TestCase):
                 spacing=(1.0, 2.0, 3.0),
                 origin=(1.0, 2.0, 3.0),
                 direction=[[1, 0, 0], [0, 1, 0], [0, 0, 1]],
-                meta=Meta(image={"tag": "value"}, is_seg=True),
+                meta=Meta(original={"tag": "value"}, is_seg=True),
             )
             image.save(path)
 

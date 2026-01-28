@@ -801,7 +801,7 @@ class MLArray:
             if not isinstance(meta, (dict, Meta)):
                 raise ValueError("Meta must be None, a dict or a Meta object.")
             if isinstance(meta, dict):
-                meta = Meta(image=meta)
+                meta = Meta(original=meta)
         else:
             meta = Meta()
         self.meta = meta

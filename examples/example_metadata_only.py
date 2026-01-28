@@ -19,7 +19,7 @@ if __name__ == '__main__':
         os.remove(filepath)
 
     print("Initializing image...")
-    image = MLArray(spacing=spacing, origin=origin, direction=direction, meta=Meta(image=image_meta, bbox=bboxes))
+    image = MLArray(spacing=spacing, origin=origin, direction=direction, meta=Meta(original=image_meta, bbox=bboxes))
     print("Saving image...")
     image.save(filepath)
 
