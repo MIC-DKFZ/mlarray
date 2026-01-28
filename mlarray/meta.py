@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import MISSING, dataclass, field, fields
-from typing import Any, Dict, List, Mapping, Optional, Type, TypeVar, Union, get_args, get_origin
+from typing import Any, Dict, List, Mapping, Optional, Type, TypeVar, Union
 
 import numpy as np
 from mlarray.utils import is_serializable
@@ -711,16 +711,16 @@ class Meta(BaseMeta):
         _image_meta_format: Image metadata format identifier.
         _mlarray_version: Version string for mlarray.
     """
-    image: "MetaImage" = field(default_factory=lambda: MetaImage())  # type: ignore[name-defined]
-    extra: "MetaExtra" = field(default_factory=lambda: MetaExtra())  # type: ignore[name-defined]
-    spatial: "MetaSpatial" = field(default_factory=lambda: MetaSpatial())  # type: ignore[name-defined]
-    stats: "MetaStatistics" = field(default_factory=lambda: MetaStatistics())  # type: ignore[name-defined]
-    bbox: "MetaBbox" = field(default_factory=lambda: MetaBbox())  # type: ignore[name-defined]
-    is_seg: "MetaIsSeg" = field(default_factory=lambda: MetaIsSeg())  # type: ignore[name-defined]
-    _blosc2: "MetaBlosc2" = field(default_factory=lambda: MetaBlosc2())  # type: ignore[name-defined]
-    _has_array: "MetaHasArray" = field(default_factory=lambda: MetaHasArray())  # type: ignore[name-defined]
-    _image_meta_format: "MetaImageFormat" = field(default_factory=lambda: MetaImageFormat())  # type: ignore[name-defined]
-    _mlarray_version: "MetaVersion" = field(default_factory=lambda: MetaVersion())  # type: ignore[name-defined]
+    image: "MetaImage" = field(default_factory=lambda: MetaImage())
+    extra: "MetaExtra" = field(default_factory=lambda: MetaExtra())
+    spatial: "MetaSpatial" = field(default_factory=lambda: MetaSpatial())
+    stats: "MetaStatistics" = field(default_factory=lambda: MetaStatistics())
+    bbox: "MetaBbox" = field(default_factory=lambda: MetaBbox())
+    is_seg: "MetaIsSeg" = field(default_factory=lambda: MetaIsSeg())
+    _blosc2: "MetaBlosc2" = field(default_factory=lambda: MetaBlosc2())
+    _has_array: "MetaHasArray" = field(default_factory=lambda: MetaHasArray())
+    _image_meta_format: "MetaImageFormat" = field(default_factory=lambda: MetaImageFormat())
+    _mlarray_version: "MetaVersion" = field(default_factory=lambda: MetaVersion())
 
     def _validate_and_cast(self, *, ndims: Optional[int] = None, **_: Any) -> None:
         """Coerce child metas and validate with optional context.
@@ -729,21 +729,19 @@ class Meta(BaseMeta):
             ndims: Number of spatial dimensions for context-aware validation.
             **_: Unused extra context.
         """
-        self.image = MetaImage.ensure(self.image)  # type: ignore[name-defined]
-        self.extra = MetaExtra.ensure(self.extra)  # type: ignore[name-defined]
-        self.spatial = MetaSpatial.ensure(self.spatial)  # type: ignore[name-defined]
-        self.stats = MetaStatistics.ensure(self.stats)  # type: ignore[name-defined]
-        self.bbox = MetaBbox.ensure(self.bbox)  # type: ignore[name-defined]
-        self.is_seg = MetaIsSeg.ensure(self.is_seg)  # type: ignore[name-defined]
-        self._blosc2 = MetaBlosc2.ensure(self._blosc2)  # type: ignore[name-defined]
-        self._has_array = MetaHasArray.ensure(self._has_array)  # type: ignore[name-defined]
-        self._image_meta_format = MetaImageFormat.ensure(self._image_meta_format)  # type: ignore[name-defined]
-        self._mlarray_version = MetaVersion.ensure(self._mlarray_version)  # type: ignore[name-defined]
+        self.image = MetaImage.ensure(self.image)
+        self.extra = MetaExtra.ensure(self.extra)
+        self.spatial = MetaSpatial.ensure(self.spatial)
+        self.stats = MetaStatistics.ensure(self.stats)
+        self.bbox = MetaBbox.ensure(self.bbox)
+        self.is_seg = MetaIsSeg.ensure(self.is_seg)
+        self._blosc2 = MetaBlosc2.ensure(self._blosc2)
+        self._has_array = MetaHasArray.ensure(self._has_array)
+        self._image_meta_format = MetaImageFormat.ensure(self._image_meta_format)
+        self._mlarray_version = MetaVersion.ensure(self._mlarray_version)
 
-        self.spatial._validate_and_cast(ndims=ndims)  # type: ignore[call-arg]
-        self._blosc2._validate_and_cast(  # type: ignore[call-arg]
-            ndims=ndims, channel_axis=getattr(self.spatial, "channel_axis", None)
-        )
+        self.spatial._validate_and_cast(ndims=ndims)
+        self._blosc2._validate_and_cast(ndims=ndims, channel_axis=getattr(self.spatial, "channel_axis", None))
 
     def to_plain(self, *, include_none: bool = False) -> Any:
         """Convert to plain values, suppressing default sub-metas.
