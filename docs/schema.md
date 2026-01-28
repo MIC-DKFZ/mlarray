@@ -11,6 +11,10 @@ The schema is designed around a few core goals:
 
 All fields in the schema are **JSON-serializable** unless otherwise noted. Fields marked as `Optional[...]` may be omitted if unknown or not applicable.
 
+### Representation notes
+
+Many namespaces are implemented as **single-key dataclasses** (subclasses of `SingleKeyBaseMeta`). In Python, these behave like their wrapped value (e.g., `meta.is_seg` is a `bool`, `meta.original` is a `dict`). When serialized via `Meta.to_mapping()`, they appear as a one-field object keyed by their internal field name (e.g., `is_seg: {"is_seg": true}` or `original: {"data": {...}}`). `Meta.from_mapping()` accepts either the one-field object or the raw value and will coerce it to the correct class.
+
 ---
 
 ## Meta
@@ -19,7 +23,7 @@ Top-level metadata container.
 
 ### Overview
 
-`Meta` is the root object that groups all metadata into well-defined namespaces. Some namespaces are **standardized** (e.g., `spatial`, `stats`), while others are intentionally **free-form** (`original`, `extra`) to support arbitrary metadata and long-term extensibility.
+`Meta` is the root object that groups all metadata into well-defined namespaces. Some namespaces are **standardized** (e.g., `spatial`, `stats`), while others are intentionally **free-form** (`original`, `extra`) to support arbitrary metadata and long-term extensibility. Several entries are single-key dataclasses that wrap a primitive value while still allowing schema-aware validation.
 
 ---
 
@@ -28,7 +32,11 @@ Top-level metadata container.
 * **Description:** Arbitrary JSON-serializable dictionary for metadata from the original image source.
   Stores information from image sources such as DICOM, NIfTI, NRRD,
   or other imaging formats.
-* **Dataclass:** None (plain dict).
+* **Dataclass:** `MetaOriginal` (single-key wrapper).
+
+| field | type                  | description                                  |
+| ----- | --------------------- | -------------------------------------------- |
+| data  | Dict[str, Any]        | JSON-serializable metadata from the source. |
 
 ---
 
@@ -37,7 +45,11 @@ Top-level metadata container.
 * **Description:** Flexible container for arbitrary, JSON-serializable metadata
   when no schema exists. Intended for experimental or application-specific
   fields that are not part of the standard.
-* **Dataclass:** None (plain dict).
+* **Dataclass:** `MetaExtra` (single-key wrapper).
+
+| field | type           | description                                  |
+| ----- | -------------- | -------------------------------------------- |
+| data  | Dict[str, Any]  | JSON-serializable metadata for extra fields. |
 
 ---
 
@@ -53,7 +65,7 @@ This section stores the information needed to interpret the array in physical sp
 | spacing      | Optional[List[float]]       | Voxel spacing per spatial axis, length = `ndims`.                                        |
 | origin       | Optional[List[float]]       | Origin per spatial axis, length = `ndims`.                                               |
 | direction    | Optional[List[List[float]]] | Direction matrix, shape `[ndims][ndims]`.                                                |
-| shape        | Optional[List[int]]       | Array shape. If `channel_axis` is set, length = `ndims + 1`, otherwise length = `ndims`. |
+| shape        | Optional[List[int]]         | Array shape. If `channel_axis` is set, length = `ndims + 1`, otherwise length = `ndims`. |
 | channel_axis | Optional[int]               | Index of channel dimension in the full array, if present.                                |
 
 ---
@@ -85,7 +97,7 @@ This section stores precomputed global statistics for the array, which can be us
 ### bbox
 
 * **Description:** Bounding boxes for objects/regions in the image.
-* **Dataclass:** `MetaBbox`.
+* **Dataclass:** `MetaBbox` (single-key wrapper).
 * **Structure:** List of bboxes, each bbox is a list with length equal to image `ndims`,
   and each entry is `[min, max]`.
 
@@ -100,7 +112,11 @@ Bounding boxes are stored in a normalized, axis-aligned representation that work
 ### is_seg
 
 * **Description:** Whether the image is a segmentation mask.
-* **Dataclass:** None (boolean).
+* **Dataclass:** `MetaIsSeg` (single-key wrapper).
+
+| field  | type           | description                                     |
+| ------ | -------------- | ----------------------------------------------- |
+| is_seg | Optional[bool] | True/False when known, None when unknown.       |
 
 ---
 
@@ -122,7 +138,11 @@ This section records how the array was laid out on disk (chunking, blocking, pat
 ### _has_array
 
 * **Description:** Whether this metadata instance represents an on-disk array.
-* **Dataclass:** None (boolean).
+* **Dataclass:** `MetaHasArray` (single-key wrapper).
+
+| field     | type | description                           |
+| --------- | ---- | ------------------------------------- |
+| has_array | bool | True when an array payload is stored. |
 
 ---
 
@@ -130,11 +150,19 @@ This section records how the array was laid out on disk (chunking, blocking, pat
 
 * **Description:** Source format identifier for the `image` metadata (e.g., "dicom",
   "nifti", "nrrd"). This is advisory and application-defined.
-* **Dataclass:** None (string).
+* **Dataclass:** `MetaImageFormat` (single-key wrapper).
+
+| field             | type           | description                                   |
+| ----------------- | -------------- | --------------------------------------------- |
+| image_meta_format | Optional[str]  | Identifier for the original metadata format. |
 
 ---
 
 ### _mlarray_version
 
 * **Description:** MLArray version string used to write the file.
-* **Dataclass:** None (string).
+* **Dataclass:** `MetaVersion` (single-key wrapper).
+
+| field           | type           | description                          |
+| --------------- | -------------- | ------------------------------------ |
+| mlarray_version | Optional[str]  | Version string for the writer.       |
