@@ -20,7 +20,7 @@ def print_header(filepath: Union[str, Path]) -> None:
     if meta is None:
         print("null")
         return
-    print(json.dumps(meta.to_dict(include_none=True), indent=2, sort_keys=True))
+    print(json.dumps(meta.to_plain(include_none=True), indent=2, sort_keys=True))
 
 
 def convert_to_mlarray(load_filepath: Union[str, Path], save_filepath: Union[str, Path]):

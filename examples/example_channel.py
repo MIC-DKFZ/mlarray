@@ -26,7 +26,7 @@ if __name__ == '__main__':
 
     print("Loading image...")
     image = MLArray(filepath)
-    print(json.dumps(image.meta.to_dict(), indent=2, sort_keys=True))
+    print(json.dumps(image.meta.to_mapping(), indent=2, sort_keys=True))
     print("Image mean value: ", np.mean(image.to_numpy()))
     print("Some array data: \n", image[:2, :2, 0])
 

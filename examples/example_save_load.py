@@ -2,6 +2,7 @@ import numpy as np
 import os
 from pathlib import Path
 from mlarray import MLArray, Meta
+from mlarray.meta import MetaImage, MetaIsSeg
 import json
 
 
@@ -19,14 +20,14 @@ if __name__ == '__main__':
         os.remove(filepath)
 
     print("Initializing image...")
-    image = MLArray(array, spacing=spacing, origin=origin, direction=direction, meta=Meta(image=image_meta, bbox=bboxes))
+    image = MLArray(array, spacing=spacing, origin=origin, direction=direction, meta=Meta(image=image_meta, bbox=bboxes, is_seg=True))
     print("Saving image...")
     image.save(filepath)
 
     print("Loading image...")
     image = MLArray(filepath)
     image = MLArray.load(filepath)  # Just testing both load methods
-    print(json.dumps(image.meta.to_dict(), indent=2, sort_keys=True))
+    print(json.dumps(image.meta.to_mapping(), indent=2, sort_keys=True))
     print("Image mean value: ", np.mean(image.to_numpy()))
     print("Some array data: \n", image[:2, :2, 0])
 

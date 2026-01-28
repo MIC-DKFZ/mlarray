@@ -1,177 +1,556 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Mapping, Optional, Union
+from dataclasses import MISSING, dataclass, field, fields
+from typing import Any, Dict, List, Mapping, Optional, Type, TypeVar, Union, get_args, get_origin
+
 import numpy as np
 from mlarray.utils import is_serializable
 
+T = TypeVar("T", bound="BaseMeta")
+SK = TypeVar("SK", bound="SingleKeyBaseMeta")
+
+
+def _is_unset_value(v: Any) -> bool:
+    """Return True when a value should be treated as "unset".
+
+    This is used by BaseMeta.copy_from(overwrite=False) to decide whether to
+    overwrite a destination field.
+
+    Args:
+        v: Value to test.
+
+    Returns:
+        True when v is None or an empty container.
+    """
+    if v is None:
+        return True
+    if isinstance(v, (dict, list, tuple, set)) and len(v) == 0:
+        return True
+    return False
+
 
 @dataclass(slots=True)
-class MetaBlosc2:
-    """Blosc2 storage metadata for chunking, blocking, and patch hints."""
+class BaseMeta:
+    """Base class for metadata containers.
+
+    Subclasses should implement _validate_and_cast to coerce and validate
+    fields after initialization or mutation.
+    """
+
+    def __post_init__(self) -> None:
+        """Validate and normalize fields after dataclass initialization."""
+        self._validate_and_cast()
+
+    def _validate_and_cast(self, **_: Any) -> None:
+        """Validate and normalize fields in subclasses.
+
+        Args:
+            **_: Optional context for validation (ignored here).
+        """
+        return
+
+    def __repr__(self) -> str:
+        """Return a debug representation based on plain values."""
+        return repr(self.to_plain())
+
+    def __str__(self) -> str:
+        """Return a user-friendly string based on plain values."""
+        return str(self.to_plain())
+
+    def to_mapping(self, *, include_none: bool = True) -> Dict[str, Any]:
+        """Serialize to a mapping, recursively expanding nested BaseMeta.
+
+        Args:
+            include_none: Include fields with None values when True.
+
+        Returns:
+            A dict of field names to serialized values.
+        """
+        out: Dict[str, Any] = {}
+        for f in fields(self):
+            v = getattr(self, f.name)
+            if v is None and not include_none:
+                continue
+            if isinstance(v, BaseMeta):
+                out[f.name] = v.to_mapping(include_none=include_none)
+            else:
+                out[f.name] = v
+        return out
+
+    @classmethod
+    def from_mapping(cls: Type[T], d: Mapping[str, Any]) -> T:
+        """Construct an instance from a mapping.
+
+        Args:
+            d: Input mapping matching dataclass field names.
+
+        Returns:
+            A new instance of cls.
+
+        Raises:
+            TypeError: If d is not a Mapping.
+            KeyError: If unknown keys are present.
+        """
+        if not isinstance(d, Mapping):
+            raise TypeError(
+                f"{cls.__name__}.from_mapping expects a mapping, got {type(d).__name__}"
+            )
+
+        dd = dict(d)
+        known = {f.name for f in fields(cls)}
+        unknown = set(dd) - known
+        if unknown:
+            raise KeyError(
+                f"Unknown {cls.__name__} keys in from_mapping: {sorted(unknown)}"
+            )
+
+        for f in fields(cls):
+            if f.name not in dd:
+                continue
+            v = dd[f.name]
+            if isinstance(v, Mapping):
+                anno = f.type
+                if isinstance(anno, type) and issubclass(anno, BaseMeta):
+                    dd[f.name] = anno.from_mapping(v)
+
+        return cls(**dd)  # type: ignore[arg-type]
+
+    def to_plain(self, *, include_none: bool = False) -> Any:
+        """Convert to plain Python objects recursively.
+
+        Args:
+            include_none: Include fields with None values when True.
+
+        Returns:
+            A dict of field values, with nested BaseMeta expanded. SingleKeyBaseMeta
+            overrides this to return its wrapped value.
+        """
+        out: Dict[str, Any] = {}
+        for f in fields(self):
+            v = getattr(self, f.name)
+            if v is None and not include_none:
+                continue
+            if isinstance(v, BaseMeta):
+                out[f.name] = v.to_plain(include_none=include_none)
+            else:
+                out[f.name] = v
+        return out
+
+    def is_default(self) -> bool:
+        """Return True if this equals a default-constructed instance."""
+        default = self.__class__()  # type: ignore[call-arg]
+
+        for f in fields(self):
+            a = getattr(self, f.name)
+            b = getattr(default, f.name)
+
+            if isinstance(a, BaseMeta) and isinstance(b, BaseMeta):
+                if not a.is_default():
+                    return False
+            else:
+                if a != b:
+                    return False
+        return True
+
+    def reset(self) -> None:
+        """Reset all fields to their default or None."""
+        for f in fields(self):
+            if f.default_factory is not MISSING:  # type: ignore[attr-defined]
+                setattr(self, f.name, f.default_factory())  # type: ignore[misc]
+            elif f.default is not MISSING:
+                setattr(self, f.name, f.default)
+            else:
+                setattr(self, f.name, None)
+
+    def copy_from(self: T, other: T, *, overwrite: bool = False) -> None:
+        """Copy fields from another instance of the same class.
+
+        Args:
+            other: Source instance.
+            overwrite: When True, overwrite all fields. When False, only fill
+                destination fields that are "unset" (None or empty containers).
+                Nested BaseMeta fields are merged recursively unless the entire
+                destination sub-meta is default, in which case it is replaced.
+
+        Raises:
+            TypeError: If other is not the same class as self.
+        """
+        if other.__class__ is not self.__class__:
+            raise TypeError(f"copy_from expects {self.__class__.__name__}")
+
+        for f in fields(self):
+            src = getattr(other, f.name)
+            dst = getattr(self, f.name)
+
+            if overwrite:
+                setattr(self, f.name, src)
+                continue
+
+            if isinstance(dst, BaseMeta) and isinstance(src, BaseMeta):
+                if dst.is_default():
+                    setattr(self, f.name, src)
+                else:
+                    dst.copy_from(src, overwrite=False)
+                continue
+
+            if _is_unset_value(dst):
+                setattr(self, f.name, src)
+
+    @classmethod
+    def ensure(cls: Type[T], x: Any) -> T:
+        """Coerce x into an instance of cls.
+
+        Args:
+            x: None, an instance of cls, or a mapping of fields.
+
+        Returns:
+            An instance of cls.
+
+        Raises:
+            TypeError: If x is not None, cls, or a mapping.
+        """
+        if x is None:
+            return cls()
+        if isinstance(x, cls):
+            return x
+        if isinstance(x, Mapping):
+            return cls.from_mapping(x)
+        raise TypeError(f"Expected None, mapping, or {cls.__name__}; got {type(x).__name__}")
+
+
+@dataclass(slots=True)
+class SingleKeyBaseMeta(BaseMeta):
+    """BaseMeta subclass that wraps a single field as a raw value."""
+
+    @classmethod
+    def _key_name(cls) -> str:
+        """Return the single dataclass field name for this meta.
+
+        Raises:
+            TypeError: If the subclass does not define exactly one field.
+        """
+        flds = fields(cls)
+        if len(flds) != 1:
+            raise TypeError(
+                f"{cls.__name__} must define exactly one dataclass field (found {len(flds)})"
+            )
+        return flds[0].name
+
+    @property
+    def value(self) -> Any:
+        """Return the wrapped value."""
+        return getattr(self, self._key_name())
+
+    @value.setter
+    def value(self, v: Any) -> None:
+        """Set the wrapped value and re-validate."""
+        setattr(self, self._key_name(), v)
+        self._validate_and_cast()
+
+    def set(self, v: Any) -> None:
+        """Set the wrapped value."""
+        self.value = v
+
+    def to_mapping(self, *, include_none: bool = True) -> Dict[str, Any]:
+        """Serialize to a mapping with the single key.
+
+        Args:
+            include_none: Include the key when the value is None.
+
+        Returns:
+            A dict with the single field name as the key, or an empty dict.
+        """
+        k = self._key_name()
+        v = self.value
+        if v is None and not include_none:
+            return {}
+        return {k: v}
+
+    @classmethod
+    def from_mapping(cls: Type[SK], d: Any) -> SK:
+        """Construct from either schema-shaped mapping or raw value.
+
+        Args:
+            d: None, mapping, or raw value.
+
+        Returns:
+            A new instance of cls.
+        """
+        if d is None:
+            return cls()  # type: ignore[call-arg]
+
+        k = cls._key_name()
+
+        if isinstance(d, Mapping):
+            dd = dict(d)
+            if set(dd.keys()) == {k}:
+                return cls(**{k: dd[k]})  # type: ignore[arg-type]
+            return cls(**{k: d})  # type: ignore[arg-type]
+
+        return cls(**{k: d})  # type: ignore[arg-type]
+
+    def to_plain(self, *, include_none: bool = False) -> Any:
+        """Return the wrapped value for plain output.
+
+        Args:
+            include_none: Return None when the value is None.
+
+        Returns:
+            The wrapped value or None.
+        """
+        v = self.value
+        if v is None and not include_none:
+            return None
+        return v
+    
+    @classmethod
+    def ensure(cls: Type[SK], x: Any) -> SK:
+        """Coerce input into an instance of cls.
+
+        Args:
+            x: None, instance of cls, mapping, or raw value.
+
+        Returns:
+            An instance of cls.
+        """
+        if x is None:
+            return cls()  # type: ignore[call-arg]
+        if isinstance(x, cls):
+            return x
+        return cls.from_mapping(x)
+
+    def __repr__(self) -> str:
+        """Return a debug representation of the wrapped value."""
+        return repr(self.to_plain())
+
+    def __bool__(self) -> bool:
+        """Return truthiness of the wrapped value."""
+        return bool(self.value)
+
+    def __len__(self) -> int:
+        """Return length of the wrapped value, or 0 if None."""
+        v = self.value
+        if v is None:
+            return 0
+        return len(v)  # type: ignore[arg-type]
+
+    def __iter__(self):
+        """Iterate over the wrapped value, or empty when None."""
+        v = self.value
+        if v is None:
+            return iter(())
+        return iter(v)
+
+    def __contains__(self, item: Any) -> bool:
+        """Return membership test on the wrapped value."""
+        v = self.value
+        if v is None:
+            return False
+        return item in v
+
+    def __getitem__(self, key: Any) -> Any:
+        """Index into the wrapped value."""
+        return self.value[key]
+
+    def __setitem__(self, key: Any, val: Any) -> None:
+        """Set an item on the wrapped value and re-validate."""
+        self.value[key] = val
+        self._validate_and_cast()
+
+    def __eq__(self, other: Any) -> bool:
+        """Compare by wrapped value."""
+        if isinstance(other, SingleKeyBaseMeta):
+            return self.value == other.value
+        return self.value == other
+    
+
+def _cast_to_list(value: Any, label: str):
+    """Cast lists/tuples/ndarrays to nested lists.
+
+    Args:
+        value: Input list-like value.
+        label: Label used in error messages.
+
+    Returns:
+        A (possibly nested) Python list.
+
+    Raises:
+        TypeError: If the value cannot be cast to a list.
+    """
+    if isinstance(value, list):
+        out = value
+    elif isinstance(value, tuple):
+        out = list(value)
+    elif np is not None and isinstance(value, np.ndarray):
+        out = value.tolist()
+    else:
+        raise TypeError(f"{label} must be a list, tuple, or numpy array")
+
+    for i, item in enumerate(out):
+        if isinstance(item, (list, tuple)) or (np is not None and isinstance(item, np.ndarray)):
+            out[i] = _cast_to_list(item, label)
+    return out
+
+
+def _validate_int(value: Any, label: str) -> None:
+    """Validate that value is an int.
+
+    Args:
+        value: Value to validate.
+        label: Label used in error messages.
+
+    Raises:
+        TypeError: If value is not an int.
+    """
+    if not isinstance(value, int):
+        raise TypeError(f"{label} must be an int")
+
+
+def _validate_float_int_list(value: Any, label: str, ndims: Optional[int] = None) -> None:
+    """Validate a list of floats/ints, optionally with a fixed length.
+
+    Args:
+        value: List to validate.
+        label: Label used in error messages.
+        ndims: Required length when provided.
+
+    Raises:
+        TypeError: If value is not a list or contains non-numbers.
+        ValueError: If ndims is provided and the length does not match.
+    """
+    if not isinstance(value, list):
+        raise TypeError(f"{label} must be a list")
+    if ndims is not None and len(value) != ndims:
+        raise ValueError(f"{label} must have length {ndims}")
+    for v in value:
+        if not isinstance(v, (float, int)):
+            raise TypeError(f"{label} must contain only floats or ints")
+
+
+def _validate_float_int_matrix(value: Any, label: str, ndims: Optional[int] = None) -> None:
+    """Validate a square list-of-lists matrix of floats/ints.
+
+    Args:
+        value: Matrix to validate.
+        label: Label used in error messages.
+        ndims: Required shape (ndims x ndims) when provided.
+
+    Raises:
+        TypeError: If value is not a list-of-lists or contains non-numbers.
+        ValueError: If ndims is provided and the shape does not match.
+    """
+    if not isinstance(value, list):
+        raise TypeError(f"{label} must be a list of lists")
+    if ndims is not None and len(value) != ndims:
+        raise ValueError(f"{label} must have shape [{ndims}, {ndims}]")
+    for row in value:
+        if not isinstance(row, list):
+            raise TypeError(f"{label} must be a list of lists")
+        if ndims is not None and len(row) != ndims:
+            raise ValueError(f"{label} must have shape [{ndims}, {ndims}]")
+        for v in row:
+            if not isinstance(v, (float, int)):
+                raise TypeError(f"{label} must contain only floats or ints")
+
+
+@dataclass(slots=True)
+class MetaBlosc2(BaseMeta):
+    """Metadata for Blosc2 tiling and chunking.
+
+    Attributes:
+        chunk_size: List of per-dimension chunk sizes. Length must match ndims.
+        block_size: List of per-dimension block sizes. Length must match ndims.
+        patch_size: List of per-dimension patch sizes. Length must match ndims,
+            or (ndims - 1) when a channel axis is present.
+    """
     chunk_size: Optional[list] = None
     block_size: Optional[list] = None
     patch_size: Optional[list] = None
 
-    def __post_init__(self) -> None:
-        """Validate and normalize any provided sizes."""
-        self._validate_and_cast()
-
-    def __repr__(self) -> str:
-        """Return a repr using the dict form for readability."""
-        return repr(self.to_dict())
-
-    def to_dict(self, *, include_none: bool = True) -> Dict[str, Any]:
-        """Serialize to a JSON-compatible dict.
+    def _validate_and_cast(self, *, ndims: Optional[int] = None, channel_axis: Optional[int] = None, **_: Any) -> None:
+        """Validate and normalize tiling sizes.
 
         Args:
-            include_none (bool): If False, keys with None values are omitted.
-
-        Returns:
-            Dict[str, Any]: Serialized metadata.
-        """
-        out: Dict[str, Any] = {
-            "chunk_size": self.chunk_size,
-            "block_size": self.block_size,
-            "patch_size": self.patch_size,
-        }
-        if not include_none:
-            out = {k: v for k, v in out.items() if v is not None}
-        return out
-
-    def _validate_and_cast(self, ndims: Optional[int] = None, channel_axis: Optional[int] = None) -> None:
-        """Validate and cast sizes to list form.
-
-        Args:
-            ndims (Optional[int]): Expected number of array dimensions.
-            channel_axis (Optional[int]): Channel axis index for patch size
-                validation when channels are present.
+            ndims: Number of spatial dimensions.
+            channel_axis: Channel axis index when present.
+            **_: Unused extra context.
         """
         if self.chunk_size is not None:
             self.chunk_size = _cast_to_list(self.chunk_size, "meta._blosc2.chunk_size")
-            _validate_float_int_list(self.chunk_size, f"meta._blosc2.chunk_size", ndims)
+            _validate_float_int_list(self.chunk_size, "meta._blosc2.chunk_size", ndims)
+
         if self.block_size is not None:
             self.block_size = _cast_to_list(self.block_size, "meta._blosc2.block_size")
-            _validate_float_int_list(self.block_size, f"meta._blosc2.block_size", ndims)
+            _validate_float_int_list(self.block_size, "meta._blosc2.block_size", ndims)
+
         if self.patch_size is not None:
-            _ndims = ndims if (ndims is None or channel_axis is None) else ndims-1
+            _ndims = ndims if (ndims is None or channel_axis is None) else ndims - 1
             self.patch_size = _cast_to_list(self.patch_size, "meta._blosc2.patch_size")
-            _validate_float_int_list(self.patch_size, f"meta._blosc2.patch_size", _ndims)
-
-    @classmethod
-    def from_dict(cls, d: Mapping[str, Any], *, strict: bool = True) -> MetaBlosc2:
-        """Create a MetaBlosc2 instance from a mapping.
-
-        Args:
-            d (Mapping[str, Any]): Source mapping.
-            strict (bool): If True, unknown keys raise a KeyError.
-
-        Returns:
-            MetaBlosc2: Parsed instance.
-        """
-        if not isinstance(d, Mapping):
-            raise TypeError(f"MetaBlosc2.from_dict expects a mapping, got {type(d).__name__}")
-        known = {"chunk_size", "block_size", "patch_size"}
-        d = dict(d)
-        unknown = set(d.keys()) - known
-        if unknown and strict:
-            raise KeyError(f"Unknown MetaBlosc2 keys in from_dict: {sorted(unknown)}")
-        return cls(
-            chunk_size=d.get("chunk_size"),
-            block_size=d.get("block_size"),
-            patch_size=d.get("patch_size"),
-        )
+            _validate_float_int_list(self.patch_size, "meta._blosc2.patch_size", _ndims)
 
 
 @dataclass(slots=True)
-class MetaSpatial:
-    """Spatial metadata describing array geometry in physical space."""
+class MetaSpatial(BaseMeta):
+    """Spatial metadata describing geometry and layout.
+
+    Attributes:
+        spacing: Per-dimension spacing values. Length must match ndims.
+        origin: Per-dimension origin values. Length must match ndims.
+        direction: Direction cosine matrix of shape [ndims, ndims].
+        shape: Array shape. Length must match ndims, or (ndims + 1) when
+            channel_axis is set.
+        channel_axis: Index of the channel dimension, if any.
+    """
     spacing: Optional[List] = None
     origin: Optional[List] = None
     direction: Optional[List[List]] = None
     shape: Optional[List] = None
     channel_axis: Optional[int] = None
 
-    def __post_init__(self) -> None:
-        """Validate and normalize spatial fields."""
-        self._validate_and_cast()
-
-    def __repr__(self) -> str:
-        """Return a repr using the dict form for readability."""
-        return repr(self.to_dict())
-
-    def to_dict(self, *, include_none: bool = True) -> Dict[str, Any]:
-        """Serialize to a JSON-compatible dict.
+    def _validate_and_cast(self, *, ndims: Optional[int] = None, **_: Any) -> None:
+        """Validate and normalize spatial fields.
 
         Args:
-            include_none (bool): If False, keys with None values are omitted.
-
-        Returns:
-            Dict[str, Any]: Serialized metadata.
-        """
-        out: Dict[str, Any] = {
-            "spacing": self.spacing,
-            "origin": self.origin,
-            "direction": self.direction,
-            "shape": self.shape,
-            "channel_axis": self.channel_axis
-        }
-        if not include_none:
-            out = {k: v for k, v in out.items() if v is not None}
-        return out
-
-    def _validate_and_cast(self, ndims: Optional[int] = None) -> None:
-        """Validate and cast spatial fields to list form.
-
-        Args:
-            ndims (Optional[int]): Expected number of spatial dimensions.
+            ndims: Number of spatial dimensions.
+            **_: Unused extra context.
         """
         if self.channel_axis is not None:
             _validate_int(self.channel_axis, "meta.spatial.channel_axis")
+
         if self.spacing is not None:
             self.spacing = _cast_to_list(self.spacing, "meta.spatial.spacing")
             _validate_float_int_list(self.spacing, "meta.spatial.spacing", ndims)
+
         if self.origin is not None:
             self.origin = _cast_to_list(self.origin, "meta.spatial.origin")
             _validate_float_int_list(self.origin, "meta.spatial.origin", ndims)
+
         if self.direction is not None:
             self.direction = _cast_to_list(self.direction, "meta.spatial.direction")
             _validate_float_int_matrix(self.direction, "meta.spatial.direction", ndims)
+
         if self.shape is not None:
-            _ndims = ndims if (ndims is None or self.channel_axis is None) else ndims+1
+            _ndims = ndims if (ndims is None or self.channel_axis is None) else ndims + 1
             self.shape = _cast_to_list(self.shape, "meta.spatial.shape")
             _validate_float_int_list(self.shape, "meta.spatial.shape", _ndims)
 
-    @classmethod
-    def from_dict(cls, d: Mapping[str, Any], *, strict: bool = True) -> MetaSpatial:
-        """Create a MetaSpatial instance from a mapping.
-
-        Args:
-            d (Mapping[str, Any]): Source mapping.
-            strict (bool): If True, unknown keys raise a KeyError.
-
-        Returns:
-            MetaSpatial: Parsed instance.
-        """
-        if not isinstance(d, Mapping):
-            raise TypeError(f"MetaSpatial.from_dict expects a mapping, got {type(d).__name__}")
-        known = {"spacing", "origin", "direction", "shape", "channel_axis"}
-        d = dict(d)
-        unknown = set(d.keys()) - known
-        if unknown and strict:
-            raise KeyError(f"Unknown MetaSpatial keys in from_dict: {sorted(unknown)}")
-        return cls(
-            spacing=d.get("spacing"),
-            origin=d.get("origin"),
-            direction=d.get("direction"),
-            shape=d.get("shape"),
-            channel_axis=d.get("channel_axis")
-        )
-
 
 @dataclass(slots=True)
-class MetaStatistics:
-    """Summary statistics for an array or image."""
+class MetaStatistics(BaseMeta):
+    """Numeric summary statistics for an array.
+
+    Attributes:
+        min: Minimum value.
+        max: Maximum value.
+        mean: Mean value.
+        median: Median value.
+        std: Standard deviation.
+        percentile_min: Minimum percentile value.
+        percentile_max: Maximum percentile value.
+        percentile_mean: Mean percentile value.
+        percentile_median: Median percentile value.
+        percentile_std: Standard deviation of percentile values.
+    """
     min: Optional[float] = None
     max: Optional[float] = None
     mean: Optional[float] = None
@@ -183,550 +562,211 @@ class MetaStatistics:
     percentile_median: Optional[float] = None
     percentile_std: Optional[float] = None
 
-    def __post_init__(self) -> None:
-        """Validate that all provided values are numeric."""
-        self._validate_and_cast()
-
-    def __repr__(self) -> str:
-        """Return a repr using the dict form for readability."""
-        return repr(self.to_dict())
-
-    def to_dict(self, *, include_none: bool = True) -> Dict[str, Any]:
-        """Serialize to a JSON-compatible dict.
-
-        Args:
-            include_none (bool): If False, keys with None values are omitted.
-
-        Returns:
-            Dict[str, Any]: Serialized metadata.
-        """
-        out: Dict[str, Any] = {
-            "min": self.min,
-            "max": self.max,
-            "mean": self.mean,
-            "median": self.median,
-            "std": self.std,
-            "percentile_min": self.percentile_min,
-            "percentile_max": self.percentile_max,
-            "percentile_mean": self.percentile_mean,
-            "percentile_median": self.percentile_median,
-            "percentile_std": self.percentile_std,
-        }
-        if not include_none:
-            out = {k: v for k, v in out.items() if v is not None}
-        return out
-
-    def _validate_and_cast(self) -> None:
-        """Validate that all statistic fields are float or int."""
-        for name in (
-            "min",
-            "max",
-            "mean",
-            "median",
-            "std",
-            "percentile_min",
-            "percentile_max",
-            "percentile_mean",
-            "percentile_median",
-            "percentile_std",
-        ):
-            value = getattr(self, name)
-            if value is not None and not isinstance(value, (float, int)):
+    def _validate_and_cast(self, **_: Any) -> None:
+        """Validate that all stats are numeric when provided."""
+        for name in self.__dataclass_fields__:
+            v = getattr(self, name)
+            if v is not None and not isinstance(v, (float, int)):
                 raise TypeError(f"meta.stats.{name} must be a float or int")
 
-    @classmethod
-    def from_dict(cls, d: Mapping[str, Any], *, strict: bool = True) -> MetaStatistics:
-        """Create a MetaStatistics instance from a mapping.
-
-        Args:
-            d (Mapping[str, Any]): Source mapping.
-            strict (bool): If True, unknown keys raise a KeyError.
-
-        Returns:
-            MetaStatistics: Parsed instance.
-        """
-        if not isinstance(d, Mapping):
-            raise TypeError(f"MetaStatistics.from_dict expects a mapping, got {type(d).__name__}")
-        known = {
-            "min",
-            "max",
-            "mean",
-            "median",
-            "std",
-            "percentile_min",
-            "percentile_max",
-            "percentile_mean",
-            "percentile_median",
-            "percentile_std",
-        }
-        d = dict(d)
-        unknown = set(d.keys()) - known
-        if unknown and strict:
-            raise KeyError(f"Unknown MetaStatistics keys in from_dict: {sorted(unknown)}")
-        return cls(
-            min=d.get("min"),
-            max=d.get("max"),
-            mean=d.get("mean"),
-            median=d.get("median"),
-            std=d.get("std"),
-            percentile_min=d.get("percentile_min"),
-            percentile_max=d.get("percentile_max"),
-            percentile_mean=d.get("percentile_mean"),
-            percentile_median=d.get("percentile_median"),
-            percentile_std=d.get("percentile_std"),
-        )
-
 
 @dataclass(slots=True)
-class MetaBbox:
-    """Bounding boxes stored as per-dimension min/max pairs."""
+class MetaBbox(SingleKeyBaseMeta):
+    """Bounding boxes represented as per-dimension min/max pairs.
+
+    Attributes:
+        bboxes: List of bounding boxes with shape [n_boxes, ndims, 2], where
+            each inner pair is [min, max] for a dimension. Values must be ints.
+    """
     bboxes: Optional[List[List[List[int]]]] = None
 
-    def __post_init__(self) -> None:
-        """Validate and normalize bounding box lists."""
-        self._validate_and_cast()
-
-    def __repr__(self) -> str:
-        """Return a repr using the dict form for readability."""
-        return repr(self.to_dict())
-
-    def to_dict(self, *, include_none: bool = True) -> Dict[str, Any]:
-        """Serialize to a JSON-compatible dict.
-
-        Args:
-            include_none (bool): If False, keys with None values are omitted.
-
-        Returns:
-            Dict[str, Any]: Serialized metadata.
-        """
-        out: Dict[str, Any] = {
-            "bboxes": self.bboxes,
-        }
-        if not include_none:
-            out = {k: v for k, v in out.items() if v is not None}
-        return out
-
-    def _validate_and_cast(self, ndims: Optional[int] = None) -> None:
-        """Validate bbox structure and cast to list form.
-
-        Args:
-            ndims (Optional[int]): Expected number of spatial dimensions.
-        """
+    def _validate_and_cast(self, **_: Any) -> None:
+        """Validate bounding box structure and types."""
         if self.bboxes is None:
             return
+
         self.bboxes = _cast_to_list(self.bboxes, "meta.bbox.bboxes")
+
         if not isinstance(self.bboxes, list):
-            raise TypeError("meta.bbox.bboxes must be a list of bboxes")
+            raise TypeError("meta.bbox.bboxes must be a list")
+
         for bbox in self.bboxes:
             if not isinstance(bbox, list):
-                raise TypeError("meta.bbox.bboxes must be a list of bboxes")
-            if ndims is not None and len(bbox) != ndims:
-                raise ValueError(f"meta.bbox.bboxes entries must have length {ndims}")
+                raise TypeError("meta.bbox.bboxes must be a list of lists")
             for row in bbox:
-                if not isinstance(row, list):
-                    raise TypeError("meta.bbox.bboxes must be a list of lists")
-                if len(row) != 2:
-                    raise ValueError("meta.bbox.bboxes entries must have length 2 per dimension")
-                for item in row:
-                    if isinstance(item, bool) or not isinstance(item, int):
-                        raise TypeError("meta.bbox.bboxes must contain only ints")
-
-    @classmethod
-    def from_dict(cls, d: Mapping[str, Any], *, strict: bool = True) -> MetaBbox:
-        """Create a MetaBbox instance from a mapping.
-
-        Args:
-            d (Mapping[str, Any]): Source mapping.
-            strict (bool): If True, unknown keys raise a KeyError.
-
-        Returns:
-            MetaBbox: Parsed instance.
-        """
-        if not isinstance(d, Mapping):
-            raise TypeError(f"MetaBbox.from_dict expects a mapping, got {type(d).__name__}")
-        known = {"bboxes"}
-        d = dict(d)
-        unknown = set(d.keys()) - known
-        if unknown and strict:
-            raise KeyError(f"Unknown MetaBbox keys in from_dict: {sorted(unknown)}")
-        return cls(bboxes=d.get("bboxes"))
+                if not isinstance(row, list) or len(row) != 2:
+                    raise ValueError("meta.bbox.bboxes rows must have length 2")
+                for v in row:
+                    if isinstance(v, bool) or not isinstance(v, int):
+                        raise TypeError("meta.bbox.bboxes must contain ints only")
 
 
 @dataclass(slots=True)
-class Meta:
-    """Container for MLArray metadata sections."""
-    image: Optional[Dict[str, Any]] = None
-    spatial: MetaSpatial = field(default_factory=MetaSpatial)
-    stats: Optional[Union[dict, MetaStatistics]] = None
-    bbox: Optional[MetaBbox] = None
+class MetaImage(SingleKeyBaseMeta):
+    """Image-specific metadata stored as JSON-serializable dict.
+
+    Attributes:
+        data: Arbitrary JSON-serializable metadata.
+    """
+    data: Dict[str, Any] = field(default_factory=dict)
+
+    def _validate_and_cast(self, **_: Any) -> None:
+        """Validate that data is a JSON-serializable dict."""
+        if not isinstance(self.data, dict):
+            raise TypeError(f"meta.image.data must be a dict, got {type(self.data).__name__}")
+        if not is_serializable(self.data):
+            raise TypeError("meta.image.data is not JSON-serializable")
+
+
+@dataclass(slots=True)
+class MetaExtra(SingleKeyBaseMeta):
+    """Generic extra metadata stored as JSON-serializable dict.
+
+    Attributes:
+        data: Arbitrary JSON-serializable metadata.
+    """
+    data: Dict[str, Any] = field(default_factory=dict)
+
+    def _validate_and_cast(self, **_: Any) -> None:
+        """Validate that data is a JSON-serializable dict."""
+        if not isinstance(self.data, dict):
+            raise TypeError(f"meta.extra.data must be a dict, got {type(self.data).__name__}")
+        if not is_serializable(self.data):
+            raise TypeError("meta.extra.data is not JSON-serializable")
+
+
+@dataclass(slots=True)
+class MetaIsSeg(SingleKeyBaseMeta):
+    """Flag indicating whether the array is a segmentation mask.
+
+    Attributes:
+        is_seg: True/False when known, None when unknown.
+    """
     is_seg: Optional[bool] = None
-    _blosc2: MetaBlosc2 = field(default_factory=MetaBlosc2)
-    _has_array: Optional[bool] = None
-    _image_meta_format: Optional[str] = None
-    _mlarray_version: Optional[str] = None
 
-    # controlled escape hatch for future/experimental metadata
-    extra: Dict[str, Any] = field(default_factory=dict)
-
-    def __post_init__(self) -> None:
-        """Validate and normalize metadata sections."""
-        # Validate anything passed in the constructor
-        for name in ("image",):
-            val = getattr(self, name)
-            if val is not None:
-                if not isinstance(val, dict):
-                    raise TypeError(f"meta.{name} must be a dict or None, got {type(val).__name__}")
-                if not is_serializable(val):
-                    raise TypeError(f"meta.{name} is not JSON-serializable")
-        if self.stats is not None:
-            if isinstance(self.stats, MetaStatistics):
-                pass
-            elif isinstance(self.stats, Mapping):
-                self.stats = MetaStatistics.from_dict(self.stats, strict=False)
-            else:
-                raise TypeError(f"meta.stats must be a MetaStatistics or mapping, got {type(self.stats).__name__}")
-        if self.bbox is not None:
-            if isinstance(self.bbox, MetaBbox):
-                pass
-            elif isinstance(self.bbox, Mapping):
-                self.bbox = MetaBbox.from_dict(self.bbox, strict=False)
-            elif isinstance(self.bbox, (list, tuple)) or (np is not None and isinstance(self.bbox, np.ndarray)):
-                self.bbox = MetaBbox(bboxes=self.bbox)
-            else:
-                raise TypeError(f"meta.bbox must be a MetaBbox, mapping, or list-like, got {type(self.bbox).__name__}")
-
-        if self.spatial is None:
-            self.spatial = MetaSpatial()
-        if not isinstance(self.spatial, MetaSpatial):
-            raise TypeError(f"meta.spatial must be a MetaSpatial, got {type(self.spatial).__name__}")
-
-        if self._blosc2 is None:
-            self._blosc2 = MetaBlosc2()
-        if not isinstance(self._blosc2, MetaBlosc2):
-            raise TypeError(f"meta._blosc2 must be a MetaBlosc2, got {type(self._blosc2).__name__}")
-
+    def _validate_and_cast(self, **_: Any) -> None:
+        """Validate is_seg as bool or None."""
         if self.is_seg is not None and not isinstance(self.is_seg, bool):
             raise TypeError("meta.is_seg must be a bool or None")
-        if self._has_array is not None and not isinstance(self._has_array, bool):
-            raise TypeError("meta._has_array must be a bool or None")
-        if self._image_meta_format is not None and not isinstance(self._image_meta_format, str):
+
+
+@dataclass(slots=True)
+class MetaHasArray(SingleKeyBaseMeta):
+    """Flag indicating whether an array is present.
+
+    Attributes:
+        has_array: True when array data is present.
+    """
+    has_array: bool = False
+
+    def _validate_and_cast(self, **_: Any) -> None:
+        """Validate has_array as bool."""
+        if not isinstance(self.has_array, bool):
+            raise TypeError("meta._has_array must be a bool")
+
+
+@dataclass(slots=True)
+class MetaImageFormat(SingleKeyBaseMeta):
+    """String describing the image metadata format.
+
+    Attributes:
+        image_meta_format: Format identifier, or None.
+    """
+    image_meta_format: Optional[str] = None
+
+    def _validate_and_cast(self, **_: Any) -> None:
+        """Validate image_meta_format as str or None."""
+        if self.image_meta_format is not None and not isinstance(self.image_meta_format, str):
             raise TypeError("meta._image_meta_format must be a str or None")
-        if self._mlarray_version is not None and not isinstance(self._mlarray_version, str):
+
+
+@dataclass(slots=True)
+class MetaVersion(SingleKeyBaseMeta):
+    """Version metadata for mlarray.
+
+    Attributes:
+        mlarray_version: Version string, or None.
+    """
+    mlarray_version: Optional[str] = None
+
+    def _validate_and_cast(self, **_: Any) -> None:
+        """Validate mlarray_version as str or None."""
+        if self.mlarray_version is not None and not isinstance(self.mlarray_version, str):
             raise TypeError("meta._mlarray_version must be a str or None")
 
-        if not isinstance(self.extra, dict):
-            raise TypeError(f"meta.extra must be a dict, got {type(self.extra).__name__}")
-        if not is_serializable(self.extra):
-            raise TypeError("meta.extra is not JSON-serializable")
 
-    def __repr__(self) -> str:
-        """Return a repr using the dict form for readability."""
-        return repr(self.to_dict())
+@dataclass(slots=True)
+class Meta(BaseMeta):
+    """Top-level metadata container for mlarray.
 
-    def set(self, key: str, value: Any) -> None:
-        """Set a known meta section explicitly.
+    Attributes:
+        image: Image-specific metadata (JSON-serializable dict).
+        extra: Additional metadata (JSON-serializable dict).
+        spatial: Spatial metadata (spacing, origin, direction, shape).
+        stats: Summary statistics.
+        bbox: Bounding boxes.
+        is_seg: Segmentation flag.
+        _blosc2: Blosc2 chunking/tiling metadata.
+        _has_array: Payload presence flag.
+        _image_meta_format: Image metadata format identifier.
+        _mlarray_version: Version string for mlarray.
+    """
+    image: "MetaImage" = field(default_factory=lambda: MetaImage())  # type: ignore[name-defined]
+    extra: "MetaExtra" = field(default_factory=lambda: MetaExtra())  # type: ignore[name-defined]
+    spatial: "MetaSpatial" = field(default_factory=lambda: MetaSpatial())  # type: ignore[name-defined]
+    stats: "MetaStatistics" = field(default_factory=lambda: MetaStatistics())  # type: ignore[name-defined]
+    bbox: "MetaBbox" = field(default_factory=lambda: MetaBbox())  # type: ignore[name-defined]
+    is_seg: "MetaIsSeg" = field(default_factory=lambda: MetaIsSeg())  # type: ignore[name-defined]
+    _blosc2: "MetaBlosc2" = field(default_factory=lambda: MetaBlosc2())  # type: ignore[name-defined]
+    _has_array: "MetaHasArray" = field(default_factory=lambda: MetaHasArray())  # type: ignore[name-defined]
+    _image_meta_format: "MetaImageFormat" = field(default_factory=lambda: MetaImageFormat())  # type: ignore[name-defined]
+    _mlarray_version: "MetaVersion" = field(default_factory=lambda: MetaVersion())  # type: ignore[name-defined]
 
-        Args:
-            key (str): Name of the meta section (e.g., "image", "spatial",
-                "stats", "bbox", "_blosc2", "is_seg").
-            value (Any): Value to set. Must be JSON-serializable for dict
-                sections.
-
-        Raises:
-            AttributeError: If ``key`` is unknown or disallowed.
-            TypeError: If the value has an unexpected type.
-        """
-        if not hasattr(self, key) and key not in {"_blosc2", "_mlarray_version"}:
-            raise AttributeError(f"Unknown meta section: {key!r}")
-        if key == "extra":
-            raise AttributeError("Use meta.extra[...] to add to extra")
-        if key == "spatial":
-            if isinstance(value, MetaSpatial):
-                setattr(self, key, value)
-                return
-            if isinstance(value, Mapping):
-                setattr(self, key, MetaSpatial.from_dict(value, strict=False))
-                return
-            raise TypeError("meta.spatial must be a MetaSpatial or mapping")
-        if key == "stats":
-            if isinstance(value, MetaStatistics):
-                self.stats = value
-                return
-            if isinstance(value, Mapping):
-                self.stats = MetaStatistics.from_dict(value, strict=False)
-                return
-            raise TypeError("meta.stats must be a MetaStatistics or mapping")
-        if key == "bbox":
-            if isinstance(value, MetaBbox):
-                self.bbox = value
-                return
-            if isinstance(value, Mapping):
-                self.bbox = MetaBbox.from_dict(value, strict=False)
-                return
-            if isinstance(value, (list, tuple)) or (np is not None and isinstance(value, np.ndarray)):
-                self.bbox = MetaBbox(bboxes=value)
-                return
-            raise TypeError("meta.bbox must be a MetaBbox, mapping, or list-like")
-        if key == "_blosc2":
-            if isinstance(value, MetaBlosc2):
-                self._blosc2 = value
-                return
-            if isinstance(value, Mapping):
-                self._blosc2 = MetaBlosc2.from_dict(value, strict=False)
-                return
-            raise TypeError("meta._blosc2 must be a MetaBlosc2 or mapping")
-        if key == "is_seg":
-            if value is not None and not isinstance(value, bool):
-                raise TypeError("meta.is_seg must be a bool or None")
-            setattr(self, key, value)
-            return
-        if key == "_has_array":
-            if value is not None and not isinstance(value, bool):
-                raise TypeError("meta._has_array must be a bool or None")
-            setattr(self, key, value)
-            return
-        if key == "_image_meta_format":
-            if value is not None and not isinstance(value, str):
-                raise TypeError("meta._image_meta_format must be a str or None")
-            setattr(self, key, value)
-            return
-        if key == "_mlarray_version":
-            if value is not None and not isinstance(value, str):
-                raise TypeError("meta._mlarray_version must be a str or None")
-            self._mlarray_version = value
-            return
-
-        value_dict = dict(value)
-
-        if not is_serializable(value_dict):
-            raise TypeError(f"meta.{key} is not JSON-serializable")
-
-        setattr(self, key, value_dict)
-
-    def to_dict(self, *, include_none: bool = True) -> Dict[str, Any]:
-        """Convert to a JSON-serializable dict.
+    def _validate_and_cast(self, *, ndims: Optional[int] = None, **_: Any) -> None:
+        """Coerce child metas and validate with optional context.
 
         Args:
-            include_none (bool): If False, keys with None (and empty extra) are
-                omitted.
-
-        Returns:
-            Dict[str, Any]: Serialized metadata.
+            ndims: Number of spatial dimensions for context-aware validation.
+            **_: Unused extra context.
         """
-        out: Dict[str, Any] = {
-            "image": self.image,
-            "stats": self.stats.to_dict() if self.stats is not None else None,
-            "bbox": self.bbox.to_dict() if self.bbox is not None else None,
-            "is_seg": self.is_seg,
-            "spatial": self.spatial.to_dict(),
-            "_has_array": self._has_array,
-            "_image_meta_format": self._image_meta_format,
-            "_blosc2": self._blosc2.to_dict(),
-            "_mlarray_version": self._mlarray_version,
-            "extra": self.extra,
-        }
+        self.image = MetaImage.ensure(self.image)  # type: ignore[name-defined]
+        self.extra = MetaExtra.ensure(self.extra)  # type: ignore[name-defined]
+        self.spatial = MetaSpatial.ensure(self.spatial)  # type: ignore[name-defined]
+        self.stats = MetaStatistics.ensure(self.stats)  # type: ignore[name-defined]
+        self.bbox = MetaBbox.ensure(self.bbox)  # type: ignore[name-defined]
+        self.is_seg = MetaIsSeg.ensure(self.is_seg)  # type: ignore[name-defined]
+        self._blosc2 = MetaBlosc2.ensure(self._blosc2)  # type: ignore[name-defined]
+        self._has_array = MetaHasArray.ensure(self._has_array)  # type: ignore[name-defined]
+        self._image_meta_format = MetaImageFormat.ensure(self._image_meta_format)  # type: ignore[name-defined]
+        self._mlarray_version = MetaVersion.ensure(self._mlarray_version)  # type: ignore[name-defined]
 
-        if not include_none:
-            out = {k: v for k, v in out.items() if v is not None and not (k == "extra" and v == {})}
-
-        return out
-
-    def _validate_and_cast(self, ndims: int) -> None:
-        """Validate and normalize metadata with a known dimensionality.
-
-        Args:
-            ndims (int): Number of spatial dimensions.
-        """
-        self.spatial._validate_and_cast(ndims)
-        if self.bbox is not None:
-            self.bbox._validate_and_cast(ndims)
-        self._blosc2._validate_and_cast(ndims)
-
-    @classmethod
-    def from_dict(cls, d: Mapping[str, Any], *, strict: bool = True) -> Meta:
-        """Construct Meta from a mapping.
-
-        Args:
-            d (Mapping[str, Any]): Mapping with keys in {"image", "stats",
-                "bbox", "spatial", "_blosc2", "_mlarray_version",
-                "_image_meta_format", "_has_array", "is_seg", "extra"}.
-            strict (bool): If True, unknown keys raise. If False, unknown keys
-                are added to ``extra``.
-
-        Returns:
-            Meta: Parsed instance.
-        """
-        if not isinstance(d, Mapping):
-            raise TypeError(f"from_dict expects a mapping, got {type(d).__name__}")
-
-        known = {"image", "stats", "bbox", "spatial", "_has_array", "_image_meta_format", "_blosc2", "_mlarray_version", "is_seg", "extra"}
-        d = dict(d)
-        unknown = set(d.keys()) - known
-
-        if unknown and strict:
-            raise KeyError(f"Unknown meta keys in from_dict: {sorted(unknown)}")
-
-        extra = dict(d.get("extra") or {})
-        if unknown and not strict:
-            for k in unknown:
-                extra[k] = d[k]
-
-        spatial = d.get("spatial")
-        if spatial is None:
-            spatial = MetaSpatial()
-        else:
-            spatial = MetaSpatial.from_dict(spatial, strict=strict)
-
-        stats = d.get("stats")
-        if stats is None:
-            stats = None
-        else:
-            stats = MetaStatistics.from_dict(stats, strict=strict)
-
-        bbox = d.get("bbox")
-        if bbox is None:
-            bbox = None
-        elif isinstance(bbox, Mapping):
-            bbox = MetaBbox.from_dict(bbox, strict=strict)
-        else:
-            bbox = MetaBbox(bboxes=bbox)
-
-        _blosc2 = d.get("_blosc2")
-        if _blosc2 is None:
-            _blosc2 = MetaBlosc2()
-        else:
-            _blosc2 = MetaBlosc2.from_dict(_blosc2, strict=strict)
-
-        return cls(
-            image=d.get("image"),
-            stats=stats,
-            bbox=bbox,
-            is_seg=d.get("is_seg"),
-            spatial=spatial,
-            _has_array=d.get("_has_array"),
-            _image_meta_format=d.get("_image_meta_format"),
-            _blosc2=_blosc2,
-            _mlarray_version=d.get("_mlarray_version"),            
-            extra=extra,
+        self.spatial._validate_and_cast(ndims=ndims)  # type: ignore[call-arg]
+        self._blosc2._validate_and_cast(  # type: ignore[call-arg]
+            ndims=ndims, channel_axis=getattr(self.spatial, "channel_axis", None)
         )
 
-    def copy_from(self, other: Meta) -> None:
-        """Copy fields from another Meta where this instance is missing data.
+    def to_plain(self, *, include_none: bool = False) -> Any:
+        """Convert to plain values, suppressing default sub-metas.
 
         Args:
-            other (Meta): Source Meta instance.
+            include_none: Include None values when True.
+
+        Returns:
+            A dict of field values where default child metas are represented
+            as None and optionally filtered out.
         """
-        if self.image is None:
-            self.image = other.image
-        if self.stats is None:
-            self.stats = other.stats
-        if self.bbox is None:
-            self.bbox = other.bbox
-        if self.is_seg is None:
-            self.is_seg = other.is_seg
-        if self.spatial is None:
-            self.spatial = other.spatial
-        elif other.spatial is not None:
-            if self.spatial.spacing is None:
-                self.spatial.spacing = other.spatial.spacing
-            if self.spatial.origin is None:
-                self.spatial.origin = other.spatial.origin
-            if self.spatial.direction is None:
-                self.spatial.direction = other.spatial.direction
-            if self.spatial.shape is None:
-                self.spatial.shape = other.spatial.shape
-        if self._has_array is not None:
-            self._has_array = other._has_array
-        if self._image_meta_format is not None:
-            self._image_meta_format = other._image_meta_format
-        if self._blosc2 is None:
-            self._blosc2 = other._blosc2
-        elif other._blosc2 is not None:
-            if self._blosc2.chunk_size is None:
-                self._blosc2.chunk_size = other._blosc2.chunk_size
-            if self._blosc2.block_size is None:
-                self._blosc2.block_size = other._blosc2.block_size
-            if self._blosc2.patch_size is None:
-                self._blosc2.patch_size = other._blosc2.patch_size
-        if self._mlarray_version is None:
-            self._mlarray_version = other._mlarray_version
-        if self.extra == {}:
-            self.extra = other.extra
+        out: Dict[str, Any] = {}
+        for f in fields(self):
+            v = getattr(self, f.name)
 
+            if isinstance(v, BaseMeta):
+                out[f.name] = None if v.is_default() else v.to_plain(include_none=include_none)
+            else:
+                if v is None and not include_none:
+                    continue
+                out[f.name] = v
 
-def _cast_to_list(value: Any, label: str):
-    """Cast a list/tuple/ndarray to a Python list (recursively).
-
-    Args:
-        value (Any): Input value to cast.
-        label (str): Label used in error messages.
-
-    Returns:
-        list: List representation of the input value.
-    """
-    if isinstance(value, list):
-        out = value
-    elif isinstance(value, tuple):
-        out = list(value)
-    elif np is not None and isinstance(value, np.ndarray):
-        out = value.tolist()
-    else:
-        raise TypeError(f"{label} must be a list, tuple, or numpy array")
-
-    if not isinstance(out, list):
-        raise TypeError(f"{label} must be a list, tuple, or numpy array")
-
-    for idx, item in enumerate(out):
-        if isinstance(item, (list, tuple)) or (np is not None and isinstance(item, np.ndarray)):
-            out[idx] = _cast_to_list(item, label)
-    return out
-
-
-def _validate_int(value: Any, label: str) -> None:
-    """Validate that a value is an int.
-
-    Args:
-        value (Any): Value to validate.
-        label (str): Label used in error messages.
-    """
-    if not isinstance(value, int):
-        raise TypeError(f"{label} must be an int")
-
-
-def _validate_float_int_list(value: Any, label: str, ndims: Optional[int] = None) -> None:
-    """Validate a list of float/int values with optional length.
-
-    Args:
-        value (Any): Value to validate.
-        label (str): Label used in error messages.
-        ndims (Optional[int]): Required length if provided.
-    """
-    if not isinstance(value, list):
-        raise TypeError(f"{label} must be a list")
-    if ndims is not None and len(value) != ndims:
-        raise ValueError(f"{label} must have length {ndims}")
-    for item in value:
-        if not isinstance(item, (float, int)):
-            raise TypeError(f"{label} must contain only floats or ints")
-
-
-def _validate_float_int_matrix(value: Any, label: str, ndims: Optional[int] = None) -> None:
-    """Validate a 2D list of float/int values with optional shape.
-
-    Args:
-        value (Any): Value to validate.
-        label (str): Label used in error messages.
-        ndims (Optional[int]): Required square dimension if provided.
-    """
-    if not isinstance(value, list):
-        raise TypeError(f"{label} must be a list of lists")
-    if ndims is not None and len(value) != ndims:
-        raise ValueError(f"{label} must have shape [{ndims}, {ndims}]")
-    for row in value:
-        if not isinstance(row, list):
-            raise TypeError(f"{label} must be a list of lists")
-        if ndims is not None and len(row) != ndims:
-            raise ValueError(f"{label} must have shape [{ndims}, {ndims}]")
-        for item in row:
-            if not isinstance(item, (float, int)):
-                raise TypeError(f"{label} must contain only floats or ints")
+        if not include_none:
+            out = {k: val for k, val in out.items() if val is not None}
+        return out
+    

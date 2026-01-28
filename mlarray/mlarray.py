@@ -64,7 +64,7 @@ class MLArray:
             self._load(array, num_threads)
         else:
             self._store = array
-            self._validate_and_add_meta(meta, spacing, origin, direction, channel_axis)        
+            self._validate_and_add_meta(meta, spacing, origin, direction, channel_axis, True)        
             if copy is not None:
                 self.meta.copy_from(copy.meta)
 
@@ -204,7 +204,7 @@ class MLArray:
     
         if create_array:
             self.meta._blosc2 = self._comp_and_validate_blosc2_meta(self.meta._blosc2, patch_size, chunk_size, block_size, shape, channel_axis)   
-            self.meta._has_array = True     
+            self.meta._has_array.has_array = True
         
         self.support_metadata = str(filepath).endswith(f".{MLARRAY_SUFFIX}")
 
@@ -219,9 +219,7 @@ class MLArray:
         else:
             self._store = blosc2.open(urlpath=str(filepath), dparams=dparams, mmap_mode=mmap)
             self._read_meta()
-        if self.meta._has_array == True:
-            self.meta._blosc2.chunk_size = list(self._store.chunks)
-            self.meta._blosc2.block_size = list(self._store.blocks)
+        self._update_blosc2_meta()
         self.mmap = mmap
         self._write_metadata()
 
@@ -291,9 +289,7 @@ class MLArray:
         self._store = blosc2.open(urlpath=str(filepath), cdparams=dparams, mode='r')
         self.mmap = None
         self._read_meta()        
-        if self.meta._has_array == True:
-            self.meta._blosc2.chunk_size = list(self._store.chunks)
-            self.meta._blosc2.block_size = list(self._store.blocks)
+        self._update_blosc2_meta()
 
     def save(
             self,
@@ -337,9 +333,7 @@ class MLArray:
     
         if self._store is not None:
             self.meta._blosc2 = self._comp_and_validate_blosc2_meta(self.meta._blosc2, patch_size, chunk_size, block_size, self._store.shape, self.meta.spatial.channel_axis)
-            self.meta._has_array = True
-        else:
-            self.meta._has_array = False
+            self.meta._has_array.has_array = True
     
         self.support_metadata = str(filepath).endswith(f".{MLARRAY_SUFFIX}")
 
@@ -348,6 +342,9 @@ class MLArray:
             cparams = {'codec': blosc2.Codec.ZSTD, 'clevel': 8,}
         if dparams is None:
             dparams = {'nthreads': num_threads}
+
+        if Path(filepath).is_file():
+            os.remove(str(filepath))
         
         if self._store is not None:
             array = np.ascontiguousarray(self._store[...])
@@ -355,9 +352,7 @@ class MLArray:
         else:
             array = np.empty((0,))
             self._store = blosc2.asarray(array, urlpath=str(filepath), chunks=self.meta._blosc2.chunk_size, blocks=self.meta._blosc2.block_size, cparams=cparams, dparams=dparams)
-        if self.meta._has_array == True:
-            self.meta._blosc2.chunk_size = list(self._store.chunks)
-            self.meta._blosc2.block_size = list(self._store.blocks)
+        self._update_blosc2_meta()
         self.mmap = None
         self._write_metadata(force=True)
 
@@ -370,7 +365,7 @@ class MLArray:
         Raises:
             TypeError: If no array data is loaded.
         """
-        if self._store is None or self.meta._has_array == False:
+        if self._store is None or self.meta._has_array.has_array == False:
             raise TypeError("MLArray has no array data loaded.")
         return self._store[...]
 
@@ -387,7 +382,7 @@ class MLArray:
         Raises:
             TypeError: If no array data is loaded.
         """
-        if self._store is None or self.meta._has_array == False:
+        if self._store is None or self.meta._has_array.has_array == False:
             raise TypeError("MLArray has no array data loaded.")
         return self._store[key]
 
@@ -402,7 +397,7 @@ class MLArray:
         Raises:
             TypeError: If no array data is loaded.
         """
-        if self._store is None or self.meta._has_array == False:
+        if self._store is None or self.meta._has_array.has_array == False:
             raise TypeError("MLArray has no array data loaded.")
         self._store[key] = value
 
@@ -415,7 +410,7 @@ class MLArray:
         Raises:
             TypeError: If no array data is loaded.
         """
-        if self._store is None or self.meta._has_array == False:
+        if self._store is None or self.meta._has_array.has_array == False:
             raise TypeError("MLArray has no array data loaded.")
         return iter(self._store)
 
@@ -425,7 +420,7 @@ class MLArray:
         Returns:
             int: Size of axis 0, or 0 if no array is loaded.
         """
-        if self._store is None or self.meta._has_array == False:
+        if self._store is None or self.meta._has_array.has_array == False:
             return 0
         return len(self._store)
 
@@ -441,7 +436,7 @@ class MLArray:
         Raises:
             TypeError: If no array data is loaded.
         """
-        if self._store is None or self.meta._has_array == False:
+        if self._store is None or self.meta._has_array.has_array == False:
             raise TypeError("MLArray has no array data loaded.")
         arr = np.asarray(self._store)
         if dtype is not None:
@@ -485,7 +480,7 @@ class MLArray:
             list: Affine matrix with shape (ndims + 1, ndims + 1), or None if
                 no array is loaded.
         """
-        if self._store is None or self.meta._has_array == False:
+        if self._store is None or self.meta._has_array.has_array == False:
             return None
         spacing  = np.array(self.spacing) if self.spacing is not None else np.ones(self._spatial_ndim)
         origin  = np.array(self.origin) if self.origin is not None else np.zeros(self._spatial_ndim)
@@ -503,7 +498,7 @@ class MLArray:
             list: Translation vector with length equal to the number of spatial
                 dimensions, or None if no array is loaded.
         """
-        if self._store is None or self.meta._has_array == False:
+        if self._store is None or self.meta._has_array.has_array == False:
             return None
         return np.array(self.affine)[:-1, -1].tolist()
 
@@ -515,7 +510,7 @@ class MLArray:
             list: Scaling factors per axis with length equal to the number of
                 spatial dimensions, or None if no array is loaded.
         """
-        if self._store is None or self.meta._has_array == False:
+        if self._store is None or self.meta._has_array.has_array == False:
             return None
         scales = np.linalg.norm(np.array(self.affine)[:-1, :-1], axis=0)
         return scales.tolist()
@@ -528,7 +523,7 @@ class MLArray:
             list: Rotation matrix with shape (ndims, ndims), or None if no array
                 is loaded.
         """
-        if self._store is None or self.meta._has_array == False:
+        if self._store is None or self.meta._has_array.has_array == False:
             return None
         rotation_matrix = np.array(self.affine)[:-1, :-1] / np.array(self.scale)
         return rotation_matrix.tolist()
@@ -541,7 +536,7 @@ class MLArray:
             list: Shear matrix with shape (ndims, ndims), or None if no array is
                 loaded.
         """
-        if self._store is None or self.meta._has_array == False:
+        if self._store is None or self.meta._has_array.has_array == False:
             return None
         scales = np.array(self.scale)
         rotation_matrix = np.array(self.rotation)
@@ -555,7 +550,7 @@ class MLArray:
         Returns:
             tuple: Shape of the underlying array, or None if no array is loaded.
         """
-        if self._store is None or self.meta._has_array == False:
+        if self._store is None or self.meta._has_array.has_array == False:
             return None
         return self._store.shape
 
@@ -567,7 +562,7 @@ class MLArray:
             np.dtype: Dtype of the underlying array, or None if no array is
                 loaded.
         """
-        if self._store is None or self.meta._has_array == False:
+        if self._store is None or self.meta._has_array.has_array == False:
             return None
         return self._store.dtype
     
@@ -578,7 +573,7 @@ class MLArray:
         Returns:
             int: Number of dimensions, or None if no array is loaded.
         """
-        if self._store is None or self.meta._has_array == False:
+        if self._store is None or self.meta._has_array.has_array == False:
             return None
         return len(self._store.shape)
     
@@ -591,7 +586,7 @@ class MLArray:
         Returns:
             int: Number of spatial dimensions, or None if no array is loaded.
         """
-        if self._store is None or self.meta._has_array == False:
+        if self._store is None or self.meta._has_array.has_array == False:
             return None
         ndim = len(self._store.shape)
         if self.meta.spatial.channel_axis is not None:
@@ -762,7 +757,7 @@ class MLArray:
             chunk_size, block_size = self.comp_blosc2_params(shape, patch_size, channel_axis)
 
         meta_blosc2 = MetaBlosc2(chunk_size, block_size, patch_size)
-        meta_blosc2._validate_and_cast(len(shape), channel_axis)
+        meta_blosc2._validate_and_cast(ndims=len(shape), channel_axis=channel_axis)
         return meta_blosc2
     
     def _read_meta(self):
@@ -770,7 +765,7 @@ class MLArray:
         meta = Meta()
         if self.support_metadata and isinstance(self._store, blosc2.ndarray.NDArray):
             meta = self._store.vlmeta["mlarray"]
-            meta = Meta.from_dict(meta)
+            meta = Meta.from_mapping(meta)
         self._validate_and_add_meta(meta)
 
     def _write_metadata(self, force=False):
@@ -780,12 +775,12 @@ class MLArray:
             force (bool): If True, write even when mmap mode is read-only.
         """
         if self.support_metadata and isinstance(self._store, blosc2.ndarray.NDArray) and (self.mmap in ('r+', 'w+') or force):
-            metadata = self.meta.to_dict()
+            metadata = self.meta.to_mapping()
             if not is_serializable(metadata):
                 raise RuntimeError("Metadata is not serializable.")
             self._store.vlmeta["mlarray"] = metadata
     
-    def _validate_and_add_meta(self, meta, spacing=None, origin=None, direction=None, channel_axis=None):
+    def _validate_and_add_meta(self, meta, spacing=None, origin=None, direction=None, channel_axis=None, has_array=None):
         """Validate and attach metadata to the MLArray instance.
 
         Args:
@@ -819,5 +814,16 @@ class MLArray:
             self.meta.spatial.direction = direction
         if channel_axis is not None:
             self.meta.spatial.channel_axis = channel_axis
-        self.meta.spatial.shape = self.shape
-        self.meta.spatial._validate_and_cast(self._spatial_ndim)
+        if self.meta._has_array.has_array or has_array:
+            self.meta.spatial.shape = self.shape
+        self.meta.spatial._validate_and_cast(ndims=self._spatial_ndim)
+
+    def _update_blosc2_meta(self):
+        """Sync Blosc2 chunk and block sizes into metadata.
+
+        Updates ``self.meta._blosc2`` from the underlying store when the array
+        is present.
+        """
+        if self.meta._has_array.has_array == True:
+            self.meta._blosc2.chunk_size = list(self._store.chunks)
+            self.meta._blosc2.block_size = list(self._store.blocks)

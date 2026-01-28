@@ -28,7 +28,7 @@ class TestMetadataStorage(unittest.TestCase):
             image.save(path)
 
             loaded = MLArray(path)
-            self.assertEqual(loaded.meta.image, meta_dict)
+            self.assertEqual(loaded.meta.image.to_plain(), meta_dict)
 
     def test_metadata_roundtrip_meta(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -48,11 +48,11 @@ class TestMetadataStorage(unittest.TestCase):
             image.save(path)
 
             loaded = MLArray(path)
-            self.assertEqual(loaded.meta.image, {"patient_id": "p-002"})
+            self.assertEqual(loaded.meta.image.to_plain(), {"patient_id": "p-002"})
             self.assertTrue(loaded.meta.is_seg)
-            self.assertEqual(loaded.meta.stats.to_dict(), stats.to_dict())
-            self.assertEqual(loaded.meta.bbox.to_dict(), bbox.to_dict())
-            self.assertEqual(loaded.meta.extra, {"pipeline": "v1"})
+            self.assertEqual(loaded.meta.stats.to_plain(), stats.to_plain())
+            self.assertEqual(loaded.meta.bbox.to_plain(), bbox.to_plain())
+            self.assertEqual(loaded.meta.extra.to_plain(), {"pipeline": "v1"})
 
     def test_metadata_mmap_readonly_no_write(self):
         with tempfile.TemporaryDirectory() as tmpdir:
