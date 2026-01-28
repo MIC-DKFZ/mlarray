@@ -6,6 +6,10 @@
 
 ## Metadata Module
 
+::: mlarray.meta.BaseMeta
+
+::: mlarray.meta.SingleKeyBaseMeta
+
 ::: mlarray.meta.Meta
 
 ::: mlarray.meta.MetaOriginal
