@@ -550,6 +550,8 @@ class MetaStatistics(BaseMeta):
         percentile_mean: Mean percentile value.
         percentile_median: Median percentile value.
         percentile_std: Standard deviation of percentile values.
+        percentile_min_key: Minimum percentile key used to determine percentile_min (for example 0.05).
+        percentile_max_key: Maximum percentile key used to determine percentile_max (for example 0.95).
     """
     min: Optional[float] = None
     max: Optional[float] = None
@@ -561,6 +563,8 @@ class MetaStatistics(BaseMeta):
     percentile_mean: Optional[float] = None
     percentile_median: Optional[float] = None
     percentile_std: Optional[float] = None
+    percentile_min_key: Optional[float] = None
+    percentile_max_key: Optional[float] = None
 
     def _validate_and_cast(self, **_: Any) -> None:
         """Validate that all stats are numeric when provided."""

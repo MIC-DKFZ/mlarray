@@ -77,6 +77,8 @@ This section stores precomputed global statistics for the array, which can be us
 | percentile_mean   | Optional[float] | Mean within a selected percentile range.               |
 | percentile_median | Optional[float] | Median within a selected percentile range.             |
 | percentile_std    | Optional[float] | Standard deviation within a selected percentile range. |
+| percentile_min_key    | Optional[float] | Minimum percentile key used to determine percentile_min (for example 0.05).            |
+| percentile_max_key    | Optional[float] | Maximum percentile key used to determine percentile_max (for example 0.95).            |
 
 ---
 
