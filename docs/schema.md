@@ -58,13 +58,6 @@ This section stores the information needed to interpret the array in physical sp
 
 ---
 
-### is_seg
-
-* **Description:** Whether the image is a segmentation mask.
-* **Dataclass:** None (boolean).
-
----
-
 ### stats
 
 * **Description:** Summary statistics for the image.
@@ -102,18 +95,10 @@ Bounding boxes are stored in a normalized, axis-aligned representation that work
 
 ---
 
-### _has_array
+### is_seg
 
-* **Description:** Whether this metadata instance represents an on-disk array.
+* **Description:** Whether the image is a segmentation mask.
 * **Dataclass:** None (boolean).
-
----
-
-### _image_meta_format
-
-* **Description:** Source format identifier for the `image` metadata (e.g., "dicom",
-  "nifti", "nrrd"). This is advisory and application-defined.
-* **Dataclass:** None (string).
 
 ---
 
@@ -129,6 +114,21 @@ This section records how the array was laid out on disk (chunking, blocking, pat
 | chunk_size | Optional[List[float]] | Chunk size per axis, length = full array `ndims` (including channels). |
 | block_size | Optional[List[float]] | Block size per axis, length = full array `ndims` (including channels). |
 | patch_size | Optional[List[float]] | Patch size per spatial axis, length = `ndims` (channels excluded).     |
+
+---
+
+### _has_array
+
+* **Description:** Whether this metadata instance represents an on-disk array.
+* **Dataclass:** None (boolean).
+
+---
+
+### _image_meta_format
+
+* **Description:** Source format identifier for the `image` metadata (e.g., "dicom",
+  "nifti", "nrrd"). This is advisory and application-defined.
+* **Dataclass:** None (string).
 
 ---
 
