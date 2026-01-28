@@ -22,7 +22,7 @@ if __name__ == '__main__':
     image = MLArray.open(filepath, shape=array.shape, dtype=array.dtype, mmap='w+')
     print("Saving image...")
     image[...] = array
-    image.meta = Meta(image=image_meta, spatial=MetaSpatial(spacing=spacing, origin=origin, direction=direction), bbox=bboxes)
+    image.meta.copy_from(Meta(image=image_meta, spatial=MetaSpatial(spacing=spacing, origin=origin, direction=direction), bbox=bboxes))
     image.meta.is_seg = True
     image.close()
 
