@@ -1,7 +1,7 @@
 import numpy as np
 import os
 from pathlib import Path
-from mlarray import MLArray, Meta
+from mlarray import MLArray, Meta, MetaBbox
 import json
 
 
@@ -19,7 +19,7 @@ if __name__ == '__main__':
         os.remove(filepath)
 
     print("Initializing image...")
-    image = MLArray(spacing=spacing, origin=origin, direction=direction, meta=Meta(original=image_meta, bbox=bboxes))
+    image = MLArray(spacing=spacing, origin=origin, direction=direction, meta=Meta(original=image_meta, bbox=MetaBbox(bboxes)))
     print("Saving image...")
     image.save(filepath)
 

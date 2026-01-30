@@ -1,8 +1,7 @@
 import numpy as np
 import os
 from pathlib import Path
-from mlarray import MLArray, Meta
-from mlarray.meta import MetaOriginal, MetaIsSeg
+from mlarray import MLArray, Meta, MetaBbox
 import json
 
 
@@ -20,7 +19,7 @@ if __name__ == '__main__':
         os.remove(filepath)
 
     print("Initializing image...")
-    image = MLArray(array, spacing=spacing, origin=origin, direction=direction, meta=Meta(original=image_meta, bbox=bboxes, is_seg=True))
+    image = MLArray(array, spacing=spacing, origin=origin, direction=direction, meta=Meta(original=image_meta, bbox=MetaBbox(bboxes), is_seg=True))
     print("Saving image...")
     image.save(filepath)
 

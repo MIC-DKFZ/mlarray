@@ -575,34 +575,57 @@ class MetaStatistics(BaseMeta):
 
 
 @dataclass(slots=True)
-class MetaBbox(SingleKeyBaseMeta):
-    """Bounding boxes represented as per-dimension min/max pairs.
+class MetaBbox(BaseMeta):
+    """Bounding box metadata with optional scores and labels.
 
     Attributes:
         bboxes: List of bounding boxes with shape [n_boxes, ndims, 2], where
-            each inner pair is [min, max] for a dimension. Values must be ints.
+            each inner pair is [min, max] for a dimension. Values must be ints
+            or floats.
+        scores: Optional confidence scores aligned with bboxes (ints or floats).
+        labels: Optional labels aligned with bboxes. Each label may be a string,
+            int, or float.
     """
-    bboxes: Optional[List[List[List[int]]]] = None
+    bboxes: Optional[List[List[List[Union[int, float]]]]] = None
+    scores: Optional[List[Union[int, float]]] = None
+    labels: Optional[List[Union[str, int, float]]] = None
 
     def _validate_and_cast(self, **_: Any) -> None:
-        """Validate bounding box structure and types."""
-        if self.bboxes is None:
-            return
+        """Validate bounding box structure and related fields."""
+        if self.bboxes is not None:
+            self.bboxes = _cast_to_list(self.bboxes, "meta.bbox.bboxes")
 
-        self.bboxes = _cast_to_list(self.bboxes, "meta.bbox.bboxes")
+            if not isinstance(self.bboxes, list):
+                raise TypeError("meta.bbox.bboxes must be a list")
 
-        if not isinstance(self.bboxes, list):
-            raise TypeError("meta.bbox.bboxes must be a list")
+            for b_i, bbox in enumerate(self.bboxes):
+                if not isinstance(bbox, list):
+                    raise TypeError("meta.bbox.bboxes must be a list of lists")
+                for r_i, row in enumerate(bbox):
+                    if not isinstance(row, list) or len(row) != 2:
+                        raise ValueError("meta.bbox.bboxes rows must have length 2")
+                    for v in row:
+                        if isinstance(v, bool) or not isinstance(v, (float, int)):
+                            raise TypeError("meta.bbox.bboxes must contain ints or floats only")
 
-        for bbox in self.bboxes:
-            if not isinstance(bbox, list):
-                raise TypeError("meta.bbox.bboxes must be a list of lists")
-            for row in bbox:
-                if not isinstance(row, list) or len(row) != 2:
-                    raise ValueError("meta.bbox.bboxes rows must have length 2")
-                for v in row:
-                    if isinstance(v, bool) or not isinstance(v, int):
-                        raise TypeError("meta.bbox.bboxes must contain ints only")
+        if self.scores is not None:
+            self.scores = _cast_to_list(self.scores, "meta.bbox.scores")
+            _validate_float_int_list(self.scores, "meta.bbox.scores")
+
+        if self.labels is not None:
+            self.labels = _cast_to_list(self.labels, "meta.bbox.labels")
+            if not isinstance(self.labels, list):
+                raise TypeError("meta.bbox.labels must be a list")
+            for v in self.labels:
+                if isinstance(v, bool) or not isinstance(v, (str, int, float)):
+                    raise TypeError("meta.bbox.labels must contain only str, int, or float")
+
+        if self.bboxes is not None:
+            n = len(self.bboxes)
+            if self.scores is not None and len(self.scores) != n:
+                raise ValueError("meta.bbox.scores must have same length as bboxes")
+            if self.labels is not None and len(self.labels) != n:
+                raise ValueError("meta.bbox.labels must have same length as bboxes")
 
 
 @dataclass(slots=True)

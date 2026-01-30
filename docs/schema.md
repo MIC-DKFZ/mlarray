@@ -97,15 +97,17 @@ This section stores precomputed global statistics for the array, which can be us
 ### bbox
 
 * **Description:** Bounding boxes for objects/regions in the image.
-* **Dataclass:** `MetaBbox` (single-key wrapper).
+* **Dataclass:** `MetaBbox`.
 * **Structure:** List of bboxes, each bbox is a list with length equal to image `ndims`,
   and each entry is `[min, max]`.
 
 Bounding boxes are stored in a normalized, axis-aligned representation that works across dimensionalities (2D, 3D, …). This is especially useful for detection-style workflows, ROI cropping, dataset summaries, and interactive visualization.
 
-| field  | type                            | description                                                          |
-| ------ | ------------------------------- | -------------------------------------------------------------------- |
-| bboxes | Optional[List[List[List[int]]]] | Bounding boxes shaped `[num_bboxes][ndims][2]` (min/max), ints only. |
+| field  | type                                            | description                                                                 |
+| ------ | ----------------------------------------------- | --------------------------------------------------------------------------- |
+| bboxes | Optional[List[List[List[Union[int, float]]]]]   | Bounding boxes shaped `[num_bboxes][ndims][2]` (min/max), ints or floats.   |
+| scores | Optional[List[Union[int, float]]]               | Optional confidence scores aligned with `bboxes`.                           |
+| labels | Optional[List[Union[str, int, float]]]          | Optional labels aligned with `bboxes`.                                      |
 
 ---
 
