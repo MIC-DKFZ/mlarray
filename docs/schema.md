@@ -58,15 +58,34 @@ Top-level metadata container.
 * **Description:** Spatial metadata for the image.
 * **Dataclass:** `MetaSpatial`.
 
-This section stores the information needed to interpret the array in physical space (e.g., voxel spacing, coordinate origin, and orientation). It also optionally captures array shape and channel layout to make downstream consumers more robust.
+This section stores the information needed to interpret the array in physical space (e.g., voxel spacing, coordinate origin, and orientation). It also optionally captures array shape and axes layout to make downstream consumers more robust.
 
 | field        | type                        | description                                                                              |
 | ------------ | --------------------------- | ---------------------------------------------------------------------------------------- |
 | spacing      | Optional[List[float]]       | Voxel spacing per spatial axis, length = `ndims`.                                        |
 | origin       | Optional[List[float]]       | Origin per spatial axis, length = `ndims`.                                               |
 | direction    | Optional[List[List[float]]] | Direction matrix, shape `[ndims][ndims]`.                                                |
-| shape        | Optional[List[int]]         | Array shape. If `channel_axis` is set, length = `ndims + 1`, otherwise length = `ndims`. |
-| channel_axis | Optional[int]               | Index of channel dimension in the full array, if present.                                |
+| shape        | Optional[List[int]]         | Full array shape, length = spatial + non-spatial axes.                                   |
+| axis_labels  | Optional[List[str,AxisLabel]]   | Per-axis labels or roles, length = full array `ndims`.                                   |
+| axis_units   | Optional[List[str]]         | Per-axis units, length = full array `ndims`.                                             |
+
+---
+
+#### AxisLabel
+
+Axis labels describe the semantic role of each axis. They may be provided as strings or enum values.
+
+| value         | description                                              |
+| ------------- | -------------------------------------------------------- |
+| spatial       | Generic spatial axis (used when no axis-specific label). |
+| spatial_x     | Spatial axis representing X.                             |
+| spatial_y     | Spatial axis representing Y.                             |
+| spatial_z     | Spatial axis representing Z.                             |
+| non_spatial   | Generic non-spatial axis.                                |
+| channel       | Channel axis (e.g., color channels or feature maps).     |
+| temporal      | Time axis.                                               |
+| continuous    | Continuous-valued axis (non-spatial).                    |
+| components    | Component axis (e.g., vector components).                |
 
 ---
 
@@ -131,9 +150,9 @@ This section records how the array was laid out on disk (chunking, blocking, pat
 
 | field      | type                  | description                                                            |
 | ---------- | --------------------- | ---------------------------------------------------------------------- |
-| chunk_size | Optional[List[float]] | Chunk size per axis, length = full array `ndims` (including channels). |
-| block_size | Optional[List[float]] | Block size per axis, length = full array `ndims` (including channels). |
-| patch_size | Optional[List[float]] | Patch size per spatial axis, length = `ndims` (channels excluded).     |
+| chunk_size | Optional[List[float]] | Chunk size per axis, length = full array `ndims` (including non-spatial axes). |
+| block_size | Optional[List[float]] | Block size per axis, length = full array `ndims` (including non-spatial axes). |
+| patch_size | Optional[List[float]] | Patch size per spatial axis, length = `ndims` (non-spatial axes excluded).     |
 
 ---
 

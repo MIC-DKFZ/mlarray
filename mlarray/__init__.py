@@ -17,6 +17,7 @@ if TYPE_CHECKING:
         MetaSpatial,
         MetaStatistics,
         MetaVersion,
+        AxisLabel
     )
     from mlarray.utils import is_serializable
     from mlarray.cli import cli_print_header, cli_convert_to_mlarray
@@ -36,6 +37,7 @@ __all__ = [
     "MetaSpatial",
     "MetaStatistics",
     "MetaVersion",
+    "AxisLabel",
     "is_serializable",
     "cli_print_header",
     "cli_convert_to_mlarray",
@@ -61,6 +63,7 @@ _LAZY_ATTRS = {
     "MetaSpatial": ("mlarray.meta", "MetaSpatial"),
     "MetaStatistics": ("mlarray.meta", "MetaStatistics"),
     "MetaVersion": ("mlarray.meta", "MetaVersion"),
+    "AxisLabel": ("mlarray.meta", "AxisLabel"),
     "is_serializable": ("mlarray.utils", "is_serializable"),
     "cli_print_header": ("mlarray.cli", "cli_print_header"),
     "cli_convert_to_mlarray": ("mlarray.cli", "cli_convert_to_mlarray"),

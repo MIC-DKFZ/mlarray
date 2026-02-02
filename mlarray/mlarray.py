@@ -5,7 +5,7 @@ import math
 from typing import Dict, Optional, Union, List, Tuple
 from pathlib import Path
 import os
-from mlarray.meta import Meta, MetaBlosc2
+from mlarray.meta import Meta, MetaBlosc2, AxisLabel, _spatial_axis_mask
 from mlarray.utils import is_serializable
 
 MLARRAY_SUFFIX = "mla"
@@ -21,7 +21,7 @@ class MLArray:
             origin: Optional[Union[List, Tuple, np.ndarray]] = None,
             direction: Optional[Union[List, Tuple, np.ndarray]] = None,
             meta: Optional[Union[Dict, Meta]] = None,
-            channel_axis: Optional[int] = None,
+            axis_labels: Optional[List[Union[str, AxisLabel]]] = None,
             num_threads: int = 1,
             copy: Optional['MLArray'] = None) -> None:
         """Initializes a MLArray instance.
@@ -46,8 +46,7 @@ class MLArray:
             meta (Optional[Dict | Meta]): Free-form metadata dictionary or Meta
                 instance. Must be JSON-serializable when saving. 
                 If meta is passed as a Dict, it will internally be converted into a Meta object with the dict being interpreted as meta.image metadata.
-            channel_axis (Optional[int]): Axis index that represents channels
-                in the array (e.g., 0 for CHW or -1 for HWC). If None, the array
+            axis_labels (Optional[List[Union[str, AxisLabel]]]): Per-axis labels or roles. Length must match ndims. If None, the array
                 is treated as purely spatial.
             num_threads (int): Number of threads for Blosc2 operations.
             copy (Optional[MLArray]): Another MLArray instance to copy metadata
@@ -58,13 +57,14 @@ class MLArray:
         self.support_metadata = None
         self.mmap = None
         self.meta = None
-        if isinstance(array, (str, Path)) and (spacing is not None or origin is not None or direction is not None or meta is not None or channel_axis is not None or copy is not None):
-            raise ("Spacing, origin, direction, meta, channel_axis or copy cannot be set when array is a filepath.")
+        if isinstance(array, (str, Path)) and (spacing is not None or origin is not None or direction is not None or meta is not None or axis_labels is not None or copy is not None):
+            raise ("Spacing, origin, direction, meta, axis_labels or copy cannot be set when array is a filepath.")
         if isinstance(array, (str, Path)):
             self._load(array, num_threads)
         else:
             self._store = array
-            self._validate_and_add_meta(meta, spacing, origin, direction, channel_axis, True)        
+            has_array = array is not None
+            self._validate_and_add_meta(meta, spacing, origin, direction, axis_labels, has_array)        
             if copy is not None:
                 self.meta.copy_from(copy.meta)
 
@@ -74,7 +74,7 @@ class MLArray:
             filepath: Union[str, Path],
             shape: Optional[Union[List, Tuple, np.ndarray]] = None,
             dtype: Optional[np.dtype] = None,
-            channel_axis: Optional[int] = None,
+            axis_labels: Optional[List[Union[str, AxisLabel]]] = None,
             mmap: str = 'r',
             patch_size: Optional[Union[int, List, Tuple]] = 'default',  # 'default' means that the default of 192 is used. However, if set to 'default', the patch_size will be skipped if self.patch_size is set from a previously loaded MLArray image. In that case the self.patch_size is used.
             chunk_size: Optional[Union[int, List, Tuple]]= None,
@@ -99,10 +99,10 @@ class MLArray:
                 ".b2nd" or ".mla".
             shape (Optional[Union[List, Tuple, np.ndarray]]): Shape of the array
                 to create. If provided, a new file is created. Length must match
-                the full array dimensionality (including channels if present).
+                the full array dimensionality (including non-spatial axes if present).
             dtype (Optional[np.dtype]): Numpy dtype for a newly created array.
-            channel_axis (Optional[int]): Axis index for channels in the array.
-                Used for patch/chunk/block calculations.
+            axis_labels (Optional[List[Union[str, AxisLabel]]]): Per-axis labels or roles. Length must match ndims. If None, the array
+                is treated as purely spatial. Used for patch/chunk/block calculations.
             mmap (str): Blosc2 mmap mode. One of "r", "r+", "w+", "c".
             patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
                 chunk/block optimization. Provide an int for isotropic sizes or
@@ -126,7 +126,7 @@ class MLArray:
                 inconsistent, or if mmap mode is invalid for creation.
         """
         class_instance = cls()
-        class_instance._open(filepath, shape, dtype, channel_axis, mmap, patch_size, chunk_size, block_size, num_threads, cparams, dparams)
+        class_instance._open(filepath, shape, dtype, axis_labels, mmap, patch_size, chunk_size, block_size, num_threads, cparams, dparams)
         return class_instance
 
     def _open(
@@ -134,7 +134,7 @@ class MLArray:
             filepath: Union[str, Path],
             shape: Optional[Union[List, Tuple, np.ndarray]] = None,
             dtype: Optional[np.dtype] = None,
-            channel_axis: Optional[int] = None,
+            axis_labels: Optional[list[Union[str, AxisLabel]]] = None,
             mmap: str = 'r',
             patch_size: Optional[Union[int, List, Tuple]] = 'default',  # 'default' means that the default of 192 is used. However, if set to 'default', the patch_size will be skipped if self.patch_size is set from a previously loaded MLArray image. In that case the self.patch_size is used.
             chunk_size: Optional[Union[int, List, Tuple]]= None,
@@ -159,10 +159,10 @@ class MLArray:
                 ".b2nd" or ".mla".
             shape (Optional[Union[List, Tuple, np.ndarray]]): Shape of the array
                 to create. If provided, a new file is created. Length must match
-                the full array dimensionality (including channels if present).
+                the full array dimensionality (including non-spatial axes if present).
             dtype (Optional[np.dtype]): Numpy dtype for a newly created array.
-            channel_axis (Optional[int]): Axis index for channels in the array.
-                Used for patch/chunk/block calculations.
+            axis_labels (Optional[List[Union[str, AxisLabel]]]): Per-axis labels or roles. Length must match ndims. If None, the array
+                is treated as purely spatial.
             mmap (str): Blosc2 mmap mode. One of "r", "r+", "w+", "c".
             patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
                 chunk/block optimization. Provide an int for isotropic sizes or
@@ -203,7 +203,8 @@ class MLArray:
         create_array = mmap == 'w+'
     
         if create_array:
-            self.meta._blosc2 = self._comp_and_validate_blosc2_meta(self.meta._blosc2, patch_size, chunk_size, block_size, shape, channel_axis)   
+            spatial_axis_mask = [True] * len(shape) if axis_labels is None else _spatial_axis_mask(axis_labels)
+            self.meta._blosc2 = self._comp_and_validate_blosc2_meta(self.meta._blosc2, patch_size, chunk_size, block_size, shape, spatial_axis_mask)   
             self.meta._has_array.has_array = True
         
         self.support_metadata = str(filepath).endswith(f".{MLARRAY_SUFFIX}")
@@ -332,7 +333,8 @@ class MLArray:
             raise RuntimeError(f"MLArray requires '.b2nd' or '.{MLARRAY_SUFFIX}' as extension.")
     
         if self._store is not None:
-            self.meta._blosc2 = self._comp_and_validate_blosc2_meta(self.meta._blosc2, patch_size, chunk_size, block_size, self._store.shape, self.meta.spatial.channel_axis)
+            spatial_axis_mask = [True] * self.ndim if self.meta.spatial.axis_labels is None else _spatial_axis_mask(self.meta.spatial.axis_labels)
+            self.meta._blosc2 = self._comp_and_validate_blosc2_meta(self.meta._blosc2, patch_size, chunk_size, block_size, self._store.shape, spatial_axis_mask)
             self.meta._has_array.has_array = True
     
         self.support_metadata = str(filepath).endswith(f".{MLARRAY_SUFFIX}")
@@ -568,7 +570,7 @@ class MLArray:
     
     @property
     def ndim(self) -> int:
-        """Returns the number of dimensions of the array.
+        """Returns the number of spatial and non-spatial dimensions of the array.
 
         Returns:
             int: Number of dimensions, or None if no array is loaded.
@@ -581,23 +583,21 @@ class MLArray:
     def _spatial_ndim(self) -> int:
         """Returns the number of spatial dimensions.
 
-        If ``channel_axis`` is set, the channel dimension is excluded.
-
         Returns:
             int: Number of spatial dimensions, or None if no array is loaded.
         """
         if self._store is None or self.meta._has_array.has_array == False:
             return None
         ndim = len(self._store.shape)
-        if self.meta.spatial.channel_axis is not None:
-            ndim -= 1
+        if self.meta.spatial._num_spatial_axes is not None:
+            ndim = self.meta.spatial._num_spatial_axes
         return ndim
 
     def comp_blosc2_params(
             self,
             image_size: Union[Tuple[int, int], Tuple[int, int, int], Tuple[int, int, int, int]],
             patch_size: Union[Tuple[int, int], Tuple[int, int, int]],
-            channel_axis: Optional[int] = None,
+            spatial_axis_mask: Optional[list[bool]] = None,
             bytes_per_pixel: int = 4,  # 4 byte are float32
             l1_cache_size_per_core_in_bytes: int = 32768,  # 1 Kibibyte (KiB) = 2^10 Byte;  32 KiB = 32768 Byte
             l3_cache_size_per_core_in_bytes: int = 1441792, # 1 Mibibyte (MiB) = 2^20 Byte = 1.048.576 Byte; 1.375MiB = 1441792 Byte
@@ -624,13 +624,11 @@ class MLArray:
         Args:
             image_size (Union[Tuple[int, int], Tuple[int, int, int], Tuple[int, int, int, int]]):
                 Image shape. Use a 2D, 3D, or 4D size; 2D/3D inputs are
-                internally expanded to 4D (with channels first).
+                internally expanded to 4D (with non-spatial axes first).
             patch_size (Union[Tuple[int, int], Tuple[int, int, int]]): Patch
                 size for spatial dimensions. Use a 2-tuple (x, y) or 3-tuple
                 (x, y, z).
-            channel_axis (Optional[int]): Axis index for channels in the
-                source array. If set, the size is moved to channels-first
-                for cache calculations.
+            spatial_axis_mask (Optional[list[bool]]): Mask indicating for every axis whether it is spatial or not.
             bytes_per_pixel (int): Number of bytes per element. Defaults to 4
                 for float32.
             l1_cache_size_per_core_in_bytes (int): L1 cache per core in bytes.
@@ -654,8 +652,14 @@ class MLArray:
             image_size = (1, *image_size)
             num_squeezes = 1
 
-        if channel_axis is not None:
-            image_size = _move_index_list(image_size, channel_axis+num_squeezes, 0)
+        non_spatial_axis = None
+        if spatial_axis_mask is not None:
+            non_spatial_axis_mask = [not b for b in spatial_axis_mask]
+            if sum(non_spatial_axis_mask) > 1:
+                raise RuntimeError("Automatic blosc2 optimization currently only supports one non-spatial axis. Please set chunk and block size manually.")
+            non_spatial_axis = next((i for i, v in enumerate(non_spatial_axis_mask) if v), None)
+            if non_spatial_axis is not None:
+                image_size = _move_index_list(image_size, non_spatial_axis+num_squeezes, 0)
 
         if len(image_size) != 4:
             raise RuntimeError("Image size must be 4D.")
@@ -663,11 +667,11 @@ class MLArray:
         if not (len(patch_size) == 2 or len(patch_size) == 3):
             raise RuntimeError("Patch size must be 2D or 3D.")
 
-        num_channels = image_size[0]
+        non_spatial_size = image_size[0]
         if len(patch_size) == 2:
             patch_size = [1, *patch_size]
         patch_size = np.array(patch_size)
-        block_size = np.array((num_channels, *[2 ** (max(0, math.ceil(math.log2(i)))) for i in patch_size]))
+        block_size = np.array((non_spatial_size, *[2 ** (max(0, math.ceil(math.log2(i)))) for i in patch_size]))
 
         # shrink the block size until it fits in L1
         estimated_nbytes_block = np.prod(block_size) * bytes_per_pixel
@@ -713,16 +717,16 @@ class MLArray:
         # better safe than sorry
         chunk_size = [min(i, j) for i, j in zip(image_size, chunk_size)]
 
-        if channel_axis is not None:
-            block_size = _move_index_list(block_size, 0, channel_axis+num_squeezes)
-            chunk_size = _move_index_list(chunk_size, 0, channel_axis+num_squeezes)
+        if non_spatial_axis is not None:
+            block_size = _move_index_list(block_size, 0, non_spatial_axis+num_squeezes)
+            chunk_size = _move_index_list(chunk_size, 0, non_spatial_axis+num_squeezes)
 
         block_size = block_size[num_squeezes:]
         chunk_size = chunk_size[num_squeezes:]
 
         return [int(value) for value in chunk_size], [int(value) for value in block_size]
     
-    def _comp_and_validate_blosc2_meta(self, meta_blosc2, patch_size, chunk_size, block_size, shape, channel_axis):
+    def _comp_and_validate_blosc2_meta(self, meta_blosc2, patch_size, chunk_size, block_size, shape, spatial_axis_mask):
         """Compute and validate Blosc2 chunk/block metadata.
 
         Args:
@@ -732,32 +736,32 @@ class MLArray:
                 or "default". See ``open``/``save`` for expected shapes.
             chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
             block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
-            shape (Union[List, Tuple, np.ndarray]): Full array shape including
-                channels if present.
-            channel_axis (Optional[int]): Channel axis index, if any.
+            shape (Union[List, Tuple, np.ndarray]): Full array shape including non-spatial axes.
+            spatial_axis_mask (Optional[list[bool]]): Mask indicating for every axis whether it is spatial or not.
 
         Returns:
             MetaBlosc2: Validated Blosc2 metadata instance.
         """
-        if patch_size is not None and patch_size != "default" and not ((len(shape) == 2 and channel_axis is None) or (len(shape) == 3 and channel_axis is None) or (len(shape) == 4 and channel_axis is not None) or (len(shape) == 4 and channel_axis is not None)):
-            raise NotImplementedError("Chunk and block size optimization based on patch size is only implemented for 2D and 3D images. Please set the chunk and block size manually or set to None for blosc2 to determine a chunk and block size.")
+        num_spatial_axes = sum(spatial_axis_mask)
+        num_non_spatial_axes = sum([not b for b in spatial_axis_mask])
+        if patch_size is not None and patch_size != "default" and (num_spatial_axes == 1 or num_spatial_axes > 3 or num_non_spatial_axes > 1):
+            raise NotImplementedError("Chunk and block size optimization based on patch size is only implemented for 2D and 3D spatial images with at most one further non-spatial axis. Please set the chunk and block size manually or set to None for blosc2 to determine a chunk and block size.")
         if patch_size is not None and patch_size != "default" and (chunk_size is not None or block_size is not None):
             raise RuntimeError("patch_size and chunk_size / block_size cannot both be explicitly set.")
 
-        ndims = len(shape) if channel_axis is None else len(shape) - 1
         if patch_size == "default": 
             if meta_blosc2 is not None and meta_blosc2.patch_size is not None:  # Use previously loaded patch size, when patch size is not explicitly set and a patch size from a previously loaded image exists
                 patch_size = meta_blosc2.patch_size
             else:  # Use default patch size, when patch size is not explicitly set and no patch size from a previously loaded image exists
-                patch_size = [MLARRAY_DEFAULT_PATCH_SIZE] * ndims
+                patch_size = [MLARRAY_DEFAULT_PATCH_SIZE] * num_spatial_axes
 
         patch_size = [patch_size] * len(shape) if isinstance(patch_size, int) else patch_size
 
         if patch_size is not None:
-            chunk_size, block_size = self.comp_blosc2_params(shape, patch_size, channel_axis)
+            chunk_size, block_size = self.comp_blosc2_params(shape, patch_size, spatial_axis_mask)
 
         meta_blosc2 = MetaBlosc2(chunk_size, block_size, patch_size)
-        meta_blosc2._validate_and_cast(ndims=len(shape), channel_axis=channel_axis)
+        meta_blosc2._validate_and_cast(ndims=len(shape), spatial_ndims=num_spatial_axes)
         return meta_blosc2
     
     def _read_meta(self):
@@ -780,7 +784,7 @@ class MLArray:
                 raise RuntimeError("Metadata is not serializable.")
             self._store.vlmeta["mlarray"] = metadata
     
-    def _validate_and_add_meta(self, meta, spacing=None, origin=None, direction=None, channel_axis=None, has_array=None):
+    def _validate_and_add_meta(self, meta, spacing=None, origin=None, direction=None, axis_labels=None, has_array=None):
         """Validate and attach metadata to the MLArray instance.
 
         Args:
@@ -792,7 +796,7 @@ class MLArray:
                 spatial axis.
             direction (Optional[Union[List, Tuple, np.ndarray]]): Direction
                 cosine matrix with shape (ndims, ndims).
-            channel_axis (Optional[int]): Channel axis index, if any.
+            axis_labels (Optional[List[Union[str, AxisLabel]]]): Per-axis labels or roles. Length must match ndims.
 
         Raises:
             ValueError: If ``meta`` is not None, dict, or Meta.
@@ -812,11 +816,13 @@ class MLArray:
             self.meta.spatial.origin = origin
         if direction is not None:
             self.meta.spatial.direction = direction
-        if channel_axis is not None:
-            self.meta.spatial.channel_axis = channel_axis
-        if self.meta._has_array.has_array or has_array:
+        if axis_labels is not None:
+            self.meta.spatial.axis_labels = axis_labels
+        if has_array == True:
+            self.meta._has_array.has_array = True
+        if self.meta._has_array.has_array:
             self.meta.spatial.shape = self.shape
-        self.meta.spatial._validate_and_cast(ndims=self._spatial_ndim)
+        self.meta.spatial._validate_and_cast(ndims=self.ndim, spatial_ndims=self._spatial_ndim)
 
     def _update_blosc2_meta(self):
         """Sync Blosc2 chunk and block sizes into metadata.

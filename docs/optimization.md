@@ -25,7 +25,7 @@ Instead of requiring users to be storage experts, MLArray introduces a **patch s
    * element size (bytes per pixel),
    * CPU cache sizes (L1 / L3 per core),
    * your patch size (2D or 3D),
-   * channel layout (via `channel_axis`),
+   * non-spatial axes layout (via `axis_labels`),
    * and then chooses block/chunk sizes that aim to keep decompression and reads cache-friendly.
 
 Practically: this means *reading a training patch should tend to require as few chunk/block touches as possible*, while keeping the decompressed working set aligned with CPU caches.
@@ -201,8 +201,6 @@ When to use:
 
 ## Notes and practical tips
 
-* **Patch optimization is currently implemented for 2D and 3D images** (and common channel handling). If your data falls outside that, you can still set `chunk_size`/`block_size` manually or let Blosc2 decide.
+* **Patch optimization is currently implemented for 2D and 3D images** (with at most one further non-spatial axis). If your data falls outside that, you can still set `chunk_size`/`block_size` manually or let Blosc2 decide.
 * The best patch size to use is usually the **patch size your dataloader requests most often** (training patch, not necessarily inference tile size).
 * If you’re unsure: start with the default (`patch_size='default'`) and only tune if profiling shows I/O bottlenecks.
-
-If you want, I can also help you add a short “How to pick patch_size” subsection tailored to typical pipelines (nnU-Net, 2D slice training, multi-channel inputs).

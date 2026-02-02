@@ -1,14 +1,14 @@
 import numpy as np
 import os
 from pathlib import Path
-from mlarray import MLArray, Meta, MetaBbox
+from mlarray import MLArray, Meta, MetaBbox, MetaSpatial
 import json
 
 
 if __name__ == '__main__':
     print("Creating array...")
     array = np.random.random((32, 64, 64, 3))
-    channel_axis = 3
+    axis_labels = (MetaSpatial.AxisLabel.spatial_z, MetaSpatial.AxisLabel.spatial_y, MetaSpatial.AxisLabel.spatial_x, MetaSpatial.AxisLabel.channel)
     spacing = np.array((2, 2.5, 4))
     origin = (1, 1, 1)
     direction = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
@@ -20,7 +20,7 @@ if __name__ == '__main__':
         os.remove(filepath)
 
     print("Initializing image...")
-    image = MLArray(array, spacing=spacing, origin=origin, direction=direction, channel_axis=channel_axis, meta=Meta(source=source_meta, bbox=MetaBbox(bboxes)))
+    image = MLArray(array, spacing=spacing, origin=origin, direction=direction, axis_labels=axis_labels, meta=Meta(source=source_meta, bbox=MetaBbox(bboxes)))
     print("Saving image...")
     image.save(filepath)
 

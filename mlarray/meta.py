@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import MISSING, dataclass, field, fields
-from typing import Any, Dict, List, Mapping, Optional, Type, TypeVar, Union
+from typing import Any, Mapping, Optional, Type, TypeVar, Union, TypeAlias, Iterable
+from enum import Enum
 
 import numpy as np
 from mlarray.utils import is_serializable
@@ -57,7 +58,7 @@ class BaseMeta:
         """Return a user-friendly string based on plain values."""
         return str(self.to_plain())
 
-    def to_mapping(self, *, include_none: bool = True) -> Dict[str, Any]:
+    def to_mapping(self, *, include_none: bool = True) -> dict[str, Any]:
         """Serialize to a mapping, recursively expanding nested BaseMeta.
 
         Args:
@@ -66,7 +67,7 @@ class BaseMeta:
         Returns:
             A dict of field names to serialized values.
         """
-        out: Dict[str, Any] = {}
+        out: dict[str, Any] = {}
         for f in fields(self):
             v = getattr(self, f.name)
             if v is None and not include_none:
@@ -125,7 +126,7 @@ class BaseMeta:
             A dict of field values, with nested BaseMeta expanded. SingleKeyBaseMeta
             overrides this to return its wrapped value.
         """
-        out: Dict[str, Any] = {}
+        out: dict[str, Any] = {}
         for f in fields(self):
             v = getattr(self, f.name)
             if v is None and not include_none:
@@ -251,7 +252,7 @@ class SingleKeyBaseMeta(BaseMeta):
         """Set the wrapped value."""
         self.value = v
 
-    def to_mapping(self, *, include_none: bool = True) -> Dict[str, Any]:
+    def to_mapping(self, *, include_none: bool = True) -> dict[str, Any]:
         """Serialize to a mapping with the single key.
 
         Args:
@@ -451,6 +452,109 @@ def _validate_float_int_matrix(value: Any, label: str, ndims: Optional[int] = No
         for v in row:
             if not isinstance(v, (float, int)):
                 raise TypeError(f"{label} must contain only floats or ints")
+            
+
+def validate_and_cast_axis_labels(
+    value: Any,
+    label: str,
+    ndims: Optional[int] = None,
+) -> tuple[Optional[list[str]], int, int]:
+    """
+    Validate axis labels/roles, normalize to list[str], and count spatial/non-spatial axes.
+
+    Args:
+        value: None or list-like of axis labels/roles (enum members or strings).
+        label: Label used in error messages.
+        ndims: If provided, enforce list length == ndims.
+
+    Returns:
+        (labels, n_spatial, n_non_spatial)
+
+    Raises:
+        TypeError: If value is not None and not list-like, or contains invalid items.
+        ValueError: If ndims is provided and length mismatch occurs.
+    """
+    if value is None:
+        return None, 0, 0
+
+    # Cast list / tuple / ndarray -> list
+    v = _cast_to_list(value, label)
+
+    # Enforce 1D list
+    for i, item in enumerate(v):
+        if isinstance(item, list):
+            raise TypeError(
+                f"{label} must be a 1D list (got nested list at index {i})"
+            )
+
+    if ndims is not None and len(v) != ndims:
+        raise ValueError(f"{label} must have length {ndims}")
+
+    spatial_enum_roles = {
+        AxisLabelEnum.spatial,
+        AxisLabelEnum.spatial_x,
+        AxisLabelEnum.spatial_y,
+        AxisLabelEnum.spatial_z,
+    }
+    spatial_string_roles = {r.value for r in spatial_enum_roles}
+
+    out: list[str] = []
+    n_spatial = 0
+    n_non_spatial = 0
+
+    for i, x in enumerate(v):
+        if isinstance(x, AxisLabelEnum):
+            out.append(x.value)
+            if x in spatial_enum_roles:
+                n_spatial += 1
+            else:
+                n_non_spatial += 1
+            continue
+
+        if isinstance(x, str):
+            out.append(x)
+            if x in spatial_string_roles:
+                n_spatial += 1
+            else:
+                n_non_spatial += 1
+            continue
+
+        raise TypeError(
+            f"{label}[{i}] must be a str or AxisLabelEnum "
+            f"(got {type(x).__name__})"
+        )
+
+    return out, n_spatial, n_non_spatial
+
+
+def _is_spatial_axis(label: Union[str, AxisLabelEnum]) -> bool:
+    """Return True if an axis label/role represents a spatial axis."""
+    if isinstance(label, AxisLabelEnum):
+        return label in {
+            AxisLabelEnum.spatial,
+            AxisLabelEnum.spatial_x,
+            AxisLabelEnum.spatial_y,
+            AxisLabelEnum.spatial_z,
+        }
+
+    if isinstance(label, str):
+        return label in {
+            AxisLabelEnum.spatial.value,
+            AxisLabelEnum.spatial_x.value,
+            AxisLabelEnum.spatial_y.value,
+            AxisLabelEnum.spatial_z.value,
+        }
+
+    return False
+
+
+def _spatial_axis_mask(
+    labels: Iterable[Union[str, AxisLabelEnum]],
+) -> list[bool]:
+    """Return a boolean mask indicating which axes are spatial."""
+    if labels is None:
+        return None
+    return [_is_spatial_axis(label) for label in labels]
 
 
 @dataclass(slots=True)
@@ -460,19 +564,18 @@ class MetaBlosc2(BaseMeta):
     Attributes:
         chunk_size: List of per-dimension chunk sizes. Length must match ndims.
         block_size: List of per-dimension block sizes. Length must match ndims.
-        patch_size: List of per-dimension patch sizes. Length must match ndims,
-            or (ndims - 1) when a channel axis is present.
+        patch_size: List of per-dimension patch sizes. Length must match spatial ndims.
     """
     chunk_size: Optional[list] = None
     block_size: Optional[list] = None
     patch_size: Optional[list] = None
 
-    def _validate_and_cast(self, *, ndims: Optional[int] = None, channel_axis: Optional[int] = None, **_: Any) -> None:
+    def _validate_and_cast(self, *, ndims: Optional[int] = None, spatial_ndims: Optional[int] = None, **_: Any) -> None:
         """Validate and normalize tiling sizes.
 
         Args:
-            ndims: Number of spatial dimensions.
-            channel_axis: Channel axis index when present.
+            ndims: Number of dimensions.
+            spatial_ndims: Number of spatial dimensions.
             **_: Unused extra context.
         """
         if self.chunk_size is not None:
@@ -484,9 +587,37 @@ class MetaBlosc2(BaseMeta):
             _validate_float_int_list(self.block_size, "meta._blosc2.block_size", ndims)
 
         if self.patch_size is not None:
-            _ndims = ndims if (ndims is None or channel_axis is None) else ndims - 1
+            spatial_ndims = ndims if spatial_ndims is None else spatial_ndims
             self.patch_size = _cast_to_list(self.patch_size, "meta._blosc2.patch_size")
-            _validate_float_int_list(self.patch_size, "meta._blosc2.patch_size", _ndims)
+            _validate_float_int_list(self.patch_size, "meta._blosc2.patch_size", spatial_ndims)
+
+
+class AxisLabelEnum(str, Enum):
+    """Axis label/role identifiers used for spatial metadata.
+
+    Attributes:
+        spatial: Generic spatial axis (used when no axis-specific label applies).
+        spatial_x: Spatial axis representing X.
+        spatial_y: Spatial axis representing Y.
+        spatial_z: Spatial axis representing Z.
+        non_spatial: Generic non-spatial axis.
+        channel: Channel axis (e.g., color channels or feature maps).
+        temporal: Time axis.
+        continuous: Continuous-valued axis (non-spatial).
+        components: Component axis (e.g., vector components).
+    """
+    spatial = "spatial"
+    spatial_x = "spatial_x"
+    spatial_y = "spatial_y"
+    spatial_z = "spatial_z"
+    non_spatial = "non_spatial"
+    channel = "channel"
+    temporal = "temporal"
+    continuous = "continuous"
+    components = "components"
+
+
+AxisLabel: TypeAlias = Union[str, AxisLabelEnum]
 
 
 @dataclass(slots=True)
@@ -497,42 +628,49 @@ class MetaSpatial(BaseMeta):
         spacing: Per-dimension spacing values. Length must match ndims.
         origin: Per-dimension origin values. Length must match ndims.
         direction: Direction cosine matrix of shape [ndims, ndims].
-        shape: Array shape. Length must match ndims, or (ndims + 1) when
-            channel_axis is set.
-        channel_axis: Index of the channel dimension, if any.
+        shape: Array shape. Length must match (spatial + non-spatial) ndims.
+        axis_labels: Per-axis labels or roles. Length must match ndims.
+        axis_units: Per-axis units. Length must match ndims.
+        _num_spatial_axes: Cached count of spatial axes derived from axis_labels.
+        _num_non_spatial_axes: Cached count of non-spatial axes derived from axis_labels.
     """
-    spacing: Optional[List] = None
-    origin: Optional[List] = None
-    direction: Optional[List[List]] = None
-    shape: Optional[List] = None
-    channel_axis: Optional[int] = None
+    AxisLabel = AxisLabelEnum
+    spacing: Optional[list[Union[int,float]]] = None
+    origin: Optional[list[Union[int,float]]] = None
+    direction: Optional[list[list[Union[int,float]]]] = None
+    shape: Optional[list[int]] = None
+    axis_labels: Optional[list[Union[str,AxisLabel]]] = None
+    axis_units: Optional[list[str]] = None
+    _num_spatial_axes: Optional[int] = None
+    _num_non_spatial_axes: Optional[int] = None
 
-    def _validate_and_cast(self, *, ndims: Optional[int] = None, **_: Any) -> None:
+    def _validate_and_cast(self, *, ndims: Optional[int] = None, spatial_ndims: Optional[int] = None, **_: Any) -> None:
         """Validate and normalize spatial fields.
 
         Args:
-            ndims: Number of spatial dimensions.
+            ndims: Number of dimensions.
+            spatial_ndims: Number of spatial dimensions.
             **_: Unused extra context.
         """
-        if self.channel_axis is not None:
-            _validate_int(self.channel_axis, "meta.spatial.channel_axis")
+        if self.axis_labels is not None:
+            self.axis_labels, self._num_spatial_axes, self._num_non_spatial_axes = validate_and_cast_axis_labels(self.axis_labels, "meta.spatial.axis_labels", ndims)
+        spatial_ndims = spatial_ndims if self._num_spatial_axes is None else self._num_spatial_axes
 
         if self.spacing is not None:
             self.spacing = _cast_to_list(self.spacing, "meta.spatial.spacing")
-            _validate_float_int_list(self.spacing, "meta.spatial.spacing", ndims)
+            _validate_float_int_list(self.spacing, "meta.spatial.spacing", spatial_ndims)
 
         if self.origin is not None:
             self.origin = _cast_to_list(self.origin, "meta.spatial.origin")
-            _validate_float_int_list(self.origin, "meta.spatial.origin", ndims)
+            _validate_float_int_list(self.origin, "meta.spatial.origin", spatial_ndims)
 
         if self.direction is not None:
             self.direction = _cast_to_list(self.direction, "meta.spatial.direction")
-            _validate_float_int_matrix(self.direction, "meta.spatial.direction", ndims)
+            _validate_float_int_matrix(self.direction, "meta.spatial.direction", spatial_ndims)
 
         if self.shape is not None:
-            _ndims = ndims if (ndims is None or self.channel_axis is None) else ndims + 1
             self.shape = _cast_to_list(self.shape, "meta.spatial.shape")
-            _validate_float_int_list(self.shape, "meta.spatial.shape", _ndims)
+            _validate_float_int_list(self.shape, "meta.spatial.shape", ndims)
 
 
 @dataclass(slots=True)
@@ -586,9 +724,9 @@ class MetaBbox(BaseMeta):
         labels: Optional labels aligned with bboxes. Each label may be a string,
             int, or float.
     """
-    bboxes: Optional[List[List[List[Union[int, float]]]]] = None
-    scores: Optional[List[Union[int, float]]] = None
-    labels: Optional[List[Union[str, int, float]]] = None
+    bboxes: Optional[list[list[list[Union[int, float]]]]] = None
+    scores: Optional[list[Union[int, float]]] = None
+    labels: Optional[list[Union[str, int, float]]] = None
 
     def _validate_and_cast(self, **_: Any) -> None:
         """Validate bounding box structure and related fields."""
@@ -635,7 +773,7 @@ class MetaSource(SingleKeyBaseMeta):
     Attributes:
         data: Arbitrary JSON-serializable metadata.
     """
-    data: Dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any] = field(default_factory=dict)
 
     def _validate_and_cast(self, **_: Any) -> None:
         """Validate that data is a JSON-serializable dict."""
@@ -652,7 +790,7 @@ class MetaExtra(SingleKeyBaseMeta):
     Attributes:
         data: Arbitrary JSON-serializable metadata.
     """
-    data: Dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any] = field(default_factory=dict)
 
     def _validate_and_cast(self, **_: Any) -> None:
         """Validate that data is a JSON-serializable dict."""
@@ -749,11 +887,12 @@ class Meta(BaseMeta):
     _image_meta_format: "MetaImageFormat" = field(default_factory=lambda: MetaImageFormat())
     _mlarray_version: "MetaVersion" = field(default_factory=lambda: MetaVersion())
 
-    def _validate_and_cast(self, *, ndims: Optional[int] = None, **_: Any) -> None:
+    def _validate_and_cast(self, *, ndims: Optional[int] = None, spatial_ndims: Optional[int] = None, **_: Any) -> None:
         """Coerce child metas and validate with optional context.
 
         Args:
-            ndims: Number of spatial dimensions for context-aware validation.
+            ndims: Number of dimensions for context-aware validation.
+            spatial_ndims: Number of spatial dimensions for context-aware validation.
             **_: Unused extra context.
         """
         self.source = MetaSource.ensure(self.source)
@@ -767,8 +906,8 @@ class Meta(BaseMeta):
         self._image_meta_format = MetaImageFormat.ensure(self._image_meta_format)
         self._mlarray_version = MetaVersion.ensure(self._mlarray_version)
 
-        self.spatial._validate_and_cast(ndims=ndims)
-        self._blosc2._validate_and_cast(ndims=ndims, channel_axis=getattr(self.spatial, "channel_axis", None))
+        self.spatial._validate_and_cast(ndims=ndims, spatial_ndims=spatial_ndims)
+        self._blosc2._validate_and_cast(ndims=ndims, spatial_ndims=spatial_ndims)
 
     def to_plain(self, *, include_none: bool = False) -> Any:
         """Convert to plain values, suppressing default sub-metas.
@@ -780,7 +919,7 @@ class Meta(BaseMeta):
             A dict of field values where default child metas are represented
             as None and optionally filtered out.
         """
-        out: Dict[str, Any] = {}
+        out: dict[str, Any] = {}
         for f in fields(self):
             v = getattr(self, f.name)
 
