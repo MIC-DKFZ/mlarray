@@ -13,7 +13,7 @@ All fields in the schema are **JSON-serializable** unless otherwise noted. Field
 
 ### Representation notes
 
-Many namespaces are implemented as **single-key dataclasses** (subclasses of `SingleKeyBaseMeta`). In Python, these behave like their wrapped value (e.g., `meta.is_seg` is a `bool`, `meta.original` is a `dict`). When serialized via `Meta.to_mapping()`, they appear as a one-field object keyed by their internal field name (e.g., `is_seg: {"is_seg": true}` or `original: {"data": {...}}`). `Meta.from_mapping()` accepts either the one-field object or the raw value and will coerce it to the correct class.
+Many namespaces are implemented as **single-key dataclasses** (subclasses of `SingleKeyBaseMeta`). In Python, these behave like their wrapped value (e.g., `meta.is_seg` is a `bool`, `meta.source` is a `dict`). When serialized via `Meta.to_mapping()`, they appear as a one-field object keyed by their internal field name (e.g., `is_seg: {"is_seg": true}` or `source: {"data": {...}}`). `Meta.from_mapping()` accepts either the one-field object or the raw value and will coerce it to the correct class.
 
 ---
 
@@ -23,16 +23,16 @@ Top-level metadata container.
 
 ### Overview
 
-`Meta` is the root object that groups all metadata into well-defined namespaces. Some namespaces are **standardized** (e.g., `spatial`, `stats`), while others are intentionally **free-form** (`original`, `extra`) to support arbitrary metadata and long-term extensibility. Several entries are single-key dataclasses that wrap a primitive value while still allowing schema-aware validation.
+`Meta` is the root object that groups all metadata into well-defined namespaces. Some namespaces are **standardized** (e.g., `spatial`, `stats`), while others are intentionally **free-form** (`source`, `extra`) to support arbitrary metadata and long-term extensibility. Several entries are single-key dataclasses that wrap a primitive value while still allowing schema-aware validation.
 
 ---
 
-### original
+### source
 
 * **Description:** Arbitrary JSON-serializable dictionary for metadata from the original image source.
   Stores information from image sources such as DICOM, NIfTI, NRRD,
   or other imaging formats.
-* **Dataclass:** `MetaOriginal` (single-key wrapper).
+* **Dataclass:** `MetaSource` (single-key wrapper).
 
 | field | type                  | description                                  |
 | ----- | --------------------- | -------------------------------------------- |
@@ -156,7 +156,7 @@ This section records how the array was laid out on disk (chunking, blocking, pat
 
 | field             | type           | description                                   |
 | ----------------- | -------------- | --------------------------------------------- |
-| image_meta_format | Optional[str]  | Identifier for the original metadata format. |
+| image_meta_format | Optional[str]  | Identifier for the source metadata format. |
 
 ---
 

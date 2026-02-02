@@ -84,15 +84,15 @@ image = MLArray(
 
 print(image.spacing)  # [1.0, 1.0, 1.5]
 print(image.origin)  # [10.0, 10.0, 30.0]
-print(image.meta.original)  # {"patient_id": "123", "modality": "CT"}
+print(image.meta.source)  # {"patient_id": "123", "modality": "CT"}
 
 image.spacing[1] = 5.3
-image.meta.original["study_id"] = "study-001"
+image.meta.source["study_id"] = "study-001"
 image.save("with-metadata.mla")
 
 # Open memory-mapped
 image = MLArray.open("with-metadata.mla", mmap='r+')  
-image.meta.original["study_id"] = "new-study"  # Modify metadata
+image.meta.source["study_id"] = "new-study"  # Modify metadata
 image.close()  # Close and save metadata, only necessary to save modified metadata
 ```
 
@@ -123,13 +123,13 @@ from mlarray import MLArray, Meta
 array = np.random.random((64, 128, 128))
 image = MLArray(
     array,
-    meta=Meta(original={"patient_id": "123", "modality": "CT"}, is_seg=True),  # Add metadata in a pre-defined format
+    meta=Meta(source={"patient_id": "123", "modality": "CT"}, is_seg=True),  # Add metadata in a pre-defined format
 )
 
-print(image.meta.original)  # {"patient_id": "123", "modality": "CT"}
+print(image.meta.source)  # {"patient_id": "123", "modality": "CT"}
 print(image.meta.is_seg)  # True
 
-image.meta.original["study_id"] = "study-001"
+image.meta.source["study_id"] = "study-001"
 image.meta.is_seg = False
 image.save("with-metadata.mla")
 ```

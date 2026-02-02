@@ -12,7 +12,7 @@ if __name__ == '__main__':
     spacing = np.array((2, 2.5, 4))
     origin = (1, 1, 1)
     direction = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
-    image_meta = {"tmp1": "This is an image", "tmp2": 5, "tmp3": {"test1": 16.4587, "test2": [1, 2, 3, 4, 5, 6]}}
+    source_meta = {"tmp1": "This is an image", "tmp2": 5, "tmp3": {"test1": 16.4587, "test2": [1, 2, 3, 4, 5, 6]}}
     bboxes = [[[0, 1], [0, 1], [0, 1]]]
     filepath = "tmp.mla"
 
@@ -20,7 +20,7 @@ if __name__ == '__main__':
         os.remove(filepath)
 
     print("Initializing image...")
-    image = MLArray(array, spacing=spacing, origin=origin, direction=direction, channel_axis=channel_axis, meta=Meta(original=image_meta, bbox=MetaBbox(bboxes)))
+    image = MLArray(array, spacing=spacing, origin=origin, direction=direction, channel_axis=channel_axis, meta=Meta(source=source_meta, bbox=MetaBbox(bboxes)))
     print("Saving image...")
     image.save(filepath)
 

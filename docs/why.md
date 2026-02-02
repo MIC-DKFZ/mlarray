@@ -13,8 +13,8 @@ MLArray is designed to bridge that gap: a machine-learning-friendly array format
 * **A standardized, extensible metadata schema**
   MLArray defines a metadata schema that balances *standardization* and *flexibility*: software that supports MLArray has a consistent way to access relevant metadata, while users can still attach arbitrary custom metadata when needed.
 
-* **Preserve original metadata across conversions**
-  Users can convert images from arbitrary formats to MLArray while preserving the original metadata *in a structured and reproducible way*. Tools that integrate MLArray can still access metadata according to the original format’s conventions, which makes MLArray a practical alternative for ML pipelines without breaking downstream analysis or visualization workflows.
+* **Preserve source metadata across conversions**
+  Users can convert images from arbitrary formats to MLArray while preserving the source metadata *in a structured and reproducible way*. Tools that integrate MLArray can still access metadata according to the source format’s conventions, which makes MLArray a practical alternative for ML pipelines without breaking downstream analysis or visualization workflows.
 
 * **Machine learning–specific metadata support**
   In addition to format-preserving metadata, MLArray includes a dedicated schema for machine-learning-relevant information, and it also supports storing dynamic metadata outside predefined schemas.

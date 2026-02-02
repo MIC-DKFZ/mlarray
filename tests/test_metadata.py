@@ -28,7 +28,7 @@ class TestMetadataStorage(unittest.TestCase):
             image.save(path)
 
             loaded = MLArray(path)
-            self.assertEqual(loaded.meta.original.to_plain(), meta_dict)
+            self.assertEqual(loaded.meta.source.to_plain(), meta_dict)
 
     def test_metadata_roundtrip_meta(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -36,7 +36,7 @@ class TestMetadataStorage(unittest.TestCase):
             stats = MetaStatistics(min=0.0, max=1.0, mean=0.5)
             bbox = MetaBbox(bboxes=[[[0, 3], [1, 5], [2, 7]]])
             meta = Meta(
-                original={"patient_id": "p-002"},
+                source={"patient_id": "p-002"},
                 stats=stats,
                 bbox=bbox,
                 is_seg=True,
@@ -48,7 +48,7 @@ class TestMetadataStorage(unittest.TestCase):
             image.save(path)
 
             loaded = MLArray(path)
-            self.assertEqual(loaded.meta.original.to_plain(), {"patient_id": "p-002"})
+            self.assertEqual(loaded.meta.source.to_plain(), {"patient_id": "p-002"})
             self.assertTrue(loaded.meta.is_seg)
             self.assertEqual(loaded.meta.stats.to_plain(), stats.to_plain())
             self.assertEqual(loaded.meta.bbox.to_plain(), bbox.to_plain())
@@ -62,11 +62,11 @@ class TestMetadataStorage(unittest.TestCase):
             image.save(path)
 
             opened = MLArray.open(path, mmap="r")
-            opened.meta.original["a"] = 2
+            opened.meta.source["a"] = 2
             opened.close()
 
             reloaded = MLArray(path)
-            self.assertEqual(reloaded.meta.original["a"], 1)
+            self.assertEqual(reloaded.meta.source["a"], 1)
 
     def test_metadata_mmap_readwrite_persists(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -76,11 +76,11 @@ class TestMetadataStorage(unittest.TestCase):
             image.save(path)
 
             opened = MLArray.open(path, mmap="r+")
-            opened.meta.original["a"] = 2
+            opened.meta.source["a"] = 2
             opened.close()
 
             reloaded = MLArray(path)
-            self.assertEqual(reloaded.meta.original["a"], 2)
+            self.assertEqual(reloaded.meta.source["a"], 2)
 
     def test_metadata_mmap_copy_mode_no_write(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -90,11 +90,11 @@ class TestMetadataStorage(unittest.TestCase):
             image.save(path)
 
             opened = MLArray.open(path, mmap="c")
-            opened.meta.original["a"] = 3
+            opened.meta.source["a"] = 3
             opened.close()
 
             reloaded = MLArray(path)
-            self.assertEqual(reloaded.meta.original["a"], 1)
+            self.assertEqual(reloaded.meta.source["a"], 1)
 
     def test_metadata_open_create_write_mode(self):
         with tempfile.TemporaryDirectory() as tmpdir:

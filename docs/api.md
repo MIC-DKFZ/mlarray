@@ -12,7 +12,7 @@
 
 ::: mlarray.meta.Meta
 
-::: mlarray.meta.MetaOriginal
+::: mlarray.meta.MetaSource
 
 ::: mlarray.meta.MetaExtra
 

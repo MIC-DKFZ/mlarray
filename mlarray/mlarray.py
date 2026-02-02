@@ -629,7 +629,7 @@ class MLArray:
                 size for spatial dimensions. Use a 2-tuple (x, y) or 3-tuple
                 (x, y, z).
             channel_axis (Optional[int]): Axis index for channels in the
-                original array. If set, the size is moved to channels-first
+                source array. If set, the size is moved to channels-first
                 for cache calculations.
             bytes_per_pixel (int): Number of bytes per element. Defaults to 4
                 for float32.
@@ -801,7 +801,7 @@ class MLArray:
             if not isinstance(meta, (dict, Meta)):
                 raise ValueError("Meta must be None, a dict or a Meta object.")
             if isinstance(meta, dict):
-                meta = Meta(original=meta)
+                meta = Meta(source=meta)
         else:
             meta = Meta()
         self.meta = meta
