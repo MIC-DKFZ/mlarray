@@ -18,6 +18,8 @@
 
 ::: mlarray.meta.MetaSpatial
 
+::: mlarray.meta.AxisLabelEnum
+
 ::: mlarray.meta.MetaStatistics
 
 ::: mlarray.meta.MetaBbox
