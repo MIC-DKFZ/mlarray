@@ -128,7 +128,7 @@ image.save("with-metadata.mla")
 
 ---
 
-## Non-spatial data usage (Channels, temporal, ...)
+## Non-spatial data usage
 
 Use `axis_labels` to mark which axes are spatial and which are non-spatial
 (channels, temporal, components, etc.). Spatial metadata (`spacing`, `origin`,
