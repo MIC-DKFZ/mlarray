@@ -128,6 +128,43 @@ image.save("with-metadata.mla")
 
 ---
 
+## Non-spatial data usage (Channels, temporal, ...)
+
+Use `axis_labels` to mark which axes are spatial and which are non-spatial
+(channels, temporal, components, etc.). Spatial metadata (`spacing`, `origin`,
+`direction`) is specified only for the spatial axes, while the full array shape
+includes both spatial and non-spatial axes.
+
+```python
+import numpy as np
+from mlarray import MLArray, MetaSpatial
+
+# Example shape: (time, z, y, x, channels)
+array = np.random.random((2, 6, 4, 4, 3, 2))
+
+axis_labels = [
+    MetaSpatial.AxisLabel.temporal,
+    MetaSpatial.AxisLabel.spatial_z,
+    MetaSpatial.AxisLabel.spatial_y,
+    "spatial_x",  # Possible to pass predefined labels as string as well
+    MetaSpatial.AxisLabel.channel,
+    "some-other-type"  # Possible to pass arbitrary strings as well
+]
+
+image = MLArray(
+    array,
+    spacing=(2.5, 0.7, 0.7),  # spatial axes only (z, y, x)
+    origin=(0.0, 0.0, 0.0),
+    axis_labels=axis_labels,
+)
+
+# Optional per-axis units (length = full array ndims)
+image.meta.spatial.axis_units = ["s", "mm", "mm", "mm", ""]
+image.save("time-series.mla", patch_size=None)
+```
+
+
+
 ## Patch size variants
 
 MLArray stores arrays in a chunked layout to enable efficient partial reads. You can control how data is chunked using `patch_size` (recommended in most cases), or manually specify chunk and block sizes when you need full control.
