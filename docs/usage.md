@@ -146,7 +146,7 @@ axis_labels = [
     MetaSpatial.AxisLabel.temporal,
     MetaSpatial.AxisLabel.spatial_z,
     MetaSpatial.AxisLabel.spatial_y,
-    "spatial_x",  # Possible to pass predefined labels as string as well
+    "spatial_x",  # Possible to pass predefined labels as strings as well
     MetaSpatial.AxisLabel.channel,
     "some-other-type"  # Possible to pass arbitrary strings as well
 ]
