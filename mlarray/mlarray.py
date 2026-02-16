@@ -44,7 +44,8 @@ class MLArray:
                 (ndims, ndims) for spatial dimensions.
             meta (Optional[Dict | Meta]): Free-form metadata dictionary or Meta
                 instance. Must be JSON-serializable when saving. 
-                If meta is passed as a Dict, it will internally be converted into a Meta object with the dict being interpreted as meta.image metadata.
+                If meta is passed as a Dict, it is internally converted into a
+                ``Meta`` object with the dict stored as ``meta.source``.
             axis_labels (Optional[List[Union[str, AxisLabel]]]): Per-axis labels or roles. Length must match ndims. If None, the array
                 is treated as purely spatial.
             copy (Optional[MLArray]): Another MLArray instance to copy metadata
@@ -131,7 +132,7 @@ class MLArray:
                 If None, defaults to ``{'nthreads': num_threads}``.
 
         Returns:
-            MLArray: The current instance (for chaining).
+            MLArray: A newly created MLArray instance.
 
         Raises:
             RuntimeError: If the file extension is invalid, if shape/dtype are
@@ -202,9 +203,6 @@ class MLArray:
                 reading/accessing compressed chunks (for example number of
                 decompression threads). Controls runtime decompression behavior.
                 If None, defaults to ``{'nthreads': num_threads}``.
-
-        Returns:
-            MLArray: The current instance (for chaining).
 
         Raises:
             RuntimeError: If the file extension is invalid, if shape/dtype are
@@ -281,6 +279,9 @@ class MLArray:
 
         Args:
             array (Union[np.ndarray]): Input array to convert to MLArray.
+            memory_compressed (bool): If True, convert ``array`` into an in-memory
+                Blosc2 container. If False, keep the underlying store as the
+                original NumPy array.
             patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
                 chunk/block optimization. Provide an int for isotropic sizes or
                 a list/tuple with length equal to the number of dimensions.
@@ -293,18 +294,29 @@ class MLArray:
                 Provide an int or a tuple/list with length equal to the number
                 of dimensions, or None to let Blosc2 decide. Ignored when
                 patch_size is not None.
+            meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
+                the created ``MLArray``. Dict values are stored as
+                ``meta.source``.
             cparams (Optional[Dict]): Blosc2 compression parameters used when
                 ``memory_compressed=True`` and data is written into an in-memory
                 Blosc2 container (for example codec, compression level, and
                 filters). Controls how data is compressed when stored. If None,
                 defaults to ``{'codec': blosc2.Codec.ZSTD, 'clevel': 8}``.
+                Ignored when ``memory_compressed=False``.
             dparams (Optional[Dict]): Blosc2 decompression parameters used when
                 accessing compressed chunks (for example number of
                 decompression threads). Controls runtime decompression behavior.
-                If None, defaults to ``{'nthreads': num_threads}``.
+                If None, defaults to ``{'nthreads': 1}``. Ignored when
+                ``memory_compressed=False``.
+
+        Returns:
+            MLArray: A newly created MLArray instance.
 
         Raises:
-            RuntimeError: If the file extension is not ".b2nd" or ".mla".
+            ValueError: If ``meta`` is not None, dict, or Meta.
+            RuntimeError: If patch/chunk/block arguments are inconsistent.
+            NotImplementedError: If automatic patch optimization is not
+                implemented for the provided dimensionality.
         """
         class_instance = cls()
         class_instance._asarray(array, memory_compressed, patch_size, chunk_size, block_size, meta, cparams, dparams)
@@ -325,6 +337,9 @@ class MLArray:
 
         Args:
             array (Union[np.ndarray]): Input array to convert to MLArray.
+            memory_compressed (bool): If True, convert ``array`` into an in-memory
+                Blosc2 container. If False, keep the underlying store as the
+                original NumPy array.
             patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
                 chunk/block optimization. Provide an int for isotropic sizes or
                 a list/tuple with length equal to the number of dimensions.
@@ -337,18 +352,26 @@ class MLArray:
                 Provide an int or a tuple/list with length equal to the number
                 of dimensions, or None to let Blosc2 decide. Ignored when
                 patch_size is not None.
+            meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
+                the created ``MLArray``. Dict values are stored as
+                ``meta.source``.
             cparams (Optional[Dict]): Blosc2 compression parameters used when
                 ``memory_compressed=True`` and data is written into an in-memory
                 Blosc2 container (for example codec, compression level, and
                 filters). Controls how data is compressed when stored. If None,
                 defaults to ``{'codec': blosc2.Codec.ZSTD, 'clevel': 8}``.
+                Ignored when ``memory_compressed=False``.
             dparams (Optional[Dict]): Blosc2 decompression parameters used when
                 accessing compressed chunks (for example number of
                 decompression threads). Controls runtime decompression behavior.
-                If None, defaults to ``{'nthreads': num_threads}``.
+                If None, defaults to ``{'nthreads': 1}``. Ignored when
+                ``memory_compressed=False``.
 
         Raises:
-            RuntimeError: If the file extension is not ".b2nd" or ".mla".
+            ValueError: If ``meta`` is not None, dict, or Meta.
+            RuntimeError: If patch/chunk/block arguments are inconsistent.
+            NotImplementedError: If automatic patch optimization is not
+                implemented for the provided dimensionality.
         """
         self._store = array
         has_array = True
@@ -883,6 +906,7 @@ class MLArray:
             chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
             block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
             shape (Union[List, Tuple, np.ndarray]): Full array shape including non-spatial axes.
+            dtype_itemsize (int): Number of bytes per array element.
             spatial_axis_mask (Optional[list[bool]]): Mask indicating for every axis whether it is spatial or not.
 
         Returns:
@@ -935,7 +959,7 @@ class MLArray:
 
         Args:
             meta (Optional[Union[dict, Meta]]): Metadata to attach. Dicts are
-                interpreted as ``meta.image`` fields.
+                interpreted as ``meta.source`` fields.
             spacing (Optional[Union[List, Tuple, np.ndarray]]): Spacing per
                 spatial axis.
             origin (Optional[Union[List, Tuple, np.ndarray]]): Origin per
@@ -943,6 +967,9 @@ class MLArray:
             direction (Optional[Union[List, Tuple, np.ndarray]]): Direction
                 cosine matrix with shape (ndims, ndims).
             axis_labels (Optional[List[Union[str, AxisLabel]]]): Per-axis labels or roles. Length must match ndims.
+            has_array (Optional[bool]): Explicitly set whether array data is
+                present. When True, metadata is validated with array-dependent
+                shape information.
 
         Raises:
             ValueError: If ``meta`` is not None, dict, or Meta.
