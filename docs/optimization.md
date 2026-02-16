@@ -96,7 +96,7 @@ For large files, you typically want **mmap reads** so random patches don’t req
 from mlarray import MLArray
 
 # read-only mmap: fast random access without loading the full volume
-image = MLArray.open("patch-non-iso.mla", mmap='r')
+image = MLArray.open("patch-non-iso.mla", mmap_mode='r')
 
 patch = image[10:20, 50:60]  # Read a crop/patch (partial read)
 ```
@@ -110,7 +110,7 @@ When to use:
 
 ### 4) Memory-mapped in-place modification (advanced)
 
-You can modify regions in-place with `mmap='r+'`. This is useful for workflows like:
+You can modify regions in-place with `mmap_mode='r+'`. This is useful for workflows like:
 
 * writing derived arrays (e.g., post-processing outputs),
 * patch-wise updates,
@@ -119,7 +119,7 @@ You can modify regions in-place with `mmap='r+'`. This is useful for workflows l
 ```python
 from mlarray import MLArray
 
-image = MLArray.open("patch-non-iso.mla", mmap='r+')
+image = MLArray.open("patch-non-iso.mla", mmap_mode='r+')
 image[10:20, 50:60] *= 5  # Modify crop in memory and on disk
 image.close()
 ```
@@ -128,7 +128,7 @@ image.close()
 
 ### 5) Create a new memory-mapped file (streaming write)
 
-If you want to create a file on disk and then fill it (without holding the full array in memory), use `open(..., shape=..., dtype=..., mmap='w+')`. MLArray will compute and store the optimized layout up front.
+If you want to create a file on disk and then fill it (without holding the full array in memory), use `open(..., shape=..., dtype=..., mmap_mode='w+')`. MLArray will compute and store the optimized layout up front.
 
 ```python
 import numpy as np
@@ -141,7 +141,7 @@ image = MLArray.open(
     "streamed-write.mla",
     shape=shape,
     dtype=dtype,
-    mmap='w+',
+    mmap_mode='w+',
     patch_size=192,  # optimize for your training patch size
 )
 

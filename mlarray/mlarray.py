@@ -55,7 +55,8 @@ class MLArray:
         """
         self.filepath = None
         self.support_metadata = None
-        self.mmap = None
+        self.mode = None
+        self.mmap_mode = None
         self.meta = None
         if isinstance(array, (str, Path)) and (spacing is not None or origin is not None or direction is not None or meta is not None or axis_labels is not None or copy is not None):
             raise ("Spacing, origin, direction, meta, axis_labels or copy cannot be set when array is a filepath.")
@@ -75,7 +76,8 @@ class MLArray:
             shape: Optional[Union[List, Tuple, np.ndarray]] = None,
             dtype: Optional[np.dtype] = None,
             axis_labels: Optional[List[Union[str, AxisLabel]]] = None,
-            mmap: str = 'r',
+            mode: str = 'r',
+            mmap_mode: str = 'r',
             patch_size: Optional[Union[int, List, Tuple]] = 'default',  # 'default' means that the default of 192 is used. However, if set to 'default', the patch_size will be skipped if self.patch_size is set from a previously loaded MLArray image. In that case the self.patch_size is used.
             chunk_size: Optional[Union[int, List, Tuple]]= None,
             block_size: Optional[Union[int, List, Tuple]] = None,
@@ -103,7 +105,12 @@ class MLArray:
             dtype (Optional[np.dtype]): Numpy dtype for a newly created array.
             axis_labels (Optional[List[Union[str, AxisLabel]]]): Per-axis labels or roles. Length must match ndims. If None, the array
                 is treated as purely spatial. Used for patch/chunk/block calculations.
-            mmap (str): Blosc2 mmap mode. One of "r", "r+", "w+", "c".
+            mode (str): Controls storage open/creation permissions when using standard Blosc2 I/O (read-only, read/write, overwrite). 
+                Does not affect lazy loading or decompression; data is accessed and decompressed on demand by Blosc2.
+                One of "r", "a", "w". Leave at default if unsure.
+            mmap_mode (str): Controls access via OS-level memory mapping of the compressed data, including read/write permissions. 
+                Changes how bytes are fetched from disk (paging rather than explicit reads), while chunks are still decompressed on demand by Blosc2.
+                Overrides `mode` if set. One of "r", "r+", "w+", "c". Leave at default if unsure.
             patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
                 chunk/block optimization. Provide an int for isotropic sizes or
                 a list/tuple with length equal to the number of spatial
@@ -123,10 +130,10 @@ class MLArray:
 
         Raises:
             RuntimeError: If the file extension is invalid, if shape/dtype are
-                inconsistent, or if mmap mode is invalid for creation.
+                inconsistent, or if mmap_mode is invalid for creation.
         """
         class_instance = cls()
-        class_instance._open(filepath, shape, dtype, axis_labels, mmap, patch_size, chunk_size, block_size, num_threads, cparams, dparams)
+        class_instance._open(filepath, shape, dtype, axis_labels, mode, mmap_mode, patch_size, chunk_size, block_size, num_threads, cparams, dparams)
         return class_instance
 
     def _open(
@@ -135,7 +142,8 @@ class MLArray:
             shape: Optional[Union[List, Tuple, np.ndarray]] = None,
             dtype: Optional[np.dtype] = None,
             axis_labels: Optional[list[Union[str, AxisLabel]]] = None,
-            mmap: str = 'r',
+            mode: str = 'r',
+            mmap_mode: str = 'r',
             patch_size: Optional[Union[int, List, Tuple]] = 'default',  # 'default' means that the default of 192 is used. However, if set to 'default', the patch_size will be skipped if self.patch_size is set from a previously loaded MLArray image. In that case the self.patch_size is used.
             chunk_size: Optional[Union[int, List, Tuple]]= None,
             block_size: Optional[Union[int, List, Tuple]] = None,
@@ -163,7 +171,12 @@ class MLArray:
             dtype (Optional[np.dtype]): Numpy dtype for a newly created array.
             axis_labels (Optional[List[Union[str, AxisLabel]]]): Per-axis labels or roles. Length must match ndims. If None, the array
                 is treated as purely spatial.
-            mmap (str): Blosc2 mmap mode. One of "r", "r+", "w+", "c".
+            mode (str): Controls storage open/creation permissions when using standard Blosc2 I/O (read-only, read/write, overwrite). 
+                Does not affect lazy loading or decompression; data is accessed and decompressed on demand by Blosc2.
+                One of "r", "a", "w". Leave at default if unsure.
+            mmap_mode (str): Controls access via OS-level memory mapping of the compressed data, including read/write permissions. 
+                Changes how bytes are fetched from disk (paging rather than explicit reads), while chunks are still decompressed on demand by Blosc2.
+                Overrides `mode` if set. One of "r", "r+", "w+", "c". Leave at default if unsure.
             patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
                 chunk/block optimization. Provide an int for isotropic sizes or
                 a list/tuple with length equal to the number of spatial
@@ -183,7 +196,7 @@ class MLArray:
 
         Raises:
             RuntimeError: If the file extension is invalid, if shape/dtype are
-                inconsistent, or if mmap mode is invalid for creation.
+                inconsistent, or if mmap_mode is invalid for creation.
         """
         self.filepath = str(filepath)
         if not str(filepath).endswith(".b2nd") and not str(filepath).endswith(f".{MLARRAY_SUFFIX}"):
@@ -193,18 +206,20 @@ class MLArray:
             raise RuntimeError("Cannot create a new file as a file exists already under that path. Explicitly set shape and dtype only if you intent to create a new file.")
         if (shape is not None and dtype is None) or (shape is None and dtype is not None):
             raise RuntimeError("Both shape and dtype must be set if you intend to create a new file.")
-        if shape is not None and mmap != 'w+':
-            raise RuntimeError("mmap must be 'w+' (create/overwrite) if you intend to write a new file. Explicitly set shape and dtype only if you intent to create a new file.")
-        if (shape is None or dtype is None) and mmap == 'w+':
-            raise RuntimeError("Shape and dtype must be set explicitly when mmap is 'w+'. Explicitly set shape and dtype only if you intent to create a new file.")
-        if mmap not in ('r', 'r+', 'w+', 'c'):
-            raise RuntimeError("mmap must be one of the following: 'r', 'r+', 'w+', 'c'")
+        if shape is not None and mmap_mode != 'w+':
+            raise RuntimeError("mmap_mode must be 'w+' (create/overwrite) if you intend to write a new file. Explicitly set shape and dtype only if you intent to create a new file.")
+        if (shape is None or dtype is None) and mmap_mode == 'w+':
+            raise RuntimeError("Shape and dtype must be set explicitly when mmap_mode is 'w+'. Explicitly set shape and dtype only if you intent to create a new file.")
+        if mode not in ('r', 'a', 'w'):
+            raise RuntimeError("mode must be one of the following: 'r', 'a', 'w'")
+        if mmap_mode not in ('r', 'r+', 'w+', 'c'):
+            raise RuntimeError("mmap_mode must be one of the following: 'r', 'r+', 'w+', 'c'")
         
-        create_array = mmap == 'w+'
+        create_array = mmap_mode == 'w+'
     
         if create_array:
             spatial_axis_mask = [True] * len(shape) if axis_labels is None else _spatial_axis_mask(axis_labels)
-            self.meta._blosc2 = self._comp_and_validate_blosc2_meta(self.meta._blosc2, patch_size, chunk_size, block_size, shape, spatial_axis_mask)   
+            self.meta._blosc2 = self._comp_and_validate_blosc2_meta(self.meta._blosc2, patch_size, chunk_size, block_size, shape, np.dtype(dtype).itemsize, spatial_axis_mask)   
             self.meta._has_array.has_array = True
         
         self.support_metadata = str(filepath).endswith(f".{MLARRAY_SUFFIX}")
@@ -216,12 +231,13 @@ class MLArray:
             dparams = {'nthreads': num_threads}
         
         if create_array:
-            self._store = blosc2.empty(shape=shape, dtype=dtype, urlpath=str(filepath), chunks=self.meta._blosc2.chunk_size, blocks=self.meta._blosc2.block_size, cparams=cparams, dparams=dparams, mmap_mode=mmap)
+            self._store = blosc2.empty(shape=shape, dtype=np.dtype(dtype), urlpath=str(filepath), chunks=self.meta._blosc2.chunk_size, blocks=self.meta._blosc2.block_size, cparams=cparams, dparams=dparams, mmap_mode=mmap_mode)
         else:
-            self._store = blosc2.open(urlpath=str(filepath), dparams=dparams, mmap_mode=mmap)
+            self._store = blosc2.open(urlpath=str(filepath), dparams=dparams, mode=mode, mmap_mode=mmap_mode)
             self._read_meta()
         self._update_blosc2_meta()
-        self.mmap = mmap
+        self.mode = mode
+        self.mmap_mode = mmap_mode
         self._write_metadata()
 
     def close(self):
@@ -232,8 +248,9 @@ class MLArray:
         self._write_metadata()
         self._store = None
         self.filepath = None
-        self.support_metadata = None   
-        self.mmap = None
+        self.support_metadata = None
+        self.mode = None  
+        self.mmap_mode = None
         self.meta = None
 
     @classmethod
@@ -242,7 +259,7 @@ class MLArray:
             filepath: Union[str, Path], 
             num_threads: int = 1,
         ):
-        """Loads a Blosc2-compressed file. Both MLArray ('.mla') and Blosc2 ('.b2nd') files are supported.
+        """Loads a Blosc2-compressed file as a whole. Does not use memory-mapping. Both MLArray ('.mla') and Blosc2 ('.b2nd') files are supported.
 
         WARNING:
             MLArray supports both ".b2nd" and ".mla" files. The MLArray
@@ -288,9 +305,11 @@ class MLArray:
         blosc2.set_nthreads(num_threads)
         dparams = {'nthreads': num_threads}
         self._store = blosc2.open(urlpath=str(filepath), cdparams=dparams, mode='r')
-        self.mmap = None
+        self.mode = None
+        self.mmap_mode = None
         self._read_meta()        
         self._update_blosc2_meta()
+        self._store = np.ascontiguousarray(self._store[...])
 
     def save(
             self,
@@ -334,7 +353,7 @@ class MLArray:
     
         if self._store is not None:
             spatial_axis_mask = [True] * self.ndim if self.meta.spatial.axis_labels is None else _spatial_axis_mask(self.meta.spatial.axis_labels)
-            self.meta._blosc2 = self._comp_and_validate_blosc2_meta(self.meta._blosc2, patch_size, chunk_size, block_size, self._store.shape, spatial_axis_mask)
+            self.meta._blosc2 = self._comp_and_validate_blosc2_meta(self.meta._blosc2, patch_size, chunk_size, block_size, self._store.shape, self._store.itemsize, spatial_axis_mask)
             self.meta._has_array.has_array = True
     
         self.support_metadata = str(filepath).endswith(f".{MLARRAY_SUFFIX}")
@@ -355,7 +374,8 @@ class MLArray:
             array = np.empty((0,))
             self._store = blosc2.asarray(array, urlpath=str(filepath), chunks=self.meta._blosc2.chunk_size, blocks=self.meta._blosc2.block_size, cparams=cparams, dparams=dparams)
         self._update_blosc2_meta()
-        self.mmap = None
+        self.mode = None
+        self.mmap_mode = None
         self._write_metadata(force=True)
 
     def to_numpy(self):
@@ -726,7 +746,7 @@ class MLArray:
 
         return [int(value) for value in chunk_size], [int(value) for value in block_size]
     
-    def _comp_and_validate_blosc2_meta(self, meta_blosc2, patch_size, chunk_size, block_size, shape, spatial_axis_mask):
+    def _comp_and_validate_blosc2_meta(self, meta_blosc2, patch_size, chunk_size, block_size, shape, dtype_itemsize, spatial_axis_mask):
         """Compute and validate Blosc2 chunk/block metadata.
 
         Args:
@@ -758,7 +778,7 @@ class MLArray:
         patch_size = [patch_size] * len(shape) if isinstance(patch_size, int) else patch_size
 
         if patch_size is not None:
-            chunk_size, block_size = self.comp_blosc2_params(shape, patch_size, spatial_axis_mask)
+            chunk_size, block_size = self.comp_blosc2_params(shape, patch_size, spatial_axis_mask, bytes_per_pixel=dtype_itemsize)
 
         meta_blosc2 = MetaBlosc2(chunk_size, block_size, patch_size)
         meta_blosc2._validate_and_cast(ndims=len(shape), spatial_ndims=num_spatial_axes)
@@ -776,9 +796,9 @@ class MLArray:
         """Write MLArray metadata to the underlying store if supported.
 
         Args:
-            force (bool): If True, write even when mmap mode is read-only.
+            force (bool): If True, write even when mmap_mode is read-only.
         """
-        if self.support_metadata and isinstance(self._store, blosc2.ndarray.NDArray) and (self.mmap in ('r+', 'w+') or force):
+        if self.support_metadata and isinstance(self._store, blosc2.ndarray.NDArray) and (self.mmap_mode in ('r+', 'w+') or force):
             metadata = self.meta.to_mapping()
             if not is_serializable(metadata):
                 raise RuntimeError("Metadata is not serializable.")

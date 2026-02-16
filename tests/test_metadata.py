@@ -61,7 +61,7 @@ class TestMetadataStorage(unittest.TestCase):
             image = MLArray(array, meta={"a": 1})
             image.save(path)
 
-            opened = MLArray.open(path, mmap="r")
+            opened = MLArray.open(path, mmap_mode="r")
             opened.meta.source["a"] = 2
             opened.close()
 
@@ -75,7 +75,7 @@ class TestMetadataStorage(unittest.TestCase):
             image = MLArray(array, meta={"a": 1})
             image.save(path)
 
-            opened = MLArray.open(path, mmap="r+")
+            opened = MLArray.open(path, mmap_mode="r+")
             opened.meta.source["a"] = 2
             opened.close()
 
@@ -89,7 +89,7 @@ class TestMetadataStorage(unittest.TestCase):
             image = MLArray(array, meta={"a": 1})
             image.save(path)
 
-            opened = MLArray.open(path, mmap="c")
+            opened = MLArray.open(path, mmap_mode="c")
             opened.meta.source["a"] = 3
             opened.close()
 
@@ -102,7 +102,7 @@ class TestMetadataStorage(unittest.TestCase):
             shape = (8, 16, 16)
             dtype = np.float32
 
-            opened = MLArray.open(path, shape=shape, dtype=dtype, mmap="w+")
+            opened = MLArray.open(path, shape=shape, dtype=dtype, mmap_mode="w+")
             opened.meta.extra["created"] = True
             opened.close()
 

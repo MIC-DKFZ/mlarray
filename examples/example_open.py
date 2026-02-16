@@ -19,7 +19,7 @@ if __name__ == '__main__':
         os.remove(filepath)
 
     print("Initializing image...")
-    image = MLArray.open(filepath, shape=array.shape, dtype=array.dtype, mmap='w+')
+    image = MLArray.open(filepath, shape=array.shape, dtype=array.dtype, mmap_mode='w+')
     print("Saving image...")
     image[...] = array
     image.meta.copy_from(Meta(source=source_meta, spatial=MetaSpatial(spacing=spacing, origin=origin, direction=direction), bbox=MetaBbox(bboxes)))

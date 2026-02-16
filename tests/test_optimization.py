@@ -43,7 +43,7 @@ class TestOptimizationExamples(unittest.TestCase):
 
             MLArray(array).save(path, patch_size=(8, 16, 16))
 
-            image = MLArray.open(path, mmap="r")
+            image = MLArray.open(path, mmap_mode="r")
             patch = image[10:20, 5:15, 7:17]
 
             self.assertEqual(patch.shape, (10, 10, 10))
@@ -55,7 +55,7 @@ class TestOptimizationExamples(unittest.TestCase):
 
             MLArray(array).save(path, patch_size=(8, 16, 16))
 
-            image = MLArray.open(path, mmap="r+")
+            image = MLArray.open(path, mmap_mode="r+")
             image[0:2, 0:2, 0:2] *= 0.0
             image.close()
 
@@ -72,7 +72,7 @@ class TestOptimizationExamples(unittest.TestCase):
                 path,
                 shape=shape,
                 dtype=dtype,
-                mmap="w+",
+                mmap_mode="w+",
                 patch_size=8,
             )
             data = _make_array(shape=shape, seed=1, dtype=dtype)
