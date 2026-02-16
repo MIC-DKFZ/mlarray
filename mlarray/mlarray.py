@@ -22,7 +22,6 @@ class MLArray:
             direction: Optional[Union[List, Tuple, np.ndarray]] = None,
             meta: Optional[Union[Dict, Meta]] = None,
             axis_labels: Optional[List[Union[str, AxisLabel]]] = None,
-            num_threads: int = 1,
             copy: Optional['MLArray'] = None) -> None:
         """Initializes a MLArray instance.
 
@@ -48,7 +47,6 @@ class MLArray:
                 If meta is passed as a Dict, it will internally be converted into a Meta object with the dict being interpreted as meta.image metadata.
             axis_labels (Optional[List[Union[str, AxisLabel]]]): Per-axis labels or roles. Length must match ndims. If None, the array
                 is treated as purely spatial.
-            num_threads (int): Number of threads for Blosc2 operations.
             copy (Optional[MLArray]): Another MLArray instance to copy metadata
                 fields from. If provided, its metadata overrides any metadata
                 set via arguments.
@@ -61,7 +59,7 @@ class MLArray:
         if isinstance(array, (str, Path)) and (spacing is not None or origin is not None or direction is not None or meta is not None or axis_labels is not None or copy is not None):
             raise ("Spacing, origin, direction, meta, axis_labels or copy cannot be set when array is a filepath.")
         if isinstance(array, (str, Path)):
-            self._load(array, num_threads)
+            self._load(array)
         else:
             self._store = array
             has_array = array is not None
