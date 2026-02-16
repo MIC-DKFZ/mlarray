@@ -120,8 +120,15 @@ class MLArray:
                 Provide an int or tuple/list with length equal to the array
                 dimensions. Ignored when ``patch_size`` is provided.
             num_threads (int): Number of threads for Blosc2 operations.
-            cparams (Optional[Dict]): Blosc2 compression parameters.
-            dparams (Optional[Dict]): Blosc2 decompression parameters.
+            cparams (Optional[Dict]): Blosc2 compression parameters used when
+                creating/writing array data (for example codec, compression
+                level, and filters). Controls how data is compressed when
+                stored. If None, defaults to ``{'codec': blosc2.Codec.ZSTD,
+                'clevel': 8}``.
+            dparams (Optional[Dict]): Blosc2 decompression parameters used when
+                reading/accessing compressed chunks (for example number of
+                decompression threads). Controls runtime decompression behavior.
+                If None, defaults to ``{'nthreads': num_threads}``.
 
         Returns:
             MLArray: The current instance (for chaining).
@@ -186,8 +193,15 @@ class MLArray:
                 Provide an int or tuple/list with length equal to the array
                 dimensions. Ignored when ``patch_size`` is provided.
             num_threads (int): Number of threads for Blosc2 operations.
-            cparams (Optional[Dict]): Blosc2 compression parameters.
-            dparams (Optional[Dict]): Blosc2 decompression parameters.
+            cparams (Optional[Dict]): Blosc2 compression parameters used when
+                creating/writing array data (for example codec, compression
+                level, and filters). Controls how data is compressed when
+                stored. If None, defaults to ``{'codec': blosc2.Codec.ZSTD,
+                'clevel': 8}``.
+            dparams (Optional[Dict]): Blosc2 decompression parameters used when
+                reading/accessing compressed chunks (for example number of
+                decompression threads). Controls runtime decompression behavior.
+                If None, defaults to ``{'nthreads': num_threads}``.
 
         Returns:
             MLArray: The current instance (for chaining).
@@ -250,6 +264,111 @@ class MLArray:
         self.mode = None  
         self.mmap_mode = None
         self.meta = None
+
+    @classmethod
+    def asarray(
+            cls,
+            array: Union[np.ndarray],
+            memory_compressed: bool = False,
+            patch_size: Optional[Union[int, List, Tuple]] = 'default',  # 'default' means that the default of 192 is used. However, if set to 'default', the patch_size will be skipped if self.patch_size is set from a previously loaded MLArray image. In that case the self.patch_size is used.
+            chunk_size: Optional[Union[int, List, Tuple]]= None,
+            block_size: Optional[Union[int, List, Tuple]] = None,
+            meta: Optional[Union[Dict, Meta]] = None,
+            cparams: Optional[Dict] = None,
+            dparams: Optional[Dict] = None
+        ):
+        """Converts the array to an MLArray. The MLArray can optionally be in-memory compressed.
+
+        Args:
+            array (Union[np.ndarray]): Input array to convert to MLArray.
+            patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
+                chunk/block optimization. Provide an int for isotropic sizes or
+                a list/tuple with length equal to the number of dimensions.
+                Use "default" to use the default patch size of 192.
+            chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
+                Provide an int or a tuple/list with length equal to the number
+                of dimensions, or None to let Blosc2 decide. Ignored when
+                patch_size is not None.
+            block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
+                Provide an int or a tuple/list with length equal to the number
+                of dimensions, or None to let Blosc2 decide. Ignored when
+                patch_size is not None.
+            cparams (Optional[Dict]): Blosc2 compression parameters used when
+                ``memory_compressed=True`` and data is written into an in-memory
+                Blosc2 container (for example codec, compression level, and
+                filters). Controls how data is compressed when stored. If None,
+                defaults to ``{'codec': blosc2.Codec.ZSTD, 'clevel': 8}``.
+            dparams (Optional[Dict]): Blosc2 decompression parameters used when
+                accessing compressed chunks (for example number of
+                decompression threads). Controls runtime decompression behavior.
+                If None, defaults to ``{'nthreads': num_threads}``.
+
+        Raises:
+            RuntimeError: If the file extension is not ".b2nd" or ".mla".
+        """
+        class_instance = cls()
+        class_instance._asarray(array, memory_compressed, patch_size, chunk_size, block_size, meta, cparams, dparams)
+        return class_instance
+
+    def _asarray(
+            self,
+            array: Union[np.ndarray],
+            memory_compressed: bool = False,
+            patch_size: Optional[Union[int, List, Tuple]] = 'default',  # 'default' means that the default of 192 is used. However, if set to 'default', the patch_size will be skipped if self.patch_size is set from a previously loaded MLArray image. In that case the self.patch_size is used.
+            chunk_size: Optional[Union[int, List, Tuple]]= None,
+            block_size: Optional[Union[int, List, Tuple]] = None,
+            meta: Optional[Union[Dict, Meta]] = None,
+            cparams: Optional[Dict] = None,
+            dparams: Optional[Dict] = None
+        ):
+        """Internal MLArray asarray method. Converts the array to an MLArray. The MLArray can optionally be in-memory compressed.
+
+        Args:
+            array (Union[np.ndarray]): Input array to convert to MLArray.
+            patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
+                chunk/block optimization. Provide an int for isotropic sizes or
+                a list/tuple with length equal to the number of dimensions.
+                Use "default" to use the default patch size of 192.
+            chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
+                Provide an int or a tuple/list with length equal to the number
+                of dimensions, or None to let Blosc2 decide. Ignored when
+                patch_size is not None.
+            block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
+                Provide an int or a tuple/list with length equal to the number
+                of dimensions, or None to let Blosc2 decide. Ignored when
+                patch_size is not None.
+            cparams (Optional[Dict]): Blosc2 compression parameters used when
+                ``memory_compressed=True`` and data is written into an in-memory
+                Blosc2 container (for example codec, compression level, and
+                filters). Controls how data is compressed when stored. If None,
+                defaults to ``{'codec': blosc2.Codec.ZSTD, 'clevel': 8}``.
+            dparams (Optional[Dict]): Blosc2 decompression parameters used when
+                accessing compressed chunks (for example number of
+                decompression threads). Controls runtime decompression behavior.
+                If None, defaults to ``{'nthreads': num_threads}``.
+
+        Raises:
+            RuntimeError: If the file extension is not ".b2nd" or ".mla".
+        """
+        self._store = array
+        has_array = True
+        self._validate_and_add_meta(meta, has_array=has_array)
+        spatial_axis_mask = [True] * self.ndim if self.meta.spatial.axis_labels is None else _spatial_axis_mask(self.meta.spatial.axis_labels)
+        self.meta._blosc2 = self._comp_and_validate_blosc2_meta(self.meta._blosc2, patch_size, chunk_size, block_size, self._store.shape, self._store.dtype.itemsize, spatial_axis_mask)
+        self.meta._has_array.has_array = True
+
+        num_threads = dparams.get('nthreads', 1) if dparams is not None else 1
+        blosc2.set_nthreads(num_threads)
+        if cparams is None:
+            cparams = {'codec': blosc2.Codec.ZSTD, 'clevel': 8,}
+        if dparams is None:
+            dparams = {'nthreads': num_threads}
+
+        if memory_compressed:
+            array = np.ascontiguousarray(array[...])
+            self._store = blosc2.asarray(array, chunks=self.meta._blosc2.chunk_size, blocks=self.meta._blosc2.block_size, cparams=cparams, dparams=dparams)
+        else:
+            self._store = array
 
     @classmethod
     def load(
@@ -342,6 +461,15 @@ class MLArray:
                 of dimensions, or None to let Blosc2 decide. Ignored when
                 patch_size is not None.
             num_threads (int): Number of threads to use for saving the file.
+            cparams (Optional[Dict]): Blosc2 compression parameters used when
+                writing array data to disk (for example codec, compression
+                level, and filters). Controls how data is compressed when
+                stored. If None, defaults to ``{'codec': blosc2.Codec.ZSTD,
+                'clevel': 8}``.
+            dparams (Optional[Dict]): Blosc2 decompression parameters used when
+                accessing compressed chunks (for example number of
+                decompression threads). Controls runtime decompression behavior.
+                If None, defaults to ``{'nthreads': num_threads}``.
 
         Raises:
             RuntimeError: If the file extension is not ".b2nd" or ".mla".
@@ -351,7 +479,7 @@ class MLArray:
     
         if self._store is not None:
             spatial_axis_mask = [True] * self.ndim if self.meta.spatial.axis_labels is None else _spatial_axis_mask(self.meta.spatial.axis_labels)
-            self.meta._blosc2 = self._comp_and_validate_blosc2_meta(self.meta._blosc2, patch_size, chunk_size, block_size, self._store.shape, self._store.itemsize, spatial_axis_mask)
+            self.meta._blosc2 = self._comp_and_validate_blosc2_meta(self.meta._blosc2, patch_size, chunk_size, block_size, self._store.shape, self._store.dtype.itemsize, spatial_axis_mask)
             self.meta._has_array.has_array = True
     
         self.support_metadata = str(filepath).endswith(f".{MLARRAY_SUFFIX}")
