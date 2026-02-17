@@ -762,8 +762,9 @@ class MLArray:
             ndim = self.meta.spatial._num_spatial_axes
         return ndim
 
+    @classmethod
     def comp_blosc2_params(
-            self,
+            cls,
             image_size: Union[Tuple[int, int], Tuple[int, int, int], Tuple[int, int, int, int]],
             patch_size: Union[Tuple[int, int], Tuple[int, int, int]],
             spatial_axis_mask: Optional[list[bool]] = None,
@@ -928,7 +929,7 @@ class MLArray:
         patch_size = [patch_size] * len(shape) if isinstance(patch_size, int) else patch_size
 
         if patch_size is not None:
-            chunk_size, block_size = self.comp_blosc2_params(shape, patch_size, spatial_axis_mask, bytes_per_pixel=dtype_itemsize)
+            chunk_size, block_size = MLArray.comp_blosc2_params(shape, patch_size, spatial_axis_mask, bytes_per_pixel=dtype_itemsize)
 
         meta_blosc2 = MetaBlosc2(chunk_size, block_size, patch_size)
         meta_blosc2._validate_and_cast(ndims=len(shape), spatial_ndims=num_spatial_axes)
