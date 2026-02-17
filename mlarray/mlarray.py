@@ -259,18 +259,19 @@ class MLArray:
         Args:
             filepath (Union[str, Path]): Target file path. Must end with
                 ".b2nd" or ".mla".
-            shape (Optional[Union[List, Tuple, np.ndarray]]): Shape of the array
+            shape (Union[List, Tuple, np.ndarray]): Shape of the array
                 to create. If provided, a new file is created. Length must match
                 the full array dimensionality (including non-spatial axes if present).
-            dtype (Optional[np.dtype]): Numpy dtype for a newly created array.
-            axis_labels (Optional[List[Union[str, AxisLabel]]]): Per-axis labels or roles. Length must match ndims. If None, the array
-                is treated as purely spatial.
+            dtype (np.dtype): Numpy dtype for a newly created array.
+            meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
+                the created ``MLArray``. Dict values are stored as
+                ``meta.source``.
             mode (str): Controls storage open/creation permissions when using standard Blosc2 I/O (read-only, read/write, overwrite). 
                 Does not affect lazy loading or decompression; data is accessed and decompressed on demand by Blosc2.
-                One of "r", "a", "w". Leave at default if unsure.
+                Must be 'w' (default). Leave at default if unsure.
             mmap_mode (str): Controls access via OS-level memory mapping of the compressed data, including read/write permissions. 
                 Changes how bytes are fetched from disk (paging rather than explicit reads), while chunks are still decompressed on demand by Blosc2.
-                Overrides `mode` if set. One of "r", "r+", "w+", "c". Leave at default if unsure.
+                Overrides `mode` if set. Must be either 'w+' (default) or None. Leave at default if unsure.
             patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
                 chunk/block optimization. Provide an int for isotropic sizes or
                 a list/tuple with length equal to the number of spatial
@@ -348,8 +349,8 @@ class MLArray:
             chunk_size: Optional[Union[int, List, Tuple]]= None,
             block_size: Optional[Union[int, List, Tuple]] = None,
             meta: Optional[Union[Dict, Meta]] = None,
-            cparams: Optional[Dict] = None,
-            dparams: Optional[Dict] = None
+            cparams: Optional[Union[Dict, blosc2.CParams]] = None,
+            dparams: Optional[Union[Dict, blosc2.DParams]] = None
         ):
         """Converts the array to an MLArray. The MLArray can optionally be in-memory compressed.
 
@@ -373,13 +374,15 @@ class MLArray:
             meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
                 the created ``MLArray``. Dict values are stored as
                 ``meta.source``.
-            cparams (Optional[Dict]): Blosc2 compression parameters used when
+            cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2
+                compression parameters used when
                 ``memory_compressed=True`` and data is written into an in-memory
                 Blosc2 container (for example codec, compression level, and
                 filters). Controls how data is compressed when stored. If None,
                 defaults to ``{'codec': blosc2.Codec.ZSTD, 'clevel': 8}``.
                 Ignored when ``memory_compressed=False``.
-            dparams (Optional[Dict]): Blosc2 decompression parameters used when
+            dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
+                decompression parameters used when
                 accessing compressed chunks (for example number of
                 decompression threads). Controls runtime decompression behavior.
                 If None, defaults to ``{'nthreads': 1}``. Ignored when
@@ -406,8 +409,8 @@ class MLArray:
             chunk_size: Optional[Union[int, List, Tuple]]= None,
             block_size: Optional[Union[int, List, Tuple]] = None,
             meta: Optional[Union[Dict, Meta]] = None,
-            cparams: Optional[Dict] = None,
-            dparams: Optional[Dict] = None
+            cparams: Optional[Union[Dict, blosc2.CParams]] = None,
+            dparams: Optional[Union[Dict, blosc2.DParams]] = None
         ):
         """Internal MLArray asarray method. Converts the array to an MLArray. The MLArray can optionally be in-memory compressed.
 
@@ -431,13 +434,15 @@ class MLArray:
             meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
                 the created ``MLArray``. Dict values are stored as
                 ``meta.source``.
-            cparams (Optional[Dict]): Blosc2 compression parameters used when
+            cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2
+                compression parameters used when
                 ``memory_compressed=True`` and data is written into an in-memory
                 Blosc2 container (for example codec, compression level, and
                 filters). Controls how data is compressed when stored. If None,
                 defaults to ``{'codec': blosc2.Codec.ZSTD, 'clevel': 8}``.
                 Ignored when ``memory_compressed=False``.
-            dparams (Optional[Dict]): Blosc2 decompression parameters used when
+            dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
+                decompression parameters used when
                 accessing compressed chunks (for example number of
                 decompression threads). Controls runtime decompression behavior.
                 If None, defaults to ``{'nthreads': 1}``. Ignored when
@@ -450,13 +455,19 @@ class MLArray:
                 implemented for the provided dimensionality.
         """
         self._store = array
-        has_array = True
-        self._validate_and_add_meta(meta, has_array=has_array)
+        self._validate_and_add_meta(meta, has_array=True)
         spatial_axis_mask = [True] * self.ndim if self.meta.spatial.axis_labels is None else _spatial_axis_mask(self.meta.spatial.axis_labels)
         self.meta._blosc2 = self._comp_and_validate_blosc2_meta(self.meta._blosc2, patch_size, chunk_size, block_size, self._store.shape, self._store.dtype.itemsize, spatial_axis_mask)
         self.meta._has_array.has_array = True
 
-        num_threads = dparams.get('nthreads', 1) if dparams is not None else 1
+        num_threads = 1
+        if dparams is not None:
+            if isinstance(dparams, dict):
+                num_threads = dparams.get('nthreads', 1)
+            else:
+                num_threads = getattr(dparams, 'nthreads', 1)
+            if num_threads is None:
+                num_threads = 1
         blosc2.set_nthreads(num_threads)
         if cparams is None:
             cparams = {'codec': blosc2.Codec.ZSTD, 'clevel': 8,}
@@ -468,6 +479,7 @@ class MLArray:
             self._store = blosc2.asarray(array, chunks=self.meta._blosc2.chunk_size, blocks=self.meta._blosc2.block_size, cparams=cparams, dparams=dparams)
         else:
             self._store = array
+        self._validate_and_add_meta(self.meta)
 
     @classmethod
     def load(
@@ -534,10 +546,10 @@ class MLArray:
             chunk_size: Optional[Union[int, List, Tuple]]= None,
             block_size: Optional[Union[int, List, Tuple]] = None,
             num_threads: int = 1,
-            cparams: Optional[Dict] = None,
-            dparams: Optional[Dict] = None
+            cparams: Optional[Union[Dict, blosc2.CParams]] = None,
+            dparams: Optional[Union[Dict, blosc2.DParams]] = None
         ):
-        """Saves the array to a Blosc2-compressed file. Both MLArray ('.mla') and Blosc2 ('.b2nd') files are supported.
+        """Saves the array to a MLArray file. Both MLArray ('.mla') and Blosc2 ('.b2nd') files are supported.
 
         WARNING:
             MLArray supports both ".b2nd" and ".mla" files. The MLArray
@@ -560,12 +572,14 @@ class MLArray:
                 of dimensions, or None to let Blosc2 decide. Ignored when
                 patch_size is not None.
             num_threads (int): Number of threads to use for saving the file.
-            cparams (Optional[Dict]): Blosc2 compression parameters used when
+            cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2
+                compression parameters used when
                 writing array data to disk (for example codec, compression
                 level, and filters). Controls how data is compressed when
                 stored. If None, defaults to ``{'codec': blosc2.Codec.ZSTD,
                 'clevel': 8}``.
-            dparams (Optional[Dict]): Blosc2 decompression parameters used when
+            dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
+                decompression parameters used when
                 accessing compressed chunks (for example number of
                 decompression threads). Controls runtime decompression behavior.
                 If None, defaults to ``{'nthreads': num_threads}``.
