@@ -487,7 +487,7 @@ class MLArray:
             filepath: Union[str, Path], 
             num_threads: int = 1,
         ):
-        """Loads a Blosc2-compressed file as a whole. Does not use memory-mapping. Both MLArray ('.mla') and Blosc2 ('.b2nd') files are supported.
+        """Loads a MLArray file as a whole. Does not use memory-mapping. Both MLArray ('.mla') and Blosc2 ('.b2nd') files are supported.
 
         WARNING:
             MLArray supports both ".b2nd" and ".mla" files. The MLArray
@@ -495,7 +495,7 @@ class MLArray:
             ".mla". For ".b2nd", metadata is ignored when loading.
 
         Args:
-            filepath (Union[str, Path]): Path to the Blosc2 file to be loaded.
+            filepath (Union[str, Path]): Path to the MLArray file to be loaded.
                 The filepath needs to have the extension ".b2nd" or ".mla".
             num_threads (int): Number of threads to use for loading the file.
 
@@ -511,7 +511,7 @@ class MLArray:
             filepath: Union[str, Path], 
             num_threads: int = 1,
         ):
-        """Internal MLArray load method. Loads a Blosc2-compressed file. Both MLArray ('.mla') and Blosc2 ('.b2nd') files are supported.
+        """Internal MLArray load method. Loads a MLArray file. Both MLArray ('.mla') and Blosc2 ('.b2nd') files are supported.
 
         WARNING:
             MLArray supports both ".b2nd" and ".mla" files. The MLArray
@@ -519,7 +519,7 @@ class MLArray:
             ".mla". For ".b2nd", metadata is ignored when loading.
 
         Args:
-            filepath (Union[str, Path]): Path to the Blosc2 file to be loaded.
+            filepath (Union[str, Path]): Path to the MLArray file to be loaded.
                 The filepath needs to have the extension ".b2nd" or ".mla".
             num_threads (int): Number of threads to use for loading the file.
 
@@ -532,7 +532,7 @@ class MLArray:
         self.support_metadata = str(filepath).endswith(f".{MLARRAY_SUFFIX}")
         blosc2.set_nthreads(num_threads)
         dparams = {'nthreads': num_threads}
-        self._store = blosc2.open(urlpath=str(filepath), cdparams=dparams, mode='r')
+        self._store = blosc2.open(urlpath=str(filepath), dparams=dparams, mode='r')
         self.mode = None
         self.mmap_mode = None
         self._read_meta()        
