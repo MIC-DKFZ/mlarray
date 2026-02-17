@@ -102,7 +102,7 @@ class TestMetadataStorage(unittest.TestCase):
             shape = (8, 16, 16)
             dtype = np.float32
 
-            opened = MLArray.open(path, shape=shape, dtype=dtype, mmap_mode="w+")
+            opened = MLArray.create(path, shape=shape, dtype=dtype, mmap_mode="w+")
             opened.meta.extra["created"] = True
             opened.close()
 

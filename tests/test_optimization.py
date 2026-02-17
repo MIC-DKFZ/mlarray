@@ -68,7 +68,7 @@ class TestOptimizationExamples(unittest.TestCase):
             dtype = np.float32
             path = Path(tmpdir) / "streamed-write.mla"
 
-            image = MLArray.open(
+            image = MLArray.create(
                 path,
                 shape=shape,
                 dtype=dtype,

@@ -63,7 +63,7 @@ image[10:20, 50:60] *= 5  # Modify crop in memory and disk
 
 # read/write, partial access, create/overwrite
 array = np.random.random((128, 256, 256))
-image = MLArray.open("sample.mla", shape=array.shape, dtype=array.dtype, mmap_mode='w+')  
+image = MLArray.create("sample.mla", shape=array.shape, dtype=array.dtype, mmap_mode='w+')
 image[...] = array  # Modify image in memory and disk
 ```
 

@@ -128,7 +128,7 @@ image.close()
 
 ### 5) Create a new memory-mapped file (streaming write)
 
-If you want to create a file on disk and then fill it (without holding the full array in memory), use `open(..., shape=..., dtype=..., mmap_mode='w+')`. MLArray will compute and store the optimized layout up front.
+If you want to create a file on disk and then fill it (without holding the full array in memory), use `create(..., shape=..., dtype=..., mmap_mode='w+')`. MLArray will compute and store the optimized layout up front.
 
 ```python
 import numpy as np
@@ -137,7 +137,7 @@ from mlarray import MLArray
 shape = (128, 256, 256)
 dtype = np.float32
 
-image = MLArray.open(
+image = MLArray.create(
     "streamed-write.mla",
     shape=shape,
     dtype=dtype,
