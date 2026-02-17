@@ -58,7 +58,7 @@ class MLArray:
         self.mmap_mode = None
         self.meta = None
         if isinstance(array, (str, Path)) and (spacing is not None or origin is not None or direction is not None or meta is not None or axis_labels is not None or copy is not None):
-            raise ("Spacing, origin, direction, meta, axis_labels or copy cannot be set when array is a filepath.")
+            raise RuntimeError("Spacing, origin, direction, meta, axis_labels or copy cannot be set when array is a filepath.")
         if isinstance(array, (str, Path)):
             self._load(array)
         else:
@@ -72,23 +72,12 @@ class MLArray:
     def open(
             cls,
             filepath: Union[str, Path],
-            shape: Optional[Union[List, Tuple, np.ndarray]] = None,
-            dtype: Optional[np.dtype] = None,
-            axis_labels: Optional[List[Union[str, AxisLabel]]] = None,
             mode: str = 'r',
             mmap_mode: str = 'r',
-            patch_size: Optional[Union[int, List, Tuple]] = 'default',  # 'default' means that the default of 192 is used. However, if set to 'default', the patch_size will be skipped if self.patch_size is set from a previously loaded MLArray image. In that case the self.patch_size is used.
-            chunk_size: Optional[Union[int, List, Tuple]]= None,
-            block_size: Optional[Union[int, List, Tuple]] = None,
             num_threads: int = 1,
-            cparams: Optional[Dict] = None,
-            dparams: Optional[Dict] = None
+            dparams: Optional[Union[Dict, blosc2.DParams]] = None
         ):
-        """Open an existing Blosc2 file or create a new one with memory mapping.
-
-        This method supports both MLArray (".mla") and plain Blosc2 (".b2nd")
-        files. When creating a new file, both ``shape`` and ``dtype`` must be
-        provided.
+        """Open an existing MLArray file with memory mapping.
 
         WARNING:
             MLArray supports both ".b2nd" and ".mla" files. The MLArray
@@ -98,18 +87,123 @@ class MLArray:
         Args:
             filepath (Union[str, Path]): Target file path. Must end with
                 ".b2nd" or ".mla".
-            shape (Optional[Union[List, Tuple, np.ndarray]]): Shape of the array
-                to create. If provided, a new file is created. Length must match
-                the full array dimensionality (including non-spatial axes if present).
-            dtype (Optional[np.dtype]): Numpy dtype for a newly created array.
-            axis_labels (Optional[List[Union[str, AxisLabel]]]): Per-axis labels or roles. Length must match ndims. If None, the array
-                is treated as purely spatial. Used for patch/chunk/block calculations.
             mode (str): Controls storage open/creation permissions when using standard Blosc2 I/O (read-only, read/write, overwrite). 
                 Does not affect lazy loading or decompression; data is accessed and decompressed on demand by Blosc2.
-                One of "r", "a", "w". Leave at default if unsure.
+                Must be either 'r' (default) or 'a'. Leave at default if unsure.
             mmap_mode (str): Controls access via OS-level memory mapping of the compressed data, including read/write permissions. 
                 Changes how bytes are fetched from disk (paging rather than explicit reads), while chunks are still decompressed on demand by Blosc2.
-                Overrides `mode` if set. One of "r", "r+", "w+", "c". Leave at default if unsure.
+                Overrides `mode` if set. Must be either 'r' (default), 'r+', 'c' or None. Leave at default if unsure.
+            num_threads (int): Number of threads for Blosc2 operations.
+            dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
+                decompression parameters used when
+                reading/accessing compressed chunks (for example number of
+                decompression threads). Controls runtime decompression behavior.
+                If None, defaults to ``{'nthreads': num_threads}``.
+
+        Raises:
+            RuntimeError: If the file extension is invalid or if mode/mmap_mode is invalid for opening.
+        """
+        class_instance = cls()
+        class_instance._open(filepath, mode, mmap_mode, num_threads, dparams)
+        return class_instance
+
+    def _open(
+            self,
+            filepath: Union[str, Path],
+            mode: str = 'r',
+            mmap_mode: str = 'r',
+            num_threads: int = 1,
+            dparams: Optional[Union[Dict, blosc2.DParams]] = None
+        ):
+        """Internal open method. Open an existing MLArray file with memory mapping.
+
+        WARNING:
+            MLArray supports both ".b2nd" and ".mla" files. The MLArray
+            format standard and standardized metadata are honored only for
+            ".mla". For ".b2nd", metadata is ignored when loading.
+
+        Args:
+            filepath (Union[str, Path]): Target file path. Must end with
+                ".b2nd" or ".mla".
+            mode (str): Controls storage open/creation permissions when using standard Blosc2 I/O (read-only, read/write, overwrite). 
+                Does not affect lazy loading or decompression; data is accessed and decompressed on demand by Blosc2.
+                Must be either 'r' (default) or 'a'. Leave at default if unsure.
+            mmap_mode (str): Controls access via OS-level memory mapping of the compressed data, including read/write permissions. 
+                Changes how bytes are fetched from disk (paging rather than explicit reads), while chunks are still decompressed on demand by Blosc2.
+                Overrides `mode` if set. Must be either 'r' (default), 'r+', 'c' or None. Leave at default if unsure.
+            num_threads (int): Number of threads for Blosc2 operations.
+            dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
+                decompression parameters used when
+                reading/accessing compressed chunks (for example number of
+                decompression threads). Controls runtime decompression behavior.
+                If None, defaults to ``{'nthreads': num_threads}``.
+
+        Raises:
+            RuntimeError: If the file extension is invalid or if mode/mmap_mode is invalid for opening.
+        """
+        self.filepath = str(filepath)
+        if not str(filepath).endswith(".b2nd") and not str(filepath).endswith(f".{MLARRAY_SUFFIX}"):
+            raise RuntimeError(f"MLArray requires '.b2nd' or '.{MLARRAY_SUFFIX}' as extension.")
+        
+        if not Path(filepath).is_file():
+            raise RuntimeError(f"No MLArray file exists under {filepath}.")
+        if mode not in ('r', 'a'):
+            raise RuntimeError("mode must be one of the following: 'r', 'a'")
+        if mmap_mode not in ('r', 'r+', 'c', None):
+            raise RuntimeError("mmap_mode must be one of the following: 'r', 'r+', 'c', None")
+        
+        self.support_metadata = str(filepath).endswith(f".{MLARRAY_SUFFIX}")
+
+        blosc2.set_nthreads(num_threads)
+        if dparams is None:
+            dparams = {'nthreads': num_threads}
+        
+        self._store = blosc2.open(urlpath=str(filepath), dparams=dparams, mode=mode, mmap_mode=mmap_mode)
+        self._read_meta()
+        self._update_blosc2_meta()
+        self.mode = mode
+        self.mmap_mode = mmap_mode
+        self._write_metadata()
+
+    @classmethod
+    def create(            
+            cls,
+            filepath: Union[str, Path],
+            shape: Union[List, Tuple, np.ndarray],
+            dtype: np.dtype,
+            meta: Optional[Union[Dict, Meta]] = None,
+            mode: str = 'w',
+            mmap_mode: str = 'w+',
+            patch_size: Optional[Union[int, List, Tuple]] = 'default',  # 'default' means that the default of 192 is used. However, if set to 'default', the patch_size will be skipped if self.patch_size is set from a previously loaded MLArray image. In that case the self.patch_size is used.
+            chunk_size: Optional[Union[int, List, Tuple]]= None,
+            block_size: Optional[Union[int, List, Tuple]] = None,
+            num_threads: int = 1,
+            cparams: Optional[Union[Dict, blosc2.CParams]] = None,
+            dparams: Optional[Union[Dict, blosc2.DParams]] = None
+        ):
+        """Create a new MLArray file with memory mapping.
+
+        WARNING:
+            MLArray supports both ".b2nd" and ".mla" files. The MLArray
+            format standard and standardized metadata are honored only for
+            ".mla". For ".b2nd", metadata is ignored when loading.
+
+        Args:
+            filepath (Union[str, Path]): Target file path. Must end with
+                ".b2nd" or ".mla".
+            shape (Union[List, Tuple, np.ndarray]): Shape of the array
+                to create. If provided, a new file is created. Length must match
+                the full array dimensionality (including non-spatial axes if present).
+            dtype (np.dtype): Numpy dtype for a newly created array.
+            meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
+                the created ``MLArray``. Dict values are stored as
+                ``meta.source``.
+            mode (str): Controls storage open/creation permissions when using standard Blosc2 I/O (read-only, read/write, overwrite). 
+                Does not affect lazy loading or decompression; data is accessed and decompressed on demand by Blosc2.
+                Must be 'w' (default). Leave at default if unsure.
+            mmap_mode (str): Controls access via OS-level memory mapping of the compressed data, including read/write permissions. 
+                Changes how bytes are fetched from disk (paging rather than explicit reads), while chunks are still decompressed on demand by Blosc2.
+                Overrides `mode` if set. Must be either 'w+' (default) or None. Leave at default if unsure.
             patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
                 chunk/block optimization. Provide an int for isotropic sizes or
                 a list/tuple with length equal to the number of spatial
@@ -121,47 +215,41 @@ class MLArray:
                 Provide an int or tuple/list with length equal to the array
                 dimensions. Ignored when ``patch_size`` is provided.
             num_threads (int): Number of threads for Blosc2 operations.
-            cparams (Optional[Dict]): Blosc2 compression parameters used when
+            cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2
+                compression parameters used when
                 creating/writing array data (for example codec, compression
                 level, and filters). Controls how data is compressed when
                 stored. If None, defaults to ``{'codec': blosc2.Codec.ZSTD,
                 'clevel': 8}``.
-            dparams (Optional[Dict]): Blosc2 decompression parameters used when
+            dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
+                decompression parameters used when
                 reading/accessing compressed chunks (for example number of
                 decompression threads). Controls runtime decompression behavior.
                 If None, defaults to ``{'nthreads': num_threads}``.
 
-        Returns:
-            MLArray: A newly created MLArray instance.
-
         Raises:
-            RuntimeError: If the file extension is invalid, if shape/dtype are
-                inconsistent, or if mmap_mode is invalid for creation.
+            RuntimeError: If the file extension is invalid or if mode/mmap_mode is invalid for creation.
         """
         class_instance = cls()
-        class_instance._open(filepath, shape, dtype, axis_labels, mode, mmap_mode, patch_size, chunk_size, block_size, num_threads, cparams, dparams)
+        class_instance._create(filepath, shape, dtype, meta, mode, mmap_mode, patch_size, chunk_size, block_size, num_threads, cparams, dparams)
         return class_instance
 
-    def _open(
+    def _create(            
             self,
             filepath: Union[str, Path],
-            shape: Optional[Union[List, Tuple, np.ndarray]] = None,
-            dtype: Optional[np.dtype] = None,
-            axis_labels: Optional[list[Union[str, AxisLabel]]] = None,
-            mode: str = 'r',
-            mmap_mode: str = 'r',
+            shape: Union[List, Tuple, np.ndarray],
+            dtype: np.dtype,
+            meta: Optional[Union[Dict, Meta]] = None,
+            mode: str = 'w',
+            mmap_mode: str = 'w+',
             patch_size: Optional[Union[int, List, Tuple]] = 'default',  # 'default' means that the default of 192 is used. However, if set to 'default', the patch_size will be skipped if self.patch_size is set from a previously loaded MLArray image. In that case the self.patch_size is used.
             chunk_size: Optional[Union[int, List, Tuple]]= None,
             block_size: Optional[Union[int, List, Tuple]] = None,
             num_threads: int = 1,
-            cparams: Optional[Dict] = None,
-            dparams: Optional[Dict] = None
+            cparams: Optional[Union[Dict, blosc2.CParams]] = None,
+            dparams: Optional[Union[Dict, blosc2.DParams]] = None
         ):
-        """Internal open method. Open an existing Blosc2 file or create a new one with memory mapping.
-
-        This method supports both MLArray (".mla") and plain Blosc2 (".b2nd")
-        files. When creating a new file, both ``shape`` and ``dtype`` must be
-        provided.
+        """Internal create method. Create a new MLArray file with memory mapping.
 
         WARNING:
             MLArray supports both ".b2nd" and ".mla" files. The MLArray
@@ -194,43 +282,34 @@ class MLArray:
                 Provide an int or tuple/list with length equal to the array
                 dimensions. Ignored when ``patch_size`` is provided.
             num_threads (int): Number of threads for Blosc2 operations.
-            cparams (Optional[Dict]): Blosc2 compression parameters used when
+            cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2
+                compression parameters used when
                 creating/writing array data (for example codec, compression
                 level, and filters). Controls how data is compressed when
                 stored. If None, defaults to ``{'codec': blosc2.Codec.ZSTD,
                 'clevel': 8}``.
-            dparams (Optional[Dict]): Blosc2 decompression parameters used when
+            dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
+                decompression parameters used when
                 reading/accessing compressed chunks (for example number of
                 decompression threads). Controls runtime decompression behavior.
                 If None, defaults to ``{'nthreads': num_threads}``.
 
         Raises:
-            RuntimeError: If the file extension is invalid, if shape/dtype are
-                inconsistent, or if mmap_mode is invalid for creation.
+            RuntimeError: If the file extension is invalid or if mode/mmap_mode is invalid for creation.
         """
         self.filepath = str(filepath)
         if not str(filepath).endswith(".b2nd") and not str(filepath).endswith(f".{MLARRAY_SUFFIX}"):
             raise RuntimeError(f"MLArray requires '.b2nd' or '.{MLARRAY_SUFFIX}' as extension.")
 
-        if Path(filepath).is_file() and (shape is not None or dtype is not None):
-            raise RuntimeError("Cannot create a new file as a file exists already under that path. Explicitly set shape and dtype only if you intent to create a new file.")
-        if (shape is not None and dtype is None) or (shape is None and dtype is not None):
-            raise RuntimeError("Both shape and dtype must be set if you intend to create a new file.")
-        if shape is not None and mmap_mode != 'w+':
-            raise RuntimeError("mmap_mode must be 'w+' (create/overwrite) if you intend to write a new file. Explicitly set shape and dtype only if you intent to create a new file.")
-        if (shape is None or dtype is None) and mmap_mode == 'w+':
-            raise RuntimeError("Shape and dtype must be set explicitly when mmap_mode is 'w+'. Explicitly set shape and dtype only if you intent to create a new file.")
-        if mode not in ('r', 'a', 'w'):
-            raise RuntimeError("mode must be one of the following: 'r', 'a', 'w'")
-        if mmap_mode not in ('r', 'r+', 'w+', 'c'):
-            raise RuntimeError("mmap_mode must be one of the following: 'r', 'r+', 'w+', 'c'")
-        
-        create_array = mmap_mode == 'w+'
+        if mode != 'w':
+            raise RuntimeError("mode must be 'w'.")
+        if mmap_mode not in ('w+', None):
+            raise RuntimeError("mmap_mode must be one of the following: 'w+', None")
     
-        if create_array:
-            spatial_axis_mask = [True] * len(shape) if axis_labels is None else _spatial_axis_mask(axis_labels)
-            self.meta._blosc2 = self._comp_and_validate_blosc2_meta(self.meta._blosc2, patch_size, chunk_size, block_size, shape, np.dtype(dtype).itemsize, spatial_axis_mask)   
-            self.meta._has_array.has_array = True
+        self._validate_and_add_meta(meta, has_array=True)
+        spatial_axis_mask = [True] * len(shape) if self.meta.spatial.axis_labels is None else _spatial_axis_mask(self.meta.spatial.axis_labels)
+        self.meta._blosc2 = self._comp_and_validate_blosc2_meta(self.meta._blosc2, patch_size, chunk_size, block_size, shape, np.dtype(dtype).itemsize, spatial_axis_mask)   
+        self.meta._has_array.has_array = True
         
         self.support_metadata = str(filepath).endswith(f".{MLARRAY_SUFFIX}")
 
@@ -240,14 +319,11 @@ class MLArray:
         if dparams is None:
             dparams = {'nthreads': num_threads}
         
-        if create_array:
-            self._store = blosc2.empty(shape=shape, dtype=np.dtype(dtype), urlpath=str(filepath), chunks=self.meta._blosc2.chunk_size, blocks=self.meta._blosc2.block_size, cparams=cparams, dparams=dparams, mmap_mode=mmap_mode)
-        else:
-            self._store = blosc2.open(urlpath=str(filepath), dparams=dparams, mode=mode, mmap_mode=mmap_mode)
-            self._read_meta()
+        self._store = blosc2.empty(shape=shape, dtype=np.dtype(dtype), urlpath=str(filepath), chunks=self.meta._blosc2.chunk_size, blocks=self.meta._blosc2.block_size, cparams=cparams, dparams=dparams, mmap_mode=mmap_mode)
         self._update_blosc2_meta()
         self.mode = mode
         self.mmap_mode = mmap_mode
+        self._validate_and_add_meta(self.meta)
         self._write_metadata()
 
     def close(self):
@@ -949,11 +1025,22 @@ class MLArray:
         Args:
             force (bool): If True, write even when mmap_mode is read-only.
         """
-        if self.support_metadata and isinstance(self._store, blosc2.ndarray.NDArray) and (self.mmap_mode in ('r+', 'w+') or force):
-            metadata = self.meta.to_mapping()
-            if not is_serializable(metadata):
-                raise RuntimeError("Metadata is not serializable.")
-            self._store.vlmeta["mlarray"] = metadata
+        is_writable = False
+        if self.support_metadata and isinstance(self._store, blosc2.ndarray.NDArray):
+            if self.mode in ('a', 'w') and self.mmap_mode is None:
+                is_writable = True
+            elif self.mmap_mode in ('r+', 'w+'):
+                is_writable = True
+            elif force:
+                is_writable = True
+        
+        if not is_writable:
+            return
+        
+        metadata = self.meta.to_mapping()
+        if not is_serializable(metadata):
+            raise RuntimeError("Metadata is not serializable.")
+        self._store.vlmeta["mlarray"] = metadata
     
     def _validate_and_add_meta(self, meta, spacing=None, origin=None, direction=None, axis_labels=None, has_array=None):
         """Validate and attach metadata to the MLArray instance.
