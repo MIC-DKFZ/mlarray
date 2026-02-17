@@ -1,7 +1,7 @@
 import gc
 import os
 import numpy as np
-
+import time
 from mlarray import MLArray
 
 
@@ -68,7 +68,9 @@ if __name__ == "__main__":
     numpy_bytes = array.nbytes
 
     # Convert to in-memory compressed MLArray.
+    start_time = time.time()
     image = MLArray.asarray(array, memory_compressed=True)
+    print("MLArray conversion duration: ", time.time() - start_time)
     rss_after_compressed = get_process_rss_bytes()
 
     # Compressed payload size stored by Blosc2 in RAM.
