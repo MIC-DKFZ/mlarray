@@ -7,7 +7,7 @@ The schema is designed around a few core goals:
 * **Interoperability:** tools can reliably access common fields (e.g., spacing, orientation, statistics) without guessing conventions.
 * **Flexibility:** users can still store arbitrary metadata (including raw metadata from existing formats) without being forced into a rigid structure.
 * **Format preservation:** MLArray can act as a storage and ML-optimized alternative to existing image formats (e.g., DICOM, NIfTI, NRRD) while retaining their metadata in a consistent place.
-* **Practicality for ML workflows:** fields like `is_seg`, `bbox`, and `_blosc2` directly support common training, preprocessing, and patch-based access patterns.
+* **Practicality for ML workflows:** fields like `is_seg`, `bbox`, and `blosc2` directly support common training, preprocessing, and patch-based access patterns.
 
 All fields in the schema are **JSON-serializable** unless otherwise noted. Fields marked as `Optional[...]` may be omitted if unknown or not applicable.
 
@@ -141,7 +141,7 @@ Bounding boxes are stored in a normalized, axis-aligned representation that work
 
 ---
 
-### _blosc2
+### blosc2
 
 * **Description:** Blosc2 layout parameters.
 * **Dataclass:** `MetaBlosc2`.

@@ -579,17 +579,17 @@ class MetaBlosc2(BaseMeta):
             **_: Unused extra context.
         """
         if self.chunk_size is not None:
-            self.chunk_size = _cast_to_list(self.chunk_size, "meta._blosc2.chunk_size")
-            _validate_float_int_list(self.chunk_size, "meta._blosc2.chunk_size", ndims)
+            self.chunk_size = _cast_to_list(self.chunk_size, "meta.blosc2.chunk_size")
+            _validate_float_int_list(self.chunk_size, "meta.blosc2.chunk_size", ndims)
 
         if self.block_size is not None:
-            self.block_size = _cast_to_list(self.block_size, "meta._blosc2.block_size")
-            _validate_float_int_list(self.block_size, "meta._blosc2.block_size", ndims)
+            self.block_size = _cast_to_list(self.block_size, "meta.blosc2.block_size")
+            _validate_float_int_list(self.block_size, "meta.blosc2.block_size", ndims)
 
         if self.patch_size is not None:
             spatial_ndims = ndims if spatial_ndims is None else spatial_ndims
-            self.patch_size = _cast_to_list(self.patch_size, "meta._blosc2.patch_size")
-            _validate_float_int_list(self.patch_size, "meta._blosc2.patch_size", spatial_ndims)
+            self.patch_size = _cast_to_list(self.patch_size, "meta.blosc2.patch_size")
+            _validate_float_int_list(self.patch_size, "meta.blosc2.patch_size", spatial_ndims)
 
 
 class AxisLabelEnum(str, Enum):
@@ -871,7 +871,7 @@ class Meta(BaseMeta):
         stats: Summary statistics.
         bbox: Bounding boxes.
         is_seg: Segmentation flag.
-        _blosc2: Blosc2 chunking/tiling metadata.
+        blosc2: Blosc2 chunking/tiling metadata.
         _has_array: Payload presence flag.
         _image_meta_format: Image metadata format identifier.
         _mlarray_version: Version string for mlarray.
@@ -882,7 +882,7 @@ class Meta(BaseMeta):
     stats: "MetaStatistics" = field(default_factory=lambda: MetaStatistics())
     bbox: "MetaBbox" = field(default_factory=lambda: MetaBbox())
     is_seg: "MetaIsSeg" = field(default_factory=lambda: MetaIsSeg())
-    _blosc2: "MetaBlosc2" = field(default_factory=lambda: MetaBlosc2())
+    blosc2: "MetaBlosc2" = field(default_factory=lambda: MetaBlosc2())
     _has_array: "MetaHasArray" = field(default_factory=lambda: MetaHasArray())
     _image_meta_format: "MetaImageFormat" = field(default_factory=lambda: MetaImageFormat())
     _mlarray_version: "MetaVersion" = field(default_factory=lambda: MetaVersion())
@@ -901,13 +901,13 @@ class Meta(BaseMeta):
         self.stats = MetaStatistics.ensure(self.stats)
         self.bbox = MetaBbox.ensure(self.bbox)
         self.is_seg = MetaIsSeg.ensure(self.is_seg)
-        self._blosc2 = MetaBlosc2.ensure(self._blosc2)
+        self.blosc2 = MetaBlosc2.ensure(self.blosc2)
         self._has_array = MetaHasArray.ensure(self._has_array)
         self._image_meta_format = MetaImageFormat.ensure(self._image_meta_format)
         self._mlarray_version = MetaVersion.ensure(self._mlarray_version)
 
         self.spatial._validate_and_cast(ndims=ndims, spatial_ndims=spatial_ndims)
-        self._blosc2._validate_and_cast(ndims=ndims, spatial_ndims=spatial_ndims)
+        self.blosc2._validate_and_cast(ndims=ndims, spatial_ndims=spatial_ndims)
 
     def to_plain(self, *, include_none: bool = False) -> Any:
         """Convert to plain values, suppressing default sub-metas.

@@ -97,7 +97,7 @@ class TestUsage(unittest.TestCase):
 
             loaded = MLArray(path)
             self.assertEqual(
-                loaded.meta._blosc2.patch_size,
+                loaded.meta.blosc2.patch_size,
                 [MLARRAY_DEFAULT_PATCH_SIZE,] * 3,
             )
 
@@ -108,7 +108,7 @@ class TestUsage(unittest.TestCase):
             MLArray(array).save(path, patch_size=64)
 
             loaded = MLArray(path)
-            self.assertEqual(loaded.meta._blosc2.patch_size, [64, 64, 64])
+            self.assertEqual(loaded.meta.blosc2.patch_size, [64, 64, 64])
 
     def test_patch_size_non_isotropic(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -117,7 +117,7 @@ class TestUsage(unittest.TestCase):
             MLArray(array).save(path, patch_size=[16, 24, 32])
 
             loaded = MLArray(path)
-            self.assertEqual(loaded.meta._blosc2.patch_size, [16, 24, 32])
+            self.assertEqual(loaded.meta.blosc2.patch_size, [16, 24, 32])
 
     def test_manual_chunk_and_block(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -131,8 +131,8 @@ class TestUsage(unittest.TestCase):
             )
 
             loaded = MLArray(path)
-            self.assertEqual(loaded.meta._blosc2.chunk_size, [1, 16, 16])
-            self.assertEqual(loaded.meta._blosc2.block_size, [1, 8, 8])
+            self.assertEqual(loaded.meta.blosc2.chunk_size, [1, 16, 16])
+            self.assertEqual(loaded.meta.blosc2.block_size, [1, 8, 8])
 
     def test_b2nd_metadata_ignored_on_load(self):
         with tempfile.TemporaryDirectory() as tmpdir:

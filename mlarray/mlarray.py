@@ -309,7 +309,7 @@ class MLArray:
     
         self._validate_and_add_meta(meta, has_array=True)
         spatial_axis_mask = [True] * len(shape) if self.meta.spatial.axis_labels is None else _spatial_axis_mask(self.meta.spatial.axis_labels)
-        self.meta._blosc2 = self._comp_and_validate_blosc2_meta(self.meta._blosc2, patch_size, chunk_size, block_size, shape, np.dtype(dtype).itemsize, spatial_axis_mask)   
+        self.meta.blosc2 = self._comp_and_validate_blosc2_meta(self.meta.blosc2, patch_size, chunk_size, block_size, shape, np.dtype(dtype).itemsize, spatial_axis_mask)   
         self.meta._has_array.has_array = True
         
         self.support_metadata = str(filepath).endswith(f".{MLARRAY_SUFFIX}")
@@ -320,7 +320,7 @@ class MLArray:
         if dparams is None:
             dparams = {'nthreads': num_threads}
         
-        self._store = blosc2.empty(shape=shape, dtype=np.dtype(dtype), urlpath=str(filepath), chunks=self.meta._blosc2.chunk_size, blocks=self.meta._blosc2.block_size, cparams=cparams, dparams=dparams, mmap_mode=mmap_mode)
+        self._store = blosc2.empty(shape=shape, dtype=np.dtype(dtype), urlpath=str(filepath), chunks=self.meta.blosc2.chunk_size, blocks=self.meta.blosc2.block_size, cparams=cparams, dparams=dparams, mmap_mode=mmap_mode)
         self._update_blosc2_meta()
         self.mode = mode
         self.mmap_mode = mmap_mode
@@ -457,7 +457,7 @@ class MLArray:
         self._store = array
         self._validate_and_add_meta(meta, has_array=True)
         spatial_axis_mask = [True] * self.ndim if self.meta.spatial.axis_labels is None else _spatial_axis_mask(self.meta.spatial.axis_labels)
-        self.meta._blosc2 = self._comp_and_validate_blosc2_meta(self.meta._blosc2, patch_size, chunk_size, block_size, self._store.shape, self._store.dtype.itemsize, spatial_axis_mask)
+        self.meta.blosc2 = self._comp_and_validate_blosc2_meta(self.meta.blosc2, patch_size, chunk_size, block_size, self._store.shape, self._store.dtype.itemsize, spatial_axis_mask)
         self.meta._has_array.has_array = True
 
         num_threads = 1
@@ -476,7 +476,7 @@ class MLArray:
 
         if memory_compressed:
             array = np.ascontiguousarray(array[...])
-            self._store = blosc2.asarray(array, chunks=self.meta._blosc2.chunk_size, blocks=self.meta._blosc2.block_size, cparams=cparams, dparams=dparams)
+            self._store = blosc2.asarray(array, chunks=self.meta.blosc2.chunk_size, blocks=self.meta.blosc2.block_size, cparams=cparams, dparams=dparams)
         else:
             self._store = array
         self._validate_and_add_meta(self.meta)
@@ -592,7 +592,7 @@ class MLArray:
     
         if self._store is not None:
             spatial_axis_mask = [True] * self.ndim if self.meta.spatial.axis_labels is None else _spatial_axis_mask(self.meta.spatial.axis_labels)
-            self.meta._blosc2 = self._comp_and_validate_blosc2_meta(self.meta._blosc2, patch_size, chunk_size, block_size, self._store.shape, self._store.dtype.itemsize, spatial_axis_mask)
+            self.meta.blosc2 = self._comp_and_validate_blosc2_meta(self.meta.blosc2, patch_size, chunk_size, block_size, self._store.shape, self._store.dtype.itemsize, spatial_axis_mask)
             self.meta._has_array.has_array = True
     
         self.support_metadata = str(filepath).endswith(f".{MLARRAY_SUFFIX}")
@@ -608,10 +608,10 @@ class MLArray:
         
         if self._store is not None:
             array = np.ascontiguousarray(self._store[...])
-            self._store = blosc2.asarray(array, urlpath=str(filepath), chunks=self.meta._blosc2.chunk_size, blocks=self.meta._blosc2.block_size, cparams=cparams, dparams=dparams)
+            self._store = blosc2.asarray(array, urlpath=str(filepath), chunks=self.meta.blosc2.chunk_size, blocks=self.meta.blosc2.block_size, cparams=cparams, dparams=dparams)
         else:
             array = np.empty((0,))
-            self._store = blosc2.asarray(array, urlpath=str(filepath), chunks=self.meta._blosc2.chunk_size, blocks=self.meta._blosc2.block_size, cparams=cparams, dparams=dparams)
+            self._store = blosc2.asarray(array, urlpath=str(filepath), chunks=self.meta.blosc2.chunk_size, blocks=self.meta.blosc2.block_size, cparams=cparams, dparams=dparams)
         self._update_blosc2_meta()
         self.mode = None
         self.mmap_mode = None
@@ -1102,9 +1102,9 @@ class MLArray:
     def _update_blosc2_meta(self):
         """Sync Blosc2 chunk and block sizes into metadata.
 
-        Updates ``self.meta._blosc2`` from the underlying store when the array
+        Updates ``self.meta.blosc2`` from the underlying store when the array
         is present.
         """
         if self.meta._has_array.has_array == True:
-            self.meta._blosc2.chunk_size = list(self._store.chunks)
-            self.meta._blosc2.block_size = list(self._store.blocks)
+            self.meta.blosc2.chunk_size = list(self._store.chunks)
+            self.meta.blosc2.block_size = list(self._store.blocks)

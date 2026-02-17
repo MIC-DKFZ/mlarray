@@ -22,7 +22,7 @@ class TestOptimizationExamples(unittest.TestCase):
             loaded = MLArray(path)
 
             self.assertEqual(
-                loaded.meta._blosc2.patch_size,
+                loaded.meta.blosc2.patch_size,
                 [MLARRAY_DEFAULT_PATCH_SIZE] * 3,
             )
 
@@ -34,7 +34,7 @@ class TestOptimizationExamples(unittest.TestCase):
             MLArray(array).save(path, patch_size=(8, 12, 16))
             loaded = MLArray(path)
 
-            self.assertEqual(loaded.meta._blosc2.patch_size, [8, 12, 16])
+            self.assertEqual(loaded.meta.blosc2.patch_size, [8, 12, 16])
 
     def test_mmap_patch_read(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -96,8 +96,8 @@ class TestOptimizationExamples(unittest.TestCase):
             )
             loaded = MLArray(path)
 
-            self.assertEqual(loaded.meta._blosc2.chunk_size, [1, 16, 16])
-            self.assertEqual(loaded.meta._blosc2.block_size, [1, 8, 8])
+            self.assertEqual(loaded.meta.blosc2.chunk_size, [1, 16, 16])
+            self.assertEqual(loaded.meta.blosc2.block_size, [1, 8, 8])
 
     def test_blosc2_auto_layout(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -107,9 +107,9 @@ class TestOptimizationExamples(unittest.TestCase):
             MLArray(array).save(path, patch_size=None)
             loaded = MLArray(path)
 
-            self.assertIsNone(loaded.meta._blosc2.patch_size)
-            self.assertIsNotNone(loaded.meta._blosc2.chunk_size)
-            self.assertIsNotNone(loaded.meta._blosc2.block_size)
+            self.assertIsNone(loaded.meta.blosc2.patch_size)
+            self.assertIsNotNone(loaded.meta.blosc2.chunk_size)
+            self.assertIsNotNone(loaded.meta.blosc2.block_size)
 
 
 if __name__ == "__main__":

@@ -55,8 +55,8 @@ class TestAsArray(unittest.TestCase):
 
             self.assertFalse(isinstance(image._store, np.ndarray))
             self.assertTrue(np.allclose(image.to_numpy(), array))
-            self.assertEqual(image.meta._blosc2.chunk_size, [1, 8, 8])
-            self.assertEqual(image.meta._blosc2.block_size, [1, 4, 4])
+            self.assertEqual(image.meta.blosc2.chunk_size, [1, 8, 8])
+            self.assertEqual(image.meta.blosc2.block_size, [1, 4, 4])
 
             path = Path(tmpdir) / "asarray-compressed.mla"
             image.save(path)
