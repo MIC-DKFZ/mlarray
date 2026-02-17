@@ -64,7 +64,7 @@ class TestCreate(unittest.TestCase):
                 patch_size=None,
                 chunk_size=(1, 4, 4),
                 block_size=(1, 2, 2),
-                cparams={"codec": blosc2.Codec.ZSTD, "clevel": 1},
+                cparams={"codec": blosc2.Codec.LZ4HC, "clevel": 1},
                 dparams={"nthreads": 1},
             )
             self.assertEqual(image.mode, "w")
@@ -81,7 +81,7 @@ class TestCreate(unittest.TestCase):
                 patch_size=None,
                 chunk_size=(1, 4, 4),
                 block_size=(1, 2, 2),
-                cparams=blosc2.CParams(codec=blosc2.Codec.ZSTD, clevel=1),
+                cparams=blosc2.CParams(codec=blosc2.Codec.LZ4HC, clevel=1),
                 dparams=blosc2.DParams(nthreads=1),
             )
             self.assertEqual(image.shape, (4, 8, 8))

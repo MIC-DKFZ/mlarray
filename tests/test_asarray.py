@@ -49,7 +49,7 @@ class TestAsArray(unittest.TestCase):
                 patch_size=None,
                 chunk_size=(1, 8, 8),
                 block_size=(1, 4, 4),
-                cparams={"codec": blosc2.Codec.ZSTD, "clevel": 3},
+                cparams={"codec": blosc2.Codec.LZ4HC, "clevel": 3},
                 dparams={"nthreads": 1},
             )
 

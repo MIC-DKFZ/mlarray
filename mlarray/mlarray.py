@@ -219,7 +219,7 @@ class MLArray:
                 compression parameters used when
                 creating/writing array data (for example codec, compression
                 level, and filters). Controls how data is compressed when
-                stored. If None, defaults to ``{'codec': blosc2.Codec.ZSTD,
+                stored. If None, defaults to ``{'codec': blosc2.Codec.LZ4HC,
                 'clevel': 8}``.
             dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
                 decompression parameters used when
@@ -287,7 +287,7 @@ class MLArray:
                 compression parameters used when
                 creating/writing array data (for example codec, compression
                 level, and filters). Controls how data is compressed when
-                stored. If None, defaults to ``{'codec': blosc2.Codec.ZSTD,
+                stored. If None, defaults to ``{'codec': blosc2.Codec.LZ4HC,
                 'clevel': 8}``.
             dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
                 decompression parameters used when
@@ -316,7 +316,7 @@ class MLArray:
 
         blosc2.set_nthreads(num_threads)
         if cparams is None:
-            cparams = {'codec': blosc2.Codec.ZSTD, 'clevel': 8,}
+            cparams = {'codec': blosc2.Codec.LZ4HC, 'clevel': 8,}
         if dparams is None:
             dparams = {'nthreads': num_threads}
         
@@ -379,7 +379,7 @@ class MLArray:
                 ``memory_compressed=True`` and data is written into an in-memory
                 Blosc2 container (for example codec, compression level, and
                 filters). Controls how data is compressed when stored. If None,
-                defaults to ``{'codec': blosc2.Codec.ZSTD, 'clevel': 8}``.
+                defaults to ``{'codec': blosc2.Codec.LZ4HC, 'clevel': 8}``.
                 Ignored when ``memory_compressed=False``.
             dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
                 decompression parameters used when
@@ -439,7 +439,7 @@ class MLArray:
                 ``memory_compressed=True`` and data is written into an in-memory
                 Blosc2 container (for example codec, compression level, and
                 filters). Controls how data is compressed when stored. If None,
-                defaults to ``{'codec': blosc2.Codec.ZSTD, 'clevel': 8}``.
+                defaults to ``{'codec': blosc2.Codec.LZ4HC, 'clevel': 8}``.
                 Ignored when ``memory_compressed=False``.
             dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
                 decompression parameters used when
@@ -470,7 +470,7 @@ class MLArray:
                 num_threads = 1
         blosc2.set_nthreads(num_threads)
         if cparams is None:
-            cparams = {'codec': blosc2.Codec.ZSTD, 'clevel': 8,}
+            cparams = {'codec': blosc2.Codec.LZ4HC, 'clevel': 8,}
         if dparams is None:
             dparams = {'nthreads': num_threads}
 
@@ -576,7 +576,7 @@ class MLArray:
                 compression parameters used when
                 writing array data to disk (for example codec, compression
                 level, and filters). Controls how data is compressed when
-                stored. If None, defaults to ``{'codec': blosc2.Codec.ZSTD,
+                stored. If None, defaults to ``{'codec': blosc2.Codec.LZ4HC,
                 'clevel': 8}``.
             dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
                 decompression parameters used when
@@ -599,7 +599,7 @@ class MLArray:
 
         blosc2.set_nthreads(num_threads)
         if cparams is None:
-            cparams = {'codec': blosc2.Codec.ZSTD, 'clevel': 8,}
+            cparams = {'codec': blosc2.Codec.LZ4HC, 'clevel': 8,}
         if dparams is None:
             dparams = {'nthreads': num_threads}
 
