@@ -64,9 +64,10 @@ class MLArray:
         else:
             self._store = array
             has_array = array is not None
-            self._validate_and_add_meta(meta, spacing, origin, direction, axis_labels, has_array)        
+            self._validate_and_add_meta(meta, spacing, origin, direction, axis_labels, has_array, validate=False)        
             if copy is not None:
                 self.meta.copy_from(copy.meta)
+            self._validate_and_add_meta(self.meta, validate=True) 
 
     @classmethod
     def open(
@@ -1056,7 +1057,7 @@ class MLArray:
             raise RuntimeError("Metadata is not serializable.")
         self._store.vlmeta["mlarray"] = metadata
     
-    def _validate_and_add_meta(self, meta, spacing=None, origin=None, direction=None, axis_labels=None, has_array=None):
+    def _validate_and_add_meta(self, meta, spacing=None, origin=None, direction=None, axis_labels=None, has_array=None, validate=True):
         """Validate and attach metadata to the MLArray instance.
 
         Args:
@@ -1097,7 +1098,8 @@ class MLArray:
             self.meta._has_array.has_array = True
         if self.meta._has_array.has_array:
             self.meta.spatial.shape = self.shape
-        self.meta.spatial._validate_and_cast(ndims=self.ndim, spatial_ndims=self._spatial_ndim)
+        if validate:
+            self.meta.spatial._validate_and_cast(ndims=self.ndim, spatial_ndims=self._spatial_ndim)
 
     def _update_blosc2_meta(self):
         """Sync Blosc2 chunk and block sizes into metadata.
