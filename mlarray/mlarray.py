@@ -1010,12 +1010,16 @@ class MLArray:
             raise NotImplementedError("Chunk and block size optimization based on patch size is only implemented for 2D and 3D spatial images with at most one further non-spatial axis. Please set the chunk and block size manually or set to None for blosc2 to determine a chunk and block size.")
         if patch_size is not None and patch_size != "default" and (chunk_size is not None or block_size is not None):
             raise RuntimeError("patch_size and chunk_size / block_size cannot both be explicitly set.")
+        if (chunk_size is not None and block_size is None) or (chunk_size is None and block_size is not None):
+            raise RuntimeError("If either chunk/block size is used then both must be set.")
 
         if patch_size == "default": 
             if meta_blosc2 is not None and meta_blosc2.patch_size is not None:  # Use previously loaded patch size, when patch size is not explicitly set and a patch size from a previously loaded image exists
                 patch_size = meta_blosc2.patch_size
             else:  # Use default patch size, when patch size is not explicitly set and no patch size from a previously loaded image exists
                 patch_size = [MLARRAY_DEFAULT_PATCH_SIZE] * num_spatial_axes
+        if chunk_size is not None or block_size is not None:
+            patch_size = None
 
         patch_size = [patch_size] * len(shape) if isinstance(patch_size, int) else patch_size
 
