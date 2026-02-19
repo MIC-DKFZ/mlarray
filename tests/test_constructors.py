@@ -17,7 +17,6 @@ class TestInMemoryConstructors(unittest.TestCase):
             patch_size=None,
             chunk_size=(1, 4, 4),
             block_size=(1, 2, 2),
-            num_threads=1,
             cparams={"codec": blosc2.Codec.LZ4HC, "clevel": 1},
             dparams={"nthreads": 1},
         )
@@ -64,14 +63,14 @@ class TestInMemoryConstructors(unittest.TestCase):
         self.assertTrue(np.array_equal(full[...], np.full(shape, 7, dtype=np.int16)))
 
     def test_arange_and_linspace(self):
-        arr1 = MLArray.arange(0, 12, 2, patch_size=None, num_threads=1)
+        arr1 = MLArray.arange(0, 12, 2, patch_size=None)
         self.assertTrue(np.array_equal(arr1[...], np.arange(0, 12, 2)))
 
-        arr2 = MLArray.arange(0, 12, 2, shape=(2, 3), patch_size=None, num_threads=1)
+        arr2 = MLArray.arange(0, 12, 2, shape=(2, 3), patch_size=None)
         self.assertTrue(np.array_equal(arr2[...], np.arange(0, 12, 2).reshape(2, 3)))
 
         lin = MLArray.linspace(
-            0.0, 1.0, num=6, shape=(2, 3), endpoint=False, patch_size=None, num_threads=1
+            0.0, 1.0, num=6, shape=(2, 3), endpoint=False, patch_size=None
         )
         self.assertTrue(
             np.allclose(lin[...], np.linspace(0.0, 1.0, 6, endpoint=False).reshape(2, 3))

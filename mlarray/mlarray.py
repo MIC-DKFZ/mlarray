@@ -69,13 +69,25 @@ class MLArray:
                 self.meta.copy_from(copy.meta)
             self._validate_and_add_meta(self.meta, validate=True) 
 
+    @staticmethod
+    def _resolve_num_threads(dparams: Optional[Union[Dict, blosc2.DParams]]) -> int:
+        """Resolve thread count from dparams (fallback: 1)."""
+        num_threads = 1
+        if dparams is not None:
+            if isinstance(dparams, dict):
+                num_threads = dparams.get("nthreads", 1)
+            else:
+                num_threads = getattr(dparams, "nthreads", 1)
+            if num_threads is None:
+                num_threads = 1
+        return int(num_threads)
+
     @classmethod
     def open(
             cls,
             filepath: Union[str, Path],
             mode: str = 'r',
             mmap_mode: str = 'r',
-            num_threads: int = 1,
             dparams: Optional[Union[Dict, blosc2.DParams]] = None
         ):
         """Open an existing MLArray file with memory mapping.
@@ -94,18 +106,17 @@ class MLArray:
             mmap_mode (str): Controls access via OS-level memory mapping of the compressed data, including read/write permissions. 
                 Changes how bytes are fetched from disk (paging rather than explicit reads), while chunks are still decompressed on demand by Blosc2.
                 Overrides `mode` if set. Must be either 'r' (default), 'r+', 'c' or None. Leave at default if unsure.
-            num_threads (int): Number of threads for Blosc2 operations.
             dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
                 decompression parameters used when
                 reading/accessing compressed chunks (for example number of
                 decompression threads). Controls runtime decompression behavior.
-                If None, defaults to ``{'nthreads': num_threads}``.
+                If None, defaults to ``{'nthreads': 1}``.
 
         Raises:
             RuntimeError: If the file extension is invalid or if mode/mmap_mode is invalid for opening.
         """
         class_instance = cls()
-        class_instance._open(filepath, mode, mmap_mode, num_threads, dparams)
+        class_instance._open(filepath, mode, mmap_mode, dparams)
         return class_instance
 
     def _open(
@@ -113,7 +124,6 @@ class MLArray:
             filepath: Union[str, Path],
             mode: str = 'r',
             mmap_mode: str = 'r',
-            num_threads: int = 1,
             dparams: Optional[Union[Dict, blosc2.DParams]] = None
         ):
         """Internal open method. Open an existing MLArray file with memory mapping.
@@ -132,12 +142,11 @@ class MLArray:
             mmap_mode (str): Controls access via OS-level memory mapping of the compressed data, including read/write permissions. 
                 Changes how bytes are fetched from disk (paging rather than explicit reads), while chunks are still decompressed on demand by Blosc2.
                 Overrides `mode` if set. Must be either 'r' (default), 'r+', 'c' or None. Leave at default if unsure.
-            num_threads (int): Number of threads for Blosc2 operations.
             dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
                 decompression parameters used when
                 reading/accessing compressed chunks (for example number of
                 decompression threads). Controls runtime decompression behavior.
-                If None, defaults to ``{'nthreads': num_threads}``.
+                If None, defaults to ``{'nthreads': 1}``.
 
         Raises:
             RuntimeError: If the file extension is invalid or if mode/mmap_mode is invalid for opening.
@@ -155,6 +164,7 @@ class MLArray:
         
         self.support_metadata = str(filepath).endswith(f".{MLARRAY_SUFFIX}")
 
+        num_threads = MLArray._resolve_num_threads(dparams)
         blosc2.set_nthreads(num_threads)
         if dparams is None:
             dparams = {'nthreads': num_threads}
@@ -178,7 +188,6 @@ class MLArray:
             patch_size: Optional[Union[int, List, Tuple]] = 'default',  # 'default' means that the default of 192 is used. However, if set to 'default', the patch_size will be skipped if self.patch_size is set from a previously loaded MLArray image. In that case the self.patch_size is used.
             chunk_size: Optional[Union[int, List, Tuple]]= None,
             block_size: Optional[Union[int, List, Tuple]] = None,
-            num_threads: int = 1,
             cparams: Optional[Union[Dict, blosc2.CParams]] = None,
             dparams: Optional[Union[Dict, blosc2.DParams]] = None
         ):
@@ -215,7 +224,6 @@ class MLArray:
             block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
                 Provide an int or tuple/list with length equal to the array
                 dimensions. Ignored when ``patch_size`` is provided.
-            num_threads (int): Number of threads for Blosc2 operations.
             cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2
                 compression parameters used when
                 creating/writing array data (for example codec, compression
@@ -226,13 +234,13 @@ class MLArray:
                 decompression parameters used when
                 reading/accessing compressed chunks (for example number of
                 decompression threads). Controls runtime decompression behavior.
-                If None, defaults to ``{'nthreads': num_threads}``.
+                If None, defaults to ``{'nthreads': 1}``.
 
         Raises:
             RuntimeError: If the file extension is invalid or if mode/mmap_mode is invalid for creation.
         """
         class_instance = cls()
-        class_instance._create(filepath, shape, dtype, meta, mode, mmap_mode, patch_size, chunk_size, block_size, num_threads, cparams, dparams)
+        class_instance._create(filepath, shape, dtype, meta, mode, mmap_mode, patch_size, chunk_size, block_size, cparams, dparams)
         return class_instance
 
     def _create(            
@@ -246,7 +254,6 @@ class MLArray:
             patch_size: Optional[Union[int, List, Tuple]] = 'default',  # 'default' means that the default of 192 is used. However, if set to 'default', the patch_size will be skipped if self.patch_size is set from a previously loaded MLArray image. In that case the self.patch_size is used.
             chunk_size: Optional[Union[int, List, Tuple]]= None,
             block_size: Optional[Union[int, List, Tuple]] = None,
-            num_threads: int = 1,
             cparams: Optional[Union[Dict, blosc2.CParams]] = None,
             dparams: Optional[Union[Dict, blosc2.DParams]] = None
         ):
@@ -283,7 +290,6 @@ class MLArray:
             block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
                 Provide an int or tuple/list with length equal to the array
                 dimensions. Ignored when ``patch_size`` is provided.
-            num_threads (int): Number of threads for Blosc2 operations.
             cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2
                 compression parameters used when
                 creating/writing array data (for example codec, compression
@@ -294,7 +300,7 @@ class MLArray:
                 decompression parameters used when
                 reading/accessing compressed chunks (for example number of
                 decompression threads). Controls runtime decompression behavior.
-                If None, defaults to ``{'nthreads': num_threads}``.
+                If None, defaults to ``{'nthreads': 1}``.
 
         Raises:
             RuntimeError: If the file extension is invalid or if mode/mmap_mode is invalid for creation.
@@ -315,6 +321,7 @@ class MLArray:
         
         self.support_metadata = str(filepath).endswith(f".{MLARRAY_SUFFIX}")
 
+        num_threads = MLArray._resolve_num_threads(dparams)
         blosc2.set_nthreads(num_threads)
         if cparams is None:
             cparams = {'codec': blosc2.Codec.LZ4HC, 'clevel': 8,}
@@ -363,7 +370,6 @@ class MLArray:
             patch_size: Optional[Union[int, List, Tuple]] = "default",
             chunk_size: Optional[Union[int, List, Tuple]] = None,
             block_size: Optional[Union[int, List, Tuple]] = None,
-            num_threads: int = 1,
             cparams: Optional[Union[Dict, blosc2.CParams]] = None,
             dparams: Optional[Union[Dict, blosc2.DParams]] = None,
         ):
@@ -388,13 +394,12 @@ class MLArray:
                 Ignored when ``patch_size`` is provided.
             block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
                 Ignored when ``patch_size`` is provided.
-            num_threads (int): Number of threads for Blosc2 operations.
             cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2 compression
                 parameters. If None, defaults to
                 ``{'codec': blosc2.Codec.LZ4HC, 'clevel': 8}``.
             dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
                 decompression parameters. If None, defaults to
-                ``{'nthreads': num_threads}``.
+                ``{'nthreads': 1}``.
 
         Raises:
             ValueError: If constructor inputs are inconsistent.
@@ -432,6 +437,7 @@ class MLArray:
         )
         self.meta._has_array.has_array = True
 
+        num_threads = MLArray._resolve_num_threads(dparams)
         blosc2.set_nthreads(num_threads)
         if cparams is None:
             cparams = {"codec": blosc2.Codec.LZ4HC, "clevel": 8}
@@ -463,7 +469,6 @@ class MLArray:
             patch_size: Optional[Union[int, List, Tuple]] = "default",
             chunk_size: Optional[Union[int, List, Tuple]] = None,
             block_size: Optional[Union[int, List, Tuple]] = None,
-            num_threads: int = 1,
             cparams: Optional[Union[Dict, blosc2.CParams]] = None,
             dparams: Optional[Union[Dict, blosc2.DParams]] = None,
         ):
@@ -483,7 +488,6 @@ class MLArray:
                 Ignored when ``patch_size`` is provided.
             block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
                 Ignored when ``patch_size`` is provided.
-            num_threads (int): Number of threads for Blosc2 operations.
             cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2 compression
                 parameters used when writing chunks.
             dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
@@ -500,7 +504,6 @@ class MLArray:
             patch_size=patch_size,
             chunk_size=chunk_size,
             block_size=block_size,
-            num_threads=num_threads,
             cparams=cparams,
             dparams=dparams,
             store_builder=lambda **kwargs: blosc2.empty(**kwargs),
@@ -516,7 +519,6 @@ class MLArray:
             patch_size: Optional[Union[int, List, Tuple]] = "default",
             chunk_size: Optional[Union[int, List, Tuple]] = None,
             block_size: Optional[Union[int, List, Tuple]] = None,
-            num_threads: int = 1,
             cparams: Optional[Union[Dict, blosc2.CParams]] = None,
             dparams: Optional[Union[Dict, blosc2.DParams]] = None,
         ):
@@ -534,7 +536,6 @@ class MLArray:
                 Ignored when ``patch_size`` is provided.
             block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
                 Ignored when ``patch_size`` is provided.
-            num_threads (int): Number of threads for Blosc2 operations.
             cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2 compression
                 parameters.
             dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
@@ -551,7 +552,6 @@ class MLArray:
             patch_size=patch_size,
             chunk_size=chunk_size,
             block_size=block_size,
-            num_threads=num_threads,
             cparams=cparams,
             dparams=dparams,
             store_builder=lambda **kwargs: blosc2.zeros(**kwargs),
@@ -567,7 +567,6 @@ class MLArray:
             patch_size: Optional[Union[int, List, Tuple]] = "default",
             chunk_size: Optional[Union[int, List, Tuple]] = None,
             block_size: Optional[Union[int, List, Tuple]] = None,
-            num_threads: int = 1,
             cparams: Optional[Union[Dict, blosc2.CParams]] = None,
             dparams: Optional[Union[Dict, blosc2.DParams]] = None,
         ):
@@ -586,7 +585,6 @@ class MLArray:
                 Ignored when ``patch_size`` is provided.
             block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
                 Ignored when ``patch_size`` is provided.
-            num_threads (int): Number of threads for Blosc2 operations.
             cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2 compression
                 parameters.
             dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
@@ -604,7 +602,6 @@ class MLArray:
             patch_size=patch_size,
             chunk_size=chunk_size,
             block_size=block_size,
-            num_threads=num_threads,
             cparams=cparams,
             dparams=dparams,
             store_builder=lambda **kwargs: blosc2.ones(**kwargs),
@@ -621,7 +618,6 @@ class MLArray:
             patch_size: Optional[Union[int, List, Tuple]] = "default",
             chunk_size: Optional[Union[int, List, Tuple]] = None,
             block_size: Optional[Union[int, List, Tuple]] = None,
-            num_threads: int = 1,
             cparams: Optional[Union[Dict, blosc2.CParams]] = None,
             dparams: Optional[Union[Dict, blosc2.DParams]] = None,
         ):
@@ -642,7 +638,6 @@ class MLArray:
                 Ignored when ``patch_size`` is provided.
             block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
                 Ignored when ``patch_size`` is provided.
-            num_threads (int): Number of threads for Blosc2 operations.
             cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2 compression
                 parameters.
             dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
@@ -664,7 +659,6 @@ class MLArray:
             patch_size=patch_size,
             chunk_size=chunk_size,
             block_size=block_size,
-            num_threads=num_threads,
             cparams=cparams,
             dparams=dparams,
             store_builder=lambda **kwargs: blosc2.full(fill_value=fill_value, **kwargs),
@@ -684,7 +678,6 @@ class MLArray:
             patch_size: Optional[Union[int, List, Tuple]] = None,
             chunk_size: Optional[Union[int, List, Tuple]] = None,
             block_size: Optional[Union[int, List, Tuple]] = None,
-            num_threads: int = 1,
             cparams: Optional[Union[Dict, blosc2.CParams]] = None,
             dparams: Optional[Union[Dict, blosc2.DParams]] = None,
         ):
@@ -709,7 +702,6 @@ class MLArray:
                 chunk/block optimization. Defaults to None for this method.
             chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
             block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
-            num_threads (int): Number of threads for Blosc2 operations.
             cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2 compression
                 parameters.
             dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
@@ -753,7 +745,6 @@ class MLArray:
             patch_size=patch_size,
             chunk_size=chunk_size,
             block_size=block_size,
-            num_threads=num_threads,
             cparams=cparams,
             dparams=dparams,
             store_builder=lambda **kwargs: blosc2.arange(
@@ -780,7 +771,6 @@ class MLArray:
             patch_size: Optional[Union[int, List, Tuple]] = None,
             chunk_size: Optional[Union[int, List, Tuple]] = None,
             block_size: Optional[Union[int, List, Tuple]] = None,
-            num_threads: int = 1,
             cparams: Optional[Union[Dict, blosc2.CParams]] = None,
             dparams: Optional[Union[Dict, blosc2.DParams]] = None,
         ):
@@ -806,7 +796,6 @@ class MLArray:
                 chunk/block optimization. Defaults to None for this method.
             chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
             block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
-            num_threads (int): Number of threads for Blosc2 operations.
             cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2 compression
                 parameters.
             dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
@@ -848,7 +837,6 @@ class MLArray:
             patch_size=patch_size,
             chunk_size=chunk_size,
             block_size=block_size,
-            num_threads=num_threads,
             cparams=cparams,
             dparams=dparams,
             store_builder=lambda **kwargs: blosc2.linspace(
@@ -871,7 +859,6 @@ class MLArray:
             patch_size: Optional[Union[int, List, Tuple]] = "default",
             chunk_size: Optional[Union[int, List, Tuple]] = None,
             block_size: Optional[Union[int, List, Tuple]] = None,
-            num_threads: int = 1,
             cparams: Optional[Union[Dict, blosc2.CParams]] = None,
             dparams: Optional[Union[Dict, blosc2.DParams]] = None,
         ):
@@ -888,7 +875,6 @@ class MLArray:
                 chunk/block optimization.
             chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
             block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
-            num_threads (int): Number of threads for Blosc2 operations.
             cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2 compression
                 parameters.
             dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
@@ -909,7 +895,6 @@ class MLArray:
             patch_size=patch_size,
             chunk_size=chunk_size,
             block_size=block_size,
-            num_threads=num_threads,
             cparams=cparams,
             dparams=dparams,
             store_builder=lambda **kwargs: blosc2.empty(**kwargs),
@@ -925,7 +910,6 @@ class MLArray:
             patch_size: Optional[Union[int, List, Tuple]] = "default",
             chunk_size: Optional[Union[int, List, Tuple]] = None,
             block_size: Optional[Union[int, List, Tuple]] = None,
-            num_threads: int = 1,
             cparams: Optional[Union[Dict, blosc2.CParams]] = None,
             dparams: Optional[Union[Dict, blosc2.DParams]] = None,
         ):
@@ -942,7 +926,6 @@ class MLArray:
                 chunk/block optimization.
             chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
             block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
-            num_threads (int): Number of threads for Blosc2 operations.
             cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2 compression
                 parameters.
             dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
@@ -963,7 +946,6 @@ class MLArray:
             patch_size=patch_size,
             chunk_size=chunk_size,
             block_size=block_size,
-            num_threads=num_threads,
             cparams=cparams,
             dparams=dparams,
             store_builder=lambda **kwargs: blosc2.zeros(**kwargs),
@@ -979,7 +961,6 @@ class MLArray:
             patch_size: Optional[Union[int, List, Tuple]] = "default",
             chunk_size: Optional[Union[int, List, Tuple]] = None,
             block_size: Optional[Union[int, List, Tuple]] = None,
-            num_threads: int = 1,
             cparams: Optional[Union[Dict, blosc2.CParams]] = None,
             dparams: Optional[Union[Dict, blosc2.DParams]] = None,
         ):
@@ -996,7 +977,6 @@ class MLArray:
                 chunk/block optimization.
             chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
             block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
-            num_threads (int): Number of threads for Blosc2 operations.
             cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2 compression
                 parameters.
             dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
@@ -1017,7 +997,6 @@ class MLArray:
             patch_size=patch_size,
             chunk_size=chunk_size,
             block_size=block_size,
-            num_threads=num_threads,
             cparams=cparams,
             dparams=dparams,
             store_builder=lambda **kwargs: blosc2.ones(**kwargs),
@@ -1034,7 +1013,6 @@ class MLArray:
             patch_size: Optional[Union[int, List, Tuple]] = "default",
             chunk_size: Optional[Union[int, List, Tuple]] = None,
             block_size: Optional[Union[int, List, Tuple]] = None,
-            num_threads: int = 1,
             cparams: Optional[Union[Dict, blosc2.CParams]] = None,
             dparams: Optional[Union[Dict, blosc2.DParams]] = None,
         ):
@@ -1053,7 +1031,6 @@ class MLArray:
                 chunk/block optimization.
             chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
             block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
-            num_threads (int): Number of threads for Blosc2 operations.
             cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2 compression
                 parameters.
             dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
@@ -1074,7 +1051,6 @@ class MLArray:
             patch_size=patch_size,
             chunk_size=chunk_size,
             block_size=block_size,
-            num_threads=num_threads,
             cparams=cparams,
             dparams=dparams,
             store_builder=lambda **kwargs: blosc2.full(fill_value=fill_value, **kwargs),
@@ -1102,7 +1078,6 @@ class MLArray:
             patch_size: Optional[Union[int, List, Tuple]] = 'default',  # 'default' means that the default of 192 is used. However, if set to 'default', the patch_size will be skipped if self.patch_size is set from a previously loaded MLArray image. In that case the self.patch_size is used.
             chunk_size: Optional[Union[int, List, Tuple]]= None,
             block_size: Optional[Union[int, List, Tuple]] = None,
-            num_threads: int = 1,
             cparams: Optional[Union[Dict, blosc2.CParams]] = None,
             dparams: Optional[Union[Dict, blosc2.DParams]] = None
         ):
@@ -1125,7 +1100,6 @@ class MLArray:
                 Provide an int or a tuple/list with length equal to the number
                 of dimensions, or None to let Blosc2 decide. Ignored when
                 patch_size is not None.
-            num_threads (int): Number of threads for Blosc2 operations.
             cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2
                 compression parameters used when creating the in-memory Blosc2
                 container (for example codec, compression level, and filters).
@@ -1135,7 +1109,7 @@ class MLArray:
                 decompression parameters used when
                 accessing compressed chunks (for example number of
                 decompression threads). Controls runtime decompression behavior.
-                If None, defaults to ``{'nthreads': num_threads}``.
+                If None, defaults to ``{'nthreads': 1}``.
 
         Returns:
             MLArray: A newly created MLArray instance.
@@ -1148,7 +1122,7 @@ class MLArray:
                 implemented for the provided dimensionality.
         """
         class_instance = cls()
-        class_instance._asarray(array, meta, patch_size, chunk_size, block_size, num_threads, cparams, dparams)
+        class_instance._asarray(array, meta, patch_size, chunk_size, block_size, cparams, dparams)
         return class_instance
 
     def _asarray(
@@ -1158,7 +1132,6 @@ class MLArray:
             patch_size: Optional[Union[int, List, Tuple]] = 'default',  # 'default' means that the default of 192 is used. However, if set to 'default', the patch_size will be skipped if self.patch_size is set from a previously loaded MLArray image. In that case the self.patch_size is used.
             chunk_size: Optional[Union[int, List, Tuple]]= None,
             block_size: Optional[Union[int, List, Tuple]] = None,
-            num_threads: int = 1,
             cparams: Optional[Union[Dict, blosc2.CParams]] = None,
             dparams: Optional[Union[Dict, blosc2.DParams]] = None
         ):
@@ -1181,7 +1154,6 @@ class MLArray:
                 Provide an int or a tuple/list with length equal to the number
                 of dimensions, or None to let Blosc2 decide. Ignored when
                 patch_size is not None.
-            num_threads (int): Number of threads for Blosc2 operations.
             cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2
                 compression parameters used when creating the in-memory Blosc2
                 container (for example codec, compression level, and filters).
@@ -1191,7 +1163,7 @@ class MLArray:
                 decompression parameters used when
                 accessing compressed chunks (for example number of
                 decompression threads). Controls runtime decompression behavior.
-                If None, defaults to ``{'nthreads': num_threads}``.
+                If None, defaults to ``{'nthreads': 1}``.
 
         Raises:
             TypeError: If ``array`` is not a NumPy ndarray.
@@ -1208,7 +1180,6 @@ class MLArray:
             patch_size=patch_size,
             chunk_size=chunk_size,
             block_size=block_size,
-            num_threads=num_threads,
             cparams=cparams,
             dparams=dparams,
             store_builder=lambda **kwargs: blosc2.asarray(
@@ -1224,7 +1195,7 @@ class MLArray:
     def load(
             cls,
             filepath: Union[str, Path], 
-            num_threads: int = 1,
+            dparams: Optional[Union[Dict, blosc2.DParams]] = None,
         ):
         """Loads a MLArray file as a whole. Does not use memory-mapping. Both MLArray ('.mla') and Blosc2 ('.b2nd') files are supported.
 
@@ -1236,19 +1207,21 @@ class MLArray:
         Args:
             filepath (Union[str, Path]): Path to the MLArray file to be loaded.
                 The filepath needs to have the extension ".b2nd" or ".mla".
-            num_threads (int): Number of threads to use for loading the file.
+            dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
+                decompression parameters used when loading/accessing compressed
+                chunks. If None, defaults to ``{'nthreads': 1}``.
 
         Raises:
             RuntimeError: If the file extension is not ".b2nd" or ".mla".
         """
         class_instance = cls()
-        class_instance._load(filepath, num_threads)
+        class_instance._load(filepath, dparams)
         return class_instance
     
     def _load(
             self,
             filepath: Union[str, Path], 
-            num_threads: int = 1,
+            dparams: Optional[Union[Dict, blosc2.DParams]] = None,
         ):
         """Internal MLArray load method. Loads a MLArray file. Both MLArray ('.mla') and Blosc2 ('.b2nd') files are supported.
 
@@ -1260,7 +1233,9 @@ class MLArray:
         Args:
             filepath (Union[str, Path]): Path to the MLArray file to be loaded.
                 The filepath needs to have the extension ".b2nd" or ".mla".
-            num_threads (int): Number of threads to use for loading the file.
+            dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
+                decompression parameters used when loading/accessing compressed
+                chunks. If None, defaults to ``{'nthreads': 1}``.
 
         Raises:
             RuntimeError: If the file extension is not ".b2nd" or ".mla".
@@ -1269,8 +1244,10 @@ class MLArray:
         if not str(filepath).endswith(".b2nd") and not str(filepath).endswith(f".{MLARRAY_SUFFIX}"):
             raise RuntimeError(f"MLArray requires '.b2nd' or '.{MLARRAY_SUFFIX}' as extension.")
         self.support_metadata = str(filepath).endswith(f".{MLARRAY_SUFFIX}")
+        num_threads = MLArray._resolve_num_threads(dparams)
         blosc2.set_nthreads(num_threads)
-        dparams = {'nthreads': num_threads}
+        if dparams is None:
+            dparams = {'nthreads': num_threads}
         self._store = blosc2.open(urlpath=str(filepath), dparams=dparams, mode='r')
         self.mode = None
         self.mmap_mode = None
@@ -1284,7 +1261,6 @@ class MLArray:
             patch_size: Optional[Union[int, List, Tuple]] = 'default',  # 'default' means that the default of 192 is used. However, if set to 'default', the patch_size will be skipped if self.patch_size is set from a previously loaded MLArray image. In that case the self.patch_size is used.
             chunk_size: Optional[Union[int, List, Tuple]]= None,
             block_size: Optional[Union[int, List, Tuple]] = None,
-            num_threads: int = 1,
             cparams: Optional[Union[Dict, blosc2.CParams]] = None,
             dparams: Optional[Union[Dict, blosc2.DParams]] = None
         ):
@@ -1310,7 +1286,6 @@ class MLArray:
                 Provide an int or a tuple/list with length equal to the number
                 of dimensions, or None to let Blosc2 decide. Ignored when
                 patch_size is not None.
-            num_threads (int): Number of threads to use for saving the file.
             cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2
                 compression parameters used when
                 writing array data to disk (for example codec, compression
@@ -1321,7 +1296,7 @@ class MLArray:
                 decompression parameters used when
                 accessing compressed chunks (for example number of
                 decompression threads). Controls runtime decompression behavior.
-                If None, defaults to ``{'nthreads': num_threads}``.
+                If None, defaults to ``{'nthreads': 1}``.
 
         Raises:
             RuntimeError: If the file extension is not ".b2nd" or ".mla".
@@ -1336,6 +1311,7 @@ class MLArray:
     
         self.support_metadata = str(filepath).endswith(f".{MLARRAY_SUFFIX}")
 
+        num_threads = MLArray._resolve_num_threads(dparams)
         blosc2.set_nthreads(num_threads)
         if cparams is None:
             cparams = {'codec': blosc2.Codec.LZ4HC, 'clevel': 8,}
