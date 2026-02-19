@@ -69,7 +69,7 @@ if __name__ == "__main__":
 
     # Convert to in-memory compressed MLArray.
     start_time = time.time()
-    image = MLArray.asarray(array, memory_compressed=True)
+    image = MLArray.asarray(array)
     print("MLArray conversion duration: ", time.time() - start_time)
     rss_after_compressed = get_process_rss_bytes()
 
