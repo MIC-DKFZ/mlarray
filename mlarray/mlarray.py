@@ -1016,6 +1016,9 @@ class MLArray:
         if patch_size == "default": 
             if meta_blosc2 is not None and meta_blosc2.patch_size is not None:  # Use previously loaded patch size, when patch size is not explicitly set and a patch size from a previously loaded image exists
                 patch_size = meta_blosc2.patch_size
+            elif meta_blosc2 is not None and (meta_blosc2.chunk_size is not None):
+                chunk_size = meta_blosc2.chunk_size
+                block_size = meta_blosc2.block_size
             else:  # Use default patch size, when patch size is not explicitly set and no patch size from a previously loaded image exists
                 patch_size = [MLARRAY_DEFAULT_PATCH_SIZE] * num_spatial_axes
         if chunk_size is not None or block_size is not None:
