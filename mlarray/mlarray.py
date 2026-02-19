@@ -62,12 +62,12 @@ class MLArray:
         if isinstance(array, (str, Path)):
             self._load(array)
         else:
+            self._validate_and_add_meta(meta, spacing, origin, direction, axis_labels, False, validate=False)
             self._store = array
             has_array = array is not None
-            self._validate_and_add_meta(meta, spacing, origin, direction, axis_labels, has_array, validate=False)        
             if copy is not None:
                 self.meta.copy_from(copy.meta)
-            self._validate_and_add_meta(self.meta, validate=True) 
+            self._validate_and_add_meta(self.meta, has_array=has_array, validate=True) 
 
     @staticmethod
     def _resolve_cparams(cparams: Optional[Union[Dict, blosc2.CParams]]) -> Union[Dict, blosc2.CParams]:
