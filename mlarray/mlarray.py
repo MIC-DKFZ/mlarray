@@ -328,6 +328,734 @@ class MLArray:
         self._validate_and_add_meta(self.meta)
         self._write_metadata()
 
+    @staticmethod
+    def _normalize_shape(shape: Union[int, List, Tuple, np.ndarray]) -> Tuple[int, ...]:
+        if isinstance(shape, (int, np.integer)):
+            return (int(shape),)
+        return tuple(int(v) for v in shape)
+
+    def _resolve_like_input(self, x, dtype, meta):
+        if isinstance(x, MLArray):
+            if x._store is None or x.meta is None or x.meta._has_array.has_array is False:
+                raise TypeError("Input MLArray has no array data loaded.")
+            shape = self._normalize_shape(x.shape)
+            src_dtype = x.dtype
+            if meta is None:
+                meta = deepcopy(x.meta)
+        elif hasattr(x, "shape") and hasattr(x, "dtype"):
+            shape = self._normalize_shape(x.shape)
+            src_dtype = x.dtype
+        else:
+            raise TypeError(
+                "x must be an MLArray or an array-like object with shape and dtype."
+            )
+
+        dtype = src_dtype if dtype is None else dtype
+        return shape, np.dtype(dtype), meta
+
+    def _construct_in_memory(
+            self,
+            shape: Union[int, List, Tuple, np.ndarray],
+            dtype: np.dtype,
+            store_builder,
+            meta: Optional[Union[Dict, Meta]] = None,
+            patch_size: Optional[Union[int, List, Tuple]] = "default",
+            chunk_size: Optional[Union[int, List, Tuple]] = None,
+            block_size: Optional[Union[int, List, Tuple]] = None,
+            num_threads: int = 1,
+            cparams: Optional[Union[Dict, blosc2.CParams]] = None,
+            dparams: Optional[Union[Dict, blosc2.DParams]] = None,
+        ):
+        """Internal generic constructor for in-memory Blosc2-backed MLArrays.
+
+        Args:
+            shape (Union[int, List, Tuple, np.ndarray]): Target array shape.
+            dtype (np.dtype): Target dtype.
+            store_builder (Callable): Callable receiving normalized kwargs and
+                returning a Blosc2 NDArray.
+            meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
+                the created ``MLArray``. Dict values are stored as
+                ``meta.source``.
+            patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
+                chunk/block optimization. Use ``"default"`` to use the default
+                patch size of 192.
+            chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
+                Ignored when ``patch_size`` is provided.
+            block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
+                Ignored when ``patch_size`` is provided.
+            num_threads (int): Number of threads for Blosc2 operations.
+            cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2 compression
+                parameters. If None, defaults to
+                ``{'codec': blosc2.Codec.LZ4HC, 'clevel': 8}``.
+            dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
+                decompression parameters. If None, defaults to
+                ``{'nthreads': num_threads}``.
+        """
+        shape = self._normalize_shape(shape)
+        dtype = np.dtype(dtype)
+
+        self._validate_and_add_meta(meta, has_array=True)
+        spatial_axis_mask = (
+            [True] * len(shape)
+            if self.meta.spatial.axis_labels is None
+            else _spatial_axis_mask(self.meta.spatial.axis_labels)
+        )
+        self.meta.blosc2 = self._comp_and_validate_blosc2_meta(
+            self.meta.blosc2,
+            patch_size,
+            chunk_size,
+            block_size,
+            shape,
+            dtype.itemsize,
+            spatial_axis_mask,
+        )
+        self.meta._has_array.has_array = True
+
+        blosc2.set_nthreads(num_threads)
+        if cparams is None:
+            cparams = {"codec": blosc2.Codec.LZ4HC, "clevel": 8}
+        if dparams is None:
+            dparams = {"nthreads": num_threads}
+
+        self._store = store_builder(
+            shape=shape,
+            dtype=dtype,
+            chunks=self.meta.blosc2.chunk_size,
+            blocks=self.meta.blosc2.block_size,
+            cparams=cparams,
+            dparams=dparams,
+        )
+
+        self._update_blosc2_meta()
+        self._validate_and_add_meta(self.meta)
+
+    @classmethod
+    def empty(
+            cls,
+            shape: Union[int, List, Tuple, np.ndarray],
+            dtype: np.dtype,
+            meta: Optional[Union[Dict, Meta]] = None,
+            patch_size: Optional[Union[int, List, Tuple]] = "default",
+            chunk_size: Optional[Union[int, List, Tuple]] = None,
+            block_size: Optional[Union[int, List, Tuple]] = None,
+            num_threads: int = 1,
+            cparams: Optional[Union[Dict, blosc2.CParams]] = None,
+            dparams: Optional[Union[Dict, blosc2.DParams]] = None,
+        ):
+        """Create an in-memory MLArray with uninitialized values.
+
+        Args:
+            shape (Union[int, List, Tuple, np.ndarray]): Shape of the output
+                array.
+            dtype (np.dtype): Numpy dtype for the output array.
+            meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
+                the created ``MLArray``. Dict values are stored as
+                ``meta.source``.
+            patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
+                chunk/block optimization. Use ``"default"`` to use the default
+                patch size of 192.
+            chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
+                Ignored when ``patch_size`` is provided.
+            block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
+                Ignored when ``patch_size`` is provided.
+            num_threads (int): Number of threads for Blosc2 operations.
+            cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2 compression
+                parameters used when writing chunks.
+            dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
+                decompression parameters used when reading chunks.
+
+        Returns:
+            MLArray: A newly created in-memory MLArray instance.
+        """
+        class_instance = cls()
+        class_instance._construct_in_memory(
+            shape=shape,
+            dtype=dtype,
+            meta=meta,
+            patch_size=patch_size,
+            chunk_size=chunk_size,
+            block_size=block_size,
+            num_threads=num_threads,
+            cparams=cparams,
+            dparams=dparams,
+            store_builder=lambda **kwargs: blosc2.empty(**kwargs),
+        )
+        return class_instance
+
+    @classmethod
+    def zeros(
+            cls,
+            shape: Union[int, List, Tuple, np.ndarray],
+            dtype: np.dtype,
+            meta: Optional[Union[Dict, Meta]] = None,
+            patch_size: Optional[Union[int, List, Tuple]] = "default",
+            chunk_size: Optional[Union[int, List, Tuple]] = None,
+            block_size: Optional[Union[int, List, Tuple]] = None,
+            num_threads: int = 1,
+            cparams: Optional[Union[Dict, blosc2.CParams]] = None,
+            dparams: Optional[Union[Dict, blosc2.DParams]] = None,
+        ):
+        """Create an in-memory MLArray filled with zeros.
+
+        Args:
+            shape (Union[int, List, Tuple, np.ndarray]): Shape of the output
+                array.
+            dtype (np.dtype): Numpy dtype for the output array.
+            meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
+                the created ``MLArray``.
+            patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
+                chunk/block optimization.
+            chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
+                Ignored when ``patch_size`` is provided.
+            block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
+                Ignored when ``patch_size`` is provided.
+            num_threads (int): Number of threads for Blosc2 operations.
+            cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2 compression
+                parameters.
+            dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
+                decompression parameters.
+
+        Returns:
+            MLArray: A newly created in-memory MLArray instance.
+        """
+        class_instance = cls()
+        class_instance._construct_in_memory(
+            shape=shape,
+            dtype=dtype,
+            meta=meta,
+            patch_size=patch_size,
+            chunk_size=chunk_size,
+            block_size=block_size,
+            num_threads=num_threads,
+            cparams=cparams,
+            dparams=dparams,
+            store_builder=lambda **kwargs: blosc2.zeros(**kwargs),
+        )
+        return class_instance
+
+    @classmethod
+    def ones(
+            cls,
+            shape: Union[int, List, Tuple, np.ndarray],
+            dtype: np.dtype = None,
+            meta: Optional[Union[Dict, Meta]] = None,
+            patch_size: Optional[Union[int, List, Tuple]] = "default",
+            chunk_size: Optional[Union[int, List, Tuple]] = None,
+            block_size: Optional[Union[int, List, Tuple]] = None,
+            num_threads: int = 1,
+            cparams: Optional[Union[Dict, blosc2.CParams]] = None,
+            dparams: Optional[Union[Dict, blosc2.DParams]] = None,
+        ):
+        """Create an in-memory MLArray filled with ones.
+
+        Args:
+            shape (Union[int, List, Tuple, np.ndarray]): Shape of the output
+                array.
+            dtype (np.dtype): Numpy dtype for the output array. If None, uses
+                ``blosc2.DEFAULT_FLOAT``.
+            meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
+                the created ``MLArray``.
+            patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
+                chunk/block optimization.
+            chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
+                Ignored when ``patch_size`` is provided.
+            block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
+                Ignored when ``patch_size`` is provided.
+            num_threads (int): Number of threads for Blosc2 operations.
+            cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2 compression
+                parameters.
+            dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
+                decompression parameters.
+
+        Returns:
+            MLArray: A newly created in-memory MLArray instance.
+        """
+        dtype = blosc2.DEFAULT_FLOAT if dtype is None else dtype
+        class_instance = cls()
+        class_instance._construct_in_memory(
+            shape=shape,
+            dtype=dtype,
+            meta=meta,
+            patch_size=patch_size,
+            chunk_size=chunk_size,
+            block_size=block_size,
+            num_threads=num_threads,
+            cparams=cparams,
+            dparams=dparams,
+            store_builder=lambda **kwargs: blosc2.ones(**kwargs),
+        )
+        return class_instance
+
+    @classmethod
+    def full(
+            cls,
+            shape: Union[int, List, Tuple, np.ndarray],
+            fill_value: Union[bytes, int, float, bool],
+            dtype: np.dtype = None,
+            meta: Optional[Union[Dict, Meta]] = None,
+            patch_size: Optional[Union[int, List, Tuple]] = "default",
+            chunk_size: Optional[Union[int, List, Tuple]] = None,
+            block_size: Optional[Union[int, List, Tuple]] = None,
+            num_threads: int = 1,
+            cparams: Optional[Union[Dict, blosc2.CParams]] = None,
+            dparams: Optional[Union[Dict, blosc2.DParams]] = None,
+        ):
+        """Create an in-memory MLArray filled with ``fill_value``.
+
+        Args:
+            shape (Union[int, List, Tuple, np.ndarray]): Shape of the output
+                array.
+            fill_value (Union[bytes, int, float, bool]): Fill value used for all
+                elements in the output.
+            dtype (np.dtype): Numpy dtype for the output array. If None, inferred
+                from ``fill_value``.
+            meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
+                the created ``MLArray``.
+            patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
+                chunk/block optimization.
+            chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
+                Ignored when ``patch_size`` is provided.
+            block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
+                Ignored when ``patch_size`` is provided.
+            num_threads (int): Number of threads for Blosc2 operations.
+            cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2 compression
+                parameters.
+            dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
+                decompression parameters.
+
+        Returns:
+            MLArray: A newly created in-memory MLArray instance.
+        """
+        if dtype is None:
+            if isinstance(fill_value, bytes):
+                dtype = np.dtype(f"S{len(fill_value)}")
+            else:
+                dtype = np.dtype(type(fill_value))
+        class_instance = cls()
+        class_instance._construct_in_memory(
+            shape=shape,
+            dtype=dtype,
+            meta=meta,
+            patch_size=patch_size,
+            chunk_size=chunk_size,
+            block_size=block_size,
+            num_threads=num_threads,
+            cparams=cparams,
+            dparams=dparams,
+            store_builder=lambda **kwargs: blosc2.full(fill_value=fill_value, **kwargs),
+        )
+        return class_instance
+
+    @classmethod
+    def arange(
+            cls,
+            start: Union[int, float],
+            stop: Optional[Union[int, float]] = None,
+            step: Optional[Union[int, float]] = 1,
+            dtype: np.dtype = None,
+            shape: Optional[Union[int, List, Tuple, np.ndarray]] = None,
+            c_order: bool = True,
+            meta: Optional[Union[Dict, Meta]] = None,
+            patch_size: Optional[Union[int, List, Tuple]] = None,
+            chunk_size: Optional[Union[int, List, Tuple]] = None,
+            block_size: Optional[Union[int, List, Tuple]] = None,
+            num_threads: int = 1,
+            cparams: Optional[Union[Dict, blosc2.CParams]] = None,
+            dparams: Optional[Union[Dict, blosc2.DParams]] = None,
+        ):
+        """Create an in-memory MLArray with evenly spaced values.
+
+        Behavior mirrors :func:`blosc2.arange` while also applying MLArray
+        metadata and chunk/block optimization settings.
+
+        Args:
+            start (Union[int, float]): Start of interval. If ``stop`` is None,
+                this value is treated as stop and start becomes 0.
+            stop (Optional[Union[int, float]]): End of interval (exclusive).
+            step (Optional[Union[int, float]]): Spacing between values.
+            dtype (np.dtype): Output dtype. If None, inferred similarly to
+                ``blosc2.arange``.
+            shape (Optional[Union[int, List, Tuple, np.ndarray]]): Target output
+                shape. If None, shape is inferred from start/stop/step.
+            c_order (bool): Store in C order (row-major) if True.
+            meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
+                the created ``MLArray``.
+            patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
+                chunk/block optimization. Defaults to None for this method.
+            chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
+            block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
+            num_threads (int): Number of threads for Blosc2 operations.
+            cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2 compression
+                parameters.
+            dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
+                decompression parameters.
+
+        Returns:
+            MLArray: A newly created in-memory MLArray instance.
+
+        Raises:
+            ValueError: If ``shape`` is inconsistent with
+                ``start``/``stop``/``step``.
+        """
+        if step is None:
+            step = 1
+        if stop is None:
+            stop = start
+            start = 0
+
+        num = int((stop - start) / step)
+        if shape is None:
+            shape = (max(num, 0),)
+        else:
+            shape = cls._normalize_shape(shape)
+            if math.prod(shape) != num:
+                raise ValueError(
+                    "The shape is not consistent with the start, stop and step values"
+                )
+
+        if dtype is None:
+            dtype = (
+                blosc2.DEFAULT_FLOAT
+                if np.any([np.issubdtype(type(d), float) for d in (start, stop, step)])
+                else blosc2.DEFAULT_INT
+            )
+
+        class_instance = cls()
+        class_instance._construct_in_memory(
+            shape=shape,
+            dtype=dtype,
+            meta=meta,
+            patch_size=patch_size,
+            chunk_size=chunk_size,
+            block_size=block_size,
+            num_threads=num_threads,
+            cparams=cparams,
+            dparams=dparams,
+            store_builder=lambda **kwargs: blosc2.arange(
+                start=start,
+                stop=stop,
+                step=step,
+                c_order=c_order,
+                **kwargs,
+            ),
+        )
+        return class_instance
+
+    @classmethod
+    def linspace(
+            cls,
+            start: Union[int, float, complex],
+            stop: Union[int, float, complex],
+            num: Optional[int] = None,
+            dtype: np.dtype = None,
+            endpoint: bool = True,
+            shape: Optional[Union[int, List, Tuple, np.ndarray]] = None,
+            c_order: bool = True,
+            meta: Optional[Union[Dict, Meta]] = None,
+            patch_size: Optional[Union[int, List, Tuple]] = None,
+            chunk_size: Optional[Union[int, List, Tuple]] = None,
+            block_size: Optional[Union[int, List, Tuple]] = None,
+            num_threads: int = 1,
+            cparams: Optional[Union[Dict, blosc2.CParams]] = None,
+            dparams: Optional[Union[Dict, blosc2.DParams]] = None,
+        ):
+        """Create an in-memory MLArray with evenly spaced samples.
+
+        Behavior mirrors :func:`blosc2.linspace` while also applying MLArray
+        metadata and chunk/block optimization settings.
+
+        Args:
+            start (Union[int, float, complex]): Start value of the sequence.
+            stop (Union[int, float, complex]): End value of the sequence.
+            num (Optional[int]): Number of samples. Required when ``shape`` is
+                None.
+            dtype (np.dtype): Output dtype. If None, inferred similarly to
+                ``blosc2.linspace``.
+            endpoint (bool): Whether ``stop`` is included.
+            shape (Optional[Union[int, List, Tuple, np.ndarray]]): Target output
+                shape. If None, inferred from ``num``.
+            c_order (bool): Store in C order (row-major) if True.
+            meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
+                the created ``MLArray``.
+            patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
+                chunk/block optimization. Defaults to None for this method.
+            chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
+            block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
+            num_threads (int): Number of threads for Blosc2 operations.
+            cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2 compression
+                parameters.
+            dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
+                decompression parameters.
+
+        Returns:
+            MLArray: A newly created in-memory MLArray instance.
+
+        Raises:
+            ValueError: If neither ``shape`` nor ``num`` is specified, or if the
+                provided ``shape`` and ``num`` are inconsistent.
+        """
+        if shape is None:
+            if num is None:
+                raise ValueError("Either `shape` or `num` must be specified.")
+            shape = (num,)
+        else:
+            shape = cls._normalize_shape(shape)
+            num = math.prod(shape) if num is None else num
+
+        if math.prod(shape) != num or num < 0:
+            msg = f"Shape is not consistent with the specified num value {num}."
+            if num < 0:
+                msg += "num must be nonnegative."
+            raise ValueError(msg)
+
+        if dtype is None:
+            dtype = (
+                blosc2.DEFAULT_COMPLEX
+                if np.any([np.issubdtype(type(d), complex) for d in (start, stop)])
+                else blosc2.DEFAULT_FLOAT
+            )
+
+        class_instance = cls()
+        class_instance._construct_in_memory(
+            shape=shape,
+            dtype=dtype,
+            meta=meta,
+            patch_size=patch_size,
+            chunk_size=chunk_size,
+            block_size=block_size,
+            num_threads=num_threads,
+            cparams=cparams,
+            dparams=dparams,
+            store_builder=lambda **kwargs: blosc2.linspace(
+                start=start,
+                stop=stop,
+                num=num,
+                endpoint=endpoint,
+                c_order=c_order,
+                **kwargs,
+            ),
+        )
+        return class_instance
+
+    @classmethod
+    def empty_like(
+            cls,
+            x,
+            dtype: np.dtype = None,
+            meta: Optional[Union[Dict, Meta]] = None,
+            patch_size: Optional[Union[int, List, Tuple]] = "default",
+            chunk_size: Optional[Union[int, List, Tuple]] = None,
+            block_size: Optional[Union[int, List, Tuple]] = None,
+            num_threads: int = 1,
+            cparams: Optional[Union[Dict, blosc2.CParams]] = None,
+            dparams: Optional[Union[Dict, blosc2.DParams]] = None,
+        ):
+        """Create an in-memory MLArray with the same shape as ``x``.
+
+        Args:
+            x: Source object. Can be an ``MLArray`` or any array-like object
+                exposing ``shape`` and ``dtype``.
+            dtype (np.dtype): Output dtype. If None, inferred from ``x``.
+            meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
+                the created ``MLArray``. If ``x`` is an ``MLArray`` and ``meta``
+                is None, metadata is copied from ``x``.
+            patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
+                chunk/block optimization.
+            chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
+            block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
+            num_threads (int): Number of threads for Blosc2 operations.
+            cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2 compression
+                parameters.
+            dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
+                decompression parameters.
+
+        Returns:
+            MLArray: A newly created in-memory MLArray instance.
+
+        Raises:
+            TypeError: If ``x`` is not an ``MLArray`` and has no ``shape``/``dtype``.
+        """
+        class_instance = cls()
+        shape, dtype, meta = class_instance._resolve_like_input(x, dtype, meta)
+        class_instance._construct_in_memory(
+            shape=shape,
+            dtype=dtype,
+            meta=meta,
+            patch_size=patch_size,
+            chunk_size=chunk_size,
+            block_size=block_size,
+            num_threads=num_threads,
+            cparams=cparams,
+            dparams=dparams,
+            store_builder=lambda **kwargs: blosc2.empty(**kwargs),
+        )
+        return class_instance
+
+    @classmethod
+    def zeros_like(
+            cls,
+            x,
+            dtype: np.dtype = None,
+            meta: Optional[Union[Dict, Meta]] = None,
+            patch_size: Optional[Union[int, List, Tuple]] = "default",
+            chunk_size: Optional[Union[int, List, Tuple]] = None,
+            block_size: Optional[Union[int, List, Tuple]] = None,
+            num_threads: int = 1,
+            cparams: Optional[Union[Dict, blosc2.CParams]] = None,
+            dparams: Optional[Union[Dict, blosc2.DParams]] = None,
+        ):
+        """Create an in-memory MLArray of zeros with the same shape as ``x``.
+
+        Args:
+            x: Source object. Can be an ``MLArray`` or any array-like object
+                exposing ``shape`` and ``dtype``.
+            dtype (np.dtype): Output dtype. If None, inferred from ``x``.
+            meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
+                the created ``MLArray``. If ``x`` is an ``MLArray`` and ``meta``
+                is None, metadata is copied from ``x``.
+            patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
+                chunk/block optimization.
+            chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
+            block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
+            num_threads (int): Number of threads for Blosc2 operations.
+            cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2 compression
+                parameters.
+            dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
+                decompression parameters.
+
+        Returns:
+            MLArray: A newly created in-memory MLArray instance.
+
+        Raises:
+            TypeError: If ``x`` is not an ``MLArray`` and has no ``shape``/``dtype``.
+        """
+        class_instance = cls()
+        shape, dtype, meta = class_instance._resolve_like_input(x, dtype, meta)
+        class_instance._construct_in_memory(
+            shape=shape,
+            dtype=dtype,
+            meta=meta,
+            patch_size=patch_size,
+            chunk_size=chunk_size,
+            block_size=block_size,
+            num_threads=num_threads,
+            cparams=cparams,
+            dparams=dparams,
+            store_builder=lambda **kwargs: blosc2.zeros(**kwargs),
+        )
+        return class_instance
+
+    @classmethod
+    def ones_like(
+            cls,
+            x,
+            dtype: np.dtype = None,
+            meta: Optional[Union[Dict, Meta]] = None,
+            patch_size: Optional[Union[int, List, Tuple]] = "default",
+            chunk_size: Optional[Union[int, List, Tuple]] = None,
+            block_size: Optional[Union[int, List, Tuple]] = None,
+            num_threads: int = 1,
+            cparams: Optional[Union[Dict, blosc2.CParams]] = None,
+            dparams: Optional[Union[Dict, blosc2.DParams]] = None,
+        ):
+        """Create an in-memory MLArray of ones with the same shape as ``x``.
+
+        Args:
+            x: Source object. Can be an ``MLArray`` or any array-like object
+                exposing ``shape`` and ``dtype``.
+            dtype (np.dtype): Output dtype. If None, inferred from ``x``.
+            meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
+                the created ``MLArray``. If ``x`` is an ``MLArray`` and ``meta``
+                is None, metadata is copied from ``x``.
+            patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
+                chunk/block optimization.
+            chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
+            block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
+            num_threads (int): Number of threads for Blosc2 operations.
+            cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2 compression
+                parameters.
+            dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
+                decompression parameters.
+
+        Returns:
+            MLArray: A newly created in-memory MLArray instance.
+
+        Raises:
+            TypeError: If ``x`` is not an ``MLArray`` and has no ``shape``/``dtype``.
+        """
+        class_instance = cls()
+        shape, dtype, meta = class_instance._resolve_like_input(x, dtype, meta)
+        class_instance._construct_in_memory(
+            shape=shape,
+            dtype=dtype,
+            meta=meta,
+            patch_size=patch_size,
+            chunk_size=chunk_size,
+            block_size=block_size,
+            num_threads=num_threads,
+            cparams=cparams,
+            dparams=dparams,
+            store_builder=lambda **kwargs: blosc2.ones(**kwargs),
+        )
+        return class_instance
+
+    @classmethod
+    def full_like(
+            cls,
+            x,
+            fill_value: Union[bool, int, float, complex],
+            dtype: np.dtype = None,
+            meta: Optional[Union[Dict, Meta]] = None,
+            patch_size: Optional[Union[int, List, Tuple]] = "default",
+            chunk_size: Optional[Union[int, List, Tuple]] = None,
+            block_size: Optional[Union[int, List, Tuple]] = None,
+            num_threads: int = 1,
+            cparams: Optional[Union[Dict, blosc2.CParams]] = None,
+            dparams: Optional[Union[Dict, blosc2.DParams]] = None,
+        ):
+        """Create an in-memory MLArray filled with ``fill_value`` and shape of ``x``.
+
+        Args:
+            x: Source object. Can be an ``MLArray`` or any array-like object
+                exposing ``shape`` and ``dtype``.
+            fill_value (Union[bool, int, float, complex]): Fill value used for
+                all elements in the output.
+            dtype (np.dtype): Output dtype. If None, inferred from ``x``.
+            meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
+                the created ``MLArray``. If ``x`` is an ``MLArray`` and ``meta``
+                is None, metadata is copied from ``x``.
+            patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
+                chunk/block optimization.
+            chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
+            block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
+            num_threads (int): Number of threads for Blosc2 operations.
+            cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2 compression
+                parameters.
+            dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
+                decompression parameters.
+
+        Returns:
+            MLArray: A newly created in-memory MLArray instance.
+
+        Raises:
+            TypeError: If ``x`` is not an ``MLArray`` and has no ``shape``/``dtype``.
+        """
+        class_instance = cls()
+        shape, dtype, meta = class_instance._resolve_like_input(x, dtype, meta)
+        class_instance._construct_in_memory(
+            shape=shape,
+            dtype=dtype,
+            meta=meta,
+            patch_size=patch_size,
+            chunk_size=chunk_size,
+            block_size=block_size,
+            num_threads=num_threads,
+            cparams=cparams,
+            dparams=dparams,
+            store_builder=lambda **kwargs: blosc2.full(fill_value=fill_value, **kwargs),
+        )
+        return class_instance
+
     def close(self):
         """Flush metadata and close the underlying store.
 
