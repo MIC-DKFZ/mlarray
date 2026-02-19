@@ -70,17 +70,18 @@ class MLArray:
             self._validate_and_add_meta(self.meta, validate=True) 
 
     @staticmethod
-    def _resolve_num_threads(dparams: Optional[Union[Dict, blosc2.DParams]]) -> int:
-        """Resolve thread count from dparams (fallback: 1)."""
-        num_threads = 1
-        if dparams is not None:
-            if isinstance(dparams, dict):
-                num_threads = dparams.get("nthreads", 1)
-            else:
-                num_threads = getattr(dparams, "nthreads", 1)
-            if num_threads is None:
-                num_threads = 1
-        return int(num_threads)
+    def _resolve_cparams(cparams: Optional[Union[Dict, blosc2.CParams]]) -> Union[Dict, blosc2.CParams]:
+        """Resolve compression params with MLArray defaults."""
+        if cparams is None:
+            return {"codec": blosc2.Codec.LZ4HC, "clevel": 8}
+        return cparams
+
+    @staticmethod
+    def _resolve_dparams(dparams: Optional[Union[Dict, blosc2.DParams]]) -> Union[Dict, blosc2.DParams]:
+        """Resolve decompression params with MLArray defaults."""
+        if dparams is None:
+            return {"nthreads": 1}
+        return dparams
 
     @classmethod
     def open(
@@ -164,10 +165,7 @@ class MLArray:
         
         self.support_metadata = str(filepath).endswith(f".{MLARRAY_SUFFIX}")
 
-        num_threads = MLArray._resolve_num_threads(dparams)
-        blosc2.set_nthreads(num_threads)
-        if dparams is None:
-            dparams = {'nthreads': num_threads}
+        dparams = MLArray._resolve_dparams(dparams)
         
         self._store = blosc2.open(urlpath=str(filepath), dparams=dparams, mode=mode, mmap_mode=mmap_mode)
         self._read_meta()
@@ -321,12 +319,8 @@ class MLArray:
         
         self.support_metadata = str(filepath).endswith(f".{MLARRAY_SUFFIX}")
 
-        num_threads = MLArray._resolve_num_threads(dparams)
-        blosc2.set_nthreads(num_threads)
-        if cparams is None:
-            cparams = {'codec': blosc2.Codec.LZ4HC, 'clevel': 8,}
-        if dparams is None:
-            dparams = {'nthreads': num_threads}
+        cparams = MLArray._resolve_cparams(cparams)
+        dparams = MLArray._resolve_dparams(dparams)
         
         self._store = blosc2.empty(shape=shape, dtype=np.dtype(dtype), urlpath=str(filepath), chunks=self.meta.blosc2.chunk_size, blocks=self.meta.blosc2.block_size, cparams=cparams, dparams=dparams, mmap_mode=mmap_mode)
         self._update_blosc2_meta()
@@ -437,12 +431,8 @@ class MLArray:
         )
         self.meta._has_array.has_array = True
 
-        num_threads = MLArray._resolve_num_threads(dparams)
-        blosc2.set_nthreads(num_threads)
-        if cparams is None:
-            cparams = {"codec": blosc2.Codec.LZ4HC, "clevel": 8}
-        if dparams is None:
-            dparams = {"nthreads": num_threads}
+        cparams = MLArray._resolve_cparams(cparams)
+        dparams = MLArray._resolve_dparams(dparams)
 
         builder_kwargs = dict(
             shape=shape,
@@ -1244,10 +1234,7 @@ class MLArray:
         if not str(filepath).endswith(".b2nd") and not str(filepath).endswith(f".{MLARRAY_SUFFIX}"):
             raise RuntimeError(f"MLArray requires '.b2nd' or '.{MLARRAY_SUFFIX}' as extension.")
         self.support_metadata = str(filepath).endswith(f".{MLARRAY_SUFFIX}")
-        num_threads = MLArray._resolve_num_threads(dparams)
-        blosc2.set_nthreads(num_threads)
-        if dparams is None:
-            dparams = {'nthreads': num_threads}
+        dparams = MLArray._resolve_dparams(dparams)
         self._store = blosc2.open(urlpath=str(filepath), dparams=dparams, mode='r')
         self.mode = None
         self.mmap_mode = None
@@ -1311,12 +1298,8 @@ class MLArray:
     
         self.support_metadata = str(filepath).endswith(f".{MLARRAY_SUFFIX}")
 
-        num_threads = MLArray._resolve_num_threads(dparams)
-        blosc2.set_nthreads(num_threads)
-        if cparams is None:
-            cparams = {'codec': blosc2.Codec.LZ4HC, 'clevel': 8,}
-        if dparams is None:
-            dparams = {'nthreads': num_threads}
+        cparams = MLArray._resolve_cparams(cparams)
+        dparams = MLArray._resolve_dparams(dparams)
 
         if Path(filepath).is_file():
             os.remove(str(filepath))
