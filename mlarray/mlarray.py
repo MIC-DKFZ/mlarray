@@ -22,7 +22,13 @@ class MLArray:
             direction: Optional[Union[List, Tuple, np.ndarray]] = None,
             meta: Optional[Union[Dict, Meta]] = None,
             axis_labels: Optional[List[Union[str, AxisLabel]]] = None,
-            copy: Optional['MLArray'] = None) -> None:
+            copy: Optional['MLArray'] = None,
+            patch_size: Optional[Union[int, List, Tuple]] = "default",
+            chunk_size: Optional[Union[int, List, Tuple]] = None,
+            block_size: Optional[Union[int, List, Tuple]] = None,
+            cparams: Optional[Union[Dict, blosc2.CParams]] = None,
+            dparams: Optional[Union[Dict, blosc2.DParams]] = None,
+        ) -> None:
         """Initializes a MLArray instance.
 
         The MLArray file format (".mla") is a Blosc2-compressed container
@@ -51,20 +57,60 @@ class MLArray:
             copy (Optional[MLArray]): Another MLArray instance to copy metadata
                 fields from. If provided, its metadata overrides any metadata
                 set via arguments.
+            patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
+                chunk/block optimization. Use ``"default"`` to use the default
+                patch size of 192.
+            chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
+                Ignored when ``patch_size`` is provided.
+            block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
+                Ignored when ``patch_size`` is provided.
+            cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2 compression
+                parameters used when creating in-memory compressed array data.
+            dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
+                decompression parameters used for chunk access.
         """
         self.filepath = None
         self.support_metadata = None
         self.mode = None
         self.mmap_mode = None
         self.meta = None
-        if isinstance(array, (str, Path)) and (spacing is not None or origin is not None or direction is not None or meta is not None or axis_labels is not None or copy is not None):
-            raise RuntimeError("Spacing, origin, direction, meta, axis_labels or copy cannot be set when array is a filepath.")
+        self._store = None
+        if isinstance(array, (str, Path)) and (
+            spacing is not None
+            or origin is not None
+            or direction is not None
+            or meta is not None
+            or axis_labels is not None
+            or copy is not None
+            or patch_size != "default"
+            or chunk_size is not None
+            or block_size is not None
+            or cparams is not None
+            or dparams is not None
+        ):
+            raise RuntimeError(
+                "Spacing, origin, direction, meta, axis_labels, copy, patch_size, "
+                "chunk_size, block_size, cparams or dparams cannot be set when "
+                "array is a filepath."
+            )
         if isinstance(array, (str, Path)):
             self._load(array)
         else:
             self._validate_and_add_meta(meta, spacing, origin, direction, axis_labels, False, validate=False)
-            self._store = array
-            has_array = array is not None
+            if array is not None:
+                self._asarray(
+                    array,
+                    meta=self.meta,
+                    patch_size=patch_size,
+                    chunk_size=chunk_size,
+                    block_size=block_size,
+                    cparams=cparams,
+                    dparams=dparams,
+                )
+                has_array = True
+            else:
+                self._store = blosc2.empty((0,))
+                has_array = False
             if copy is not None:
                 self.meta.copy_from(copy.meta)
             self._validate_and_add_meta(self.meta, has_array=has_array, validate=True) 
@@ -1235,21 +1281,17 @@ class MLArray:
             raise RuntimeError(f"MLArray requires '.b2nd' or '.{MLARRAY_SUFFIX}' as extension.")
         self.support_metadata = str(filepath).endswith(f".{MLARRAY_SUFFIX}")
         dparams = MLArray._resolve_dparams(dparams)
-        self._store = blosc2.open(urlpath=str(filepath), dparams=dparams, mode='r')
+        ondisk = blosc2.open(str(filepath), dparams=dparams, mode="r")
+        cframe = ondisk.to_cframe()
+        self._store = blosc2.ndarray_from_cframe(cframe, copy=True)
         self.mode = None
         self.mmap_mode = None
         self._read_meta()        
         self._update_blosc2_meta()
-        self._store = np.ascontiguousarray(self._store[...])
 
     def save(
             self,
             filepath: Union[str, Path],
-            patch_size: Optional[Union[int, List, Tuple]] = 'default',  # 'default' means that the default of 192 is used. However, if set to 'default', the patch_size will be skipped if self.patch_size is set from a previously loaded MLArray image. In that case the self.patch_size is used.
-            chunk_size: Optional[Union[int, List, Tuple]]= None,
-            block_size: Optional[Union[int, List, Tuple]] = None,
-            cparams: Optional[Union[Dict, blosc2.CParams]] = None,
-            dparams: Optional[Union[Dict, blosc2.DParams]] = None
         ):
         """Saves the array to a MLArray file. Both MLArray ('.mla') and Blosc2 ('.b2nd') files are supported.
 
@@ -1261,59 +1303,23 @@ class MLArray:
         Args:
             filepath (Union[str, Path]): Path to save the file. Must end with
                 ".b2nd" or ".mla".
-            patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
-                chunk/block optimization. Provide an int for isotropic sizes or
-                a list/tuple with length equal to the number of dimensions.
-                Use "default" to use the default patch size of 192.
-            chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
-                Provide an int or a tuple/list with length equal to the number
-                of dimensions, or None to let Blosc2 decide. Ignored when
-                patch_size is not None.
-            block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
-                Provide an int or a tuple/list with length equal to the number
-                of dimensions, or None to let Blosc2 decide. Ignored when
-                patch_size is not None.
-            cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2
-                compression parameters used when
-                writing array data to disk (for example codec, compression
-                level, and filters). Controls how data is compressed when
-                stored. If None, defaults to ``{'codec': blosc2.Codec.LZ4HC,
-                'clevel': 8}``.
-            dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
-                decompression parameters used when
-                accessing compressed chunks (for example number of
-                decompression threads). Controls runtime decompression behavior.
-                If None, defaults to ``{'nthreads': 1}``.
 
         Raises:
             RuntimeError: If the file extension is not ".b2nd" or ".mla".
         """
         if not str(filepath).endswith(".b2nd") and not str(filepath).endswith(f".{MLARRAY_SUFFIX}"):
             raise RuntimeError(f"MLArray requires '.b2nd' or '.{MLARRAY_SUFFIX}' as extension.")
-    
-        if self._store is not None:
-            spatial_axis_mask = [True] * self.ndim if self.meta.spatial.axis_labels is None else _spatial_axis_mask(self.meta.spatial.axis_labels)
-            self.meta.blosc2 = self._comp_and_validate_blosc2_meta(self.meta.blosc2, patch_size, chunk_size, block_size, self._store.shape, self._store.dtype.itemsize, spatial_axis_mask)
-            self.meta._has_array.has_array = True
-    
-        self.support_metadata = str(filepath).endswith(f".{MLARRAY_SUFFIX}")
 
-        cparams = MLArray._resolve_cparams(cparams)
-        dparams = MLArray._resolve_dparams(dparams)
+        self.support_metadata = str(filepath).endswith(f".{MLARRAY_SUFFIX}")
 
         if Path(filepath).is_file():
             os.remove(str(filepath))
         
-        if self._store is not None:
-            array = np.ascontiguousarray(self._store[...])
-            self._store = blosc2.asarray(array, urlpath=str(filepath), chunks=self.meta.blosc2.chunk_size, blocks=self.meta.blosc2.block_size, cparams=cparams, dparams=dparams)
-        else:
-            array = np.empty((0,))
-            self._store = blosc2.asarray(array, urlpath=str(filepath), chunks=self.meta.blosc2.chunk_size, blocks=self.meta.blosc2.block_size, cparams=cparams, dparams=dparams)
+        self._write_metadata(force=True)
+        self._store.save(str(filepath))
         self._update_blosc2_meta()
         self.mode = None
         self.mmap_mode = None
-        self._write_metadata(force=True)
 
     def to_numpy(self):
         """Return the underlying data as a NumPy array.

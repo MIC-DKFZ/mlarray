@@ -31,7 +31,7 @@ class TestOptimizationExamples(unittest.TestCase):
             array = _make_array()
             path = Path(tmpdir) / "patch-non-iso.mla"
 
-            MLArray(array).save(path, patch_size=(8, 12, 16))
+            MLArray(array, patch_size=(8, 12, 16)).save(path)
             loaded = MLArray(path)
 
             self.assertEqual(loaded.meta.blosc2.patch_size, [8, 12, 16])
@@ -41,7 +41,7 @@ class TestOptimizationExamples(unittest.TestCase):
             array = _make_array(shape=(32, 64, 64))
             path = Path(tmpdir) / "patch-read.mla"
 
-            MLArray(array).save(path, patch_size=(8, 16, 16))
+            MLArray(array, patch_size=(8, 16, 16)).save(path)
 
             image = MLArray.open(path, mmap_mode="r")
             patch = image[10:20, 5:15, 7:17]
@@ -53,7 +53,7 @@ class TestOptimizationExamples(unittest.TestCase):
             array = _make_array(shape=(16, 32, 32))
             path = Path(tmpdir) / "patch-write.mla"
 
-            MLArray(array).save(path, patch_size=(8, 16, 16))
+            MLArray(array, patch_size=(8, 16, 16)).save(path)
 
             image = MLArray.open(path, mmap_mode="r+")
             image[0:2, 0:2, 0:2] *= 0.0
@@ -88,12 +88,12 @@ class TestOptimizationExamples(unittest.TestCase):
             array = _make_array()
             path = Path(tmpdir) / "manual-layout.mla"
 
-            MLArray(array).save(
-                path,
+            MLArray(
+                array,
                 patch_size=None,
                 chunk_size=(1, 16, 16),
                 block_size=(1, 8, 8),
-            )
+            ).save(path)
             loaded = MLArray(path)
 
             self.assertEqual(loaded.meta.blosc2.chunk_size, [1, 16, 16])
@@ -104,7 +104,7 @@ class TestOptimizationExamples(unittest.TestCase):
             array = _make_array()
             path = Path(tmpdir) / "blosc2-auto.mla"
 
-            MLArray(array).save(path, patch_size=None)
+            MLArray(array, patch_size=None).save(path)
             loaded = MLArray(path)
 
             self.assertIsNone(loaded.meta.blosc2.patch_size)

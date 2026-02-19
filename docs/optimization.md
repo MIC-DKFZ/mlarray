@@ -75,10 +75,10 @@ import numpy as np
 from mlarray import MLArray
 
 array = np.random.random((128, 256, 256))
-image = MLArray(array)
+image = MLArray(array, patch_size=(128, 192, 256))
 
 # Optimize storage layout for 3D patches of 128×192×256 (spatial axes)
-image.save("patch-non-iso.mla", patch_size=(128, 192, 256))
+image.save("patch-non-iso.mla")
 ```
 
 When to use:
@@ -164,12 +164,14 @@ If you already know what you’re doing (or want to reproduce a very specific la
 ```python
 from mlarray import MLArray
 
-image = MLArray("sample.mla")
-image.save(
-    "manual-layout.mla",
+loaded = MLArray("sample.mla")
+image = MLArray(
+    loaded.to_numpy(),
+    patch_size=None,
     chunk_size=(1, 128, 128),
     block_size=(1, 32, 32),
 )
+image.save("manual-layout.mla")
 ```
 
 When to use:
@@ -186,10 +188,11 @@ If you set `patch_size=None` (and don’t provide chunk/block sizes), Blosc2 wil
 ```python
 from mlarray import MLArray
 
-image = MLArray("sample.mla")
+loaded = MLArray("sample.mla")
+image = MLArray(loaded.to_numpy(), patch_size=None)
 
 # If patch_size, chunk_size and block_size are all None, Blosc2 auto-configures
-image.save("blosc2-auto.mla", patch_size=None)
+image.save("blosc2-auto.mla")
 ```
 
 When to use:

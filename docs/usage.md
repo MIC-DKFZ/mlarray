@@ -156,11 +156,12 @@ image = MLArray(
     spacing=(2.5, 0.7, 0.7),  # spatial axes only (z, y, x)
     origin=(0.0, 0.0, 0.0),
     axis_labels=axis_labels,
+    patch_size=None,
 )
 
 # Optional per-axis units (length = full array ndims)
 image.meta.spatial.axis_units = ["s", "mm", "mm", "mm", ""]
-image.save("time-series.mla", patch_size=None)
+image.save("time-series.mla")
 ```
 
 
@@ -177,8 +178,11 @@ Uses the default patch configuration, optimized for typical ML patch-based acces
 from mlarray import MLArray
 
 image = MLArray("sample.mla")
-image.save("default-patch.mla")  # Default patch_size is 'default' -> Isotropic patch size of 192 pixels
-image.save("default-patch.mla", patch_size='default')
+image.save("default-patch.mla")  # Keeps existing layout metadata
+
+loaded = MLArray("sample.mla")
+image = MLArray(loaded.to_numpy(), patch_size='default')
+image.save("default-patch-relayout.mla")  # Uses constructor patch_size='default' (192)
 ```
 
 ### Custom isotropic patch size (512)
@@ -188,8 +192,9 @@ A larger patch size can improve throughput when you typically load large regions
 ```python
 from mlarray import MLArray
 
-image = MLArray("sample.mla")
-image.save("patch-512.mla", patch_size=512)
+loaded = MLArray("sample.mla")
+image = MLArray(loaded.to_numpy(), patch_size=512)
+image.save("patch-512.mla")
 ```
 
 ### Custom non-isotropic patch size
@@ -199,8 +204,9 @@ Non-isotropic patches are useful when one axis behaves differently (e.g., fewer 
 ```python
 from mlarray import MLArray
 
-image = MLArray("sample.mla")
-image.save("patch-non-iso.mla", patch_size=(128, 192, 256))
+loaded = MLArray("sample.mla")
+image = MLArray(loaded.to_numpy(), patch_size=(128, 192, 256))
+image.save("patch-non-iso.mla")
 ```
 
 ### Manual chunk/block size
@@ -210,8 +216,14 @@ For advanced use cases, you can explicitly define the chunk and block size used 
 ```python
 from mlarray import MLArray
 
-image = MLArray("sample.mla")
-image.save("manual-chunk-block.mla", chunk_size=(1, 128, 128), block_size=(1, 32, 32))
+loaded = MLArray("sample.mla")
+image = MLArray(
+    loaded.to_numpy(),
+    patch_size=None,
+    chunk_size=(1, 128, 128),
+    block_size=(1, 32, 32),
+)
+image.save("manual-chunk-block.mla")
 ```
 
 ### Let Blosc2 itself configure chunk/block size
@@ -221,7 +233,8 @@ If you disable MLArray patch sizing, Blosc2 can choose chunk and block sizes aut
 ```python
 from mlarray import MLArray
 
-image = MLArray("sample.mla")
+loaded = MLArray("sample.mla")
+image = MLArray(loaded.to_numpy(), patch_size=None)
 # If patch_size, chunk_size and block_size are all None, Blosc2 will auto-configure chunk and block size
-image.save("manual-chunk-block.mla", patch_size=None)
+image.save("blosc2-auto.mla")
 ```

@@ -27,10 +27,10 @@ if __name__ == '__main__':
         os.remove(filepath)
 
     print("Initializing image...")
-    image = MLArray(array, spacing=spacing, origin=origin, direction=direction, axis_labels=axis_labels, meta=Meta(source=source_meta, bbox=MetaBbox(bboxes)))
+    image = MLArray(array, spacing=spacing, origin=origin, direction=direction, axis_labels=axis_labels, meta=Meta(source=source_meta, bbox=MetaBbox(bboxes)), patch_size=None)
     image.meta.spatial.axis_units = ["s", "mm", "mm", "mm", ""]
     print("Saving image...")
-    image.save(filepath, patch_size=None)
+    image.save(filepath)
 
     print("Loading image...")
     image = MLArray(filepath)

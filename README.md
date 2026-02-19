@@ -140,42 +140,54 @@ Default patch size (192):
 ```python
 from mlarray import MLArray
 
-image = MLArray("sample.mla")
-image.save("default-patch.mla")  # Default patch_size is 'default' -> Isotropic patch size of 192 pixels
-image.save("default-patch.mla", patch_size='default')
+image = MLArray("sample.mla")  # Existing file
+image.save("default-patch.mla")  # Keeps existing layout metadata
+
+loaded = MLArray("sample.mla")
+image = MLArray(loaded.to_numpy(), patch_size='default')
+image.save("default-patch-relayout.mla")  # Uses constructor patch_size='default' (192)
 ```
 
 Custom isotropic patch size (512):
 ```python
 from mlarray import MLArray
 
-image = MLArray("sample.mla")
-image.save("patch-512.mla", patch_size=512)
+loaded = MLArray("sample.mla")
+image = MLArray(loaded.to_numpy(), patch_size=512)
+image.save("patch-512.mla")
 ```
 
 Custom non-isotropic patch size:
 ```python
 from mlarray import MLArray
 
-image = MLArray("sample.mla")
-image.save("patch-non-iso.mla", patch_size=(128, 192, 256))
+loaded = MLArray("sample.mla")
+image = MLArray(loaded.to_numpy(), patch_size=(128, 192, 256))
+image.save("patch-non-iso.mla")
 ```
 
 Manual chunk/block size:
 ```python
 from mlarray import MLArray
 
-image = MLArray("sample.mla")
-image.save("manual-chunk-block.mla", chunk_size=(1, 128, 128), block_size=(1, 32, 32))
+loaded = MLArray("sample.mla")
+image = MLArray(
+    loaded.to_numpy(),
+    patch_size=None,
+    chunk_size=(1, 128, 128),
+    block_size=(1, 32, 32),
+)
+image.save("manual-chunk-block.mla")
 ```
 
 Let Blosc2 itself configure chunk/block size:
 ```python
 from mlarray import MLArray
 
-image = MLArray("sample.mla")
+loaded = MLArray("sample.mla")
+image = MLArray(loaded.to_numpy(), patch_size=None)
 # If patch_size, chunk_size and block_size are all None, Blosc2 will auto-configure chunk and block size
-image.save("manual-chunk-block.mla", patch_size=None)
+image.save("blosc2-auto.mla")
 ```
 
 ## CLI

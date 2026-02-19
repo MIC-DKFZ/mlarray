@@ -105,7 +105,7 @@ class TestUsage(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             array = _make_array()
             path = Path(tmpdir) / "patch-64.mla"
-            MLArray(array).save(path, patch_size=64)
+            MLArray(array, patch_size=64).save(path)
 
             loaded = MLArray(path)
             self.assertEqual(loaded.meta.blosc2.patch_size, [64, 64, 64])
@@ -114,7 +114,7 @@ class TestUsage(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             array = _make_array()
             path = Path(tmpdir) / "patch-non-iso.mla"
-            MLArray(array).save(path, patch_size=[16, 24, 32])
+            MLArray(array, patch_size=[16, 24, 32]).save(path)
 
             loaded = MLArray(path)
             self.assertEqual(loaded.meta.blosc2.patch_size, [16, 24, 32])
@@ -123,12 +123,12 @@ class TestUsage(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             array = _make_array()
             path = Path(tmpdir) / "manual-chunk-block.mla"
-            MLArray(array).save(
-                path,
+            MLArray(
+                array,
                 patch_size=None,
                 chunk_size=(1, 16, 16),
                 block_size=(1, 8, 8),
-            )
+            ).save(path)
 
             loaded = MLArray(path)
             self.assertEqual(loaded.meta.blosc2.chunk_size, [1, 16, 16])
