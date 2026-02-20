@@ -7,6 +7,8 @@ from pathlib import Path
 import os
 from mlarray.meta import Meta, MetaBlosc2, AxisLabel, _spatial_axis_mask
 from mlarray.utils import is_serializable
+import pickle
+import gzip
 
 MLARRAY_SUFFIX = "mla"
 MLARRAY_VERSION = "v0"
@@ -1923,6 +1925,7 @@ class MLArray:
         meta = Meta()
         if self.support_metadata and self._backend == "blosc2":
             meta = self._store.vlmeta["mlarray"]
+            meta = pickle.loads(gzip.decompress(meta))
             meta = Meta.from_mapping(meta)
         self._validate_and_add_meta(meta)
 
@@ -1947,10 +1950,12 @@ class MLArray:
         if self._backend != "blosc2":
             return
 
-        metadata = self.meta.to_mapping()
-        if not is_serializable(metadata):
+        meta = self.meta.to_mapping()
+        if not is_serializable(meta):
             raise RuntimeError("Metadata is not serializable.")
-        self._store.vlmeta["mlarray"] = metadata
+
+        meta = gzip.compress(pickle.dumps(meta, protocol=pickle.HIGHEST_PROTOCOL))
+        self._store.vlmeta["mlarray"] = meta
 
     def _ensure_blosc2_store(self):
         """Ensure underlying store is Blosc2, converting from NumPy when needed."""
