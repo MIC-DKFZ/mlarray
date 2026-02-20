@@ -25,6 +25,18 @@ class TestUsage(unittest.TestCase):
             loaded = MLArray(path)
             self.assertEqual(loaded.shape, array.shape)
 
+    def test_default_usage_uncompressed_backend(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            array = _make_array(seed=11)
+            image = MLArray(array, compressed=False)
+            self.assertTrue(isinstance(image._store, np.ndarray))
+
+            path = Path(tmpdir) / "sample-uncompressed.mla"
+            image.save(path)
+            loaded = MLArray(path)
+            self.assertEqual(loaded.shape, array.shape)
+            self.assertTrue(np.allclose(loaded.to_numpy(), array))
+
     def test_mmap_loading(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             array = _make_array()
@@ -33,6 +45,16 @@ class TestUsage(unittest.TestCase):
 
             loaded = MLArray.open(path, mmap_mode="r")
             self.assertFalse(isinstance(loaded._store, np.ndarray))
+
+    def test_load_uncompressed_store(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            array = _make_array()
+            path = Path(tmpdir) / "sample-load-uncompressed.mla"
+            MLArray(array).save(path)
+
+            loaded = MLArray.load(path, compressed=False)
+            self.assertTrue(isinstance(loaded._store, np.ndarray))
+            self.assertTrue(np.allclose(loaded.to_numpy(), array))
 
     def test_loading_and_saving(self):
         with tempfile.TemporaryDirectory() as tmpdir:

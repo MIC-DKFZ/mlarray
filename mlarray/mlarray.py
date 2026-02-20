@@ -2,7 +2,7 @@ from copy import deepcopy
 import numpy as np
 import blosc2
 import math
-from typing import Dict, Optional, Union, List, Tuple
+from typing import Any, Dict, Optional, Union, List, Tuple
 from pathlib import Path
 import os
 from mlarray.meta import Meta, MetaBlosc2, AxisLabel, _spatial_axis_mask
@@ -28,6 +28,7 @@ class MLArray:
             block_size: Optional[Union[int, List, Tuple]] = None,
             cparams: Optional[Union[Dict, blosc2.CParams]] = None,
             dparams: Optional[Union[Dict, blosc2.DParams]] = None,
+            compressed: bool = True,
         ) -> None:
         """Initializes a MLArray instance.
 
@@ -75,6 +76,7 @@ class MLArray:
         self.mmap_mode = None
         self.meta = None
         self._store = None
+        self._backend = None
         if isinstance(array, (str, Path)) and (
             spacing is not None
             or origin is not None
@@ -94,7 +96,7 @@ class MLArray:
                 "array is a filepath."
             )
         if isinstance(array, (str, Path)):
-            self._load(array)
+            self._load(array, compressed=compressed)
         else:
             self._validate_and_add_meta(meta, spacing, origin, direction, axis_labels, False, validate=False)
             if array is not None:
@@ -106,10 +108,16 @@ class MLArray:
                     block_size=block_size,
                     cparams=cparams,
                     dparams=dparams,
+                    compressed=compressed,
                 )
                 has_array = True
             else:
-                self._store = blosc2.empty((0,))
+                if compressed:
+                    self._store = blosc2.empty((0,))
+                    self._backend = "blosc2"
+                else:
+                    self._store = np.empty((0,))
+                    self._backend = "numpy"
                 has_array = False
             if copy is not None:
                 self.meta.copy_from(copy.meta)
@@ -224,6 +232,7 @@ class MLArray:
             cls,
             filepath: Union[str, Path], 
             dparams: Optional[Union[Dict, blosc2.DParams]] = None,
+            compressed: bool = True,
         ):
         """Loads a MLArray file as a whole. Does not use memory-mapping. Both MLArray ('.mla') and Blosc2 ('.b2nd') files are supported.
 
@@ -243,7 +252,7 @@ class MLArray:
             RuntimeError: If the file extension is not ".b2nd" or ".mla".
         """
         class_instance = cls()
-        class_instance._load(filepath, dparams)
+        class_instance._load(filepath, dparams, compressed=compressed)
         return class_instance
 
     @classmethod
@@ -257,6 +266,7 @@ class MLArray:
             block_size: Optional[Union[int, List, Tuple]] = None,
             cparams: Optional[Union[Dict, blosc2.CParams]] = None,
             dparams: Optional[Union[Dict, blosc2.DParams]] = None,
+            compressed: bool = True,
         ):
         """Create an in-memory MLArray with uninitialized values.
 
@@ -284,6 +294,7 @@ class MLArray:
         """
         class_instance = cls()
         class_instance._construct_in_memory(
+            constructor="empty",
             shape=shape,
             dtype=dtype,
             meta=meta,
@@ -292,7 +303,7 @@ class MLArray:
             block_size=block_size,
             cparams=cparams,
             dparams=dparams,
-            store_builder=lambda **kwargs: blosc2.empty(**kwargs),
+            compressed=compressed,
         )
         return class_instance
 
@@ -307,6 +318,7 @@ class MLArray:
             block_size: Optional[Union[int, List, Tuple]] = None,
             cparams: Optional[Union[Dict, blosc2.CParams]] = None,
             dparams: Optional[Union[Dict, blosc2.DParams]] = None,
+            compressed: bool = True,
         ):
         """Create an in-memory MLArray filled with zeros.
 
@@ -332,6 +344,7 @@ class MLArray:
         """
         class_instance = cls()
         class_instance._construct_in_memory(
+            constructor="zeros",
             shape=shape,
             dtype=dtype,
             meta=meta,
@@ -340,7 +353,7 @@ class MLArray:
             block_size=block_size,
             cparams=cparams,
             dparams=dparams,
-            store_builder=lambda **kwargs: blosc2.zeros(**kwargs),
+            compressed=compressed,
         )
         return class_instance
 
@@ -355,6 +368,7 @@ class MLArray:
             block_size: Optional[Union[int, List, Tuple]] = None,
             cparams: Optional[Union[Dict, blosc2.CParams]] = None,
             dparams: Optional[Union[Dict, blosc2.DParams]] = None,
+            compressed: bool = True,
         ):
         """Create an in-memory MLArray filled with ones.
 
@@ -382,6 +396,7 @@ class MLArray:
         dtype = blosc2.DEFAULT_FLOAT if dtype is None else dtype
         class_instance = cls()
         class_instance._construct_in_memory(
+            constructor="ones",
             shape=shape,
             dtype=dtype,
             meta=meta,
@@ -390,7 +405,7 @@ class MLArray:
             block_size=block_size,
             cparams=cparams,
             dparams=dparams,
-            store_builder=lambda **kwargs: blosc2.ones(**kwargs),
+            compressed=compressed,
         )
         return class_instance
 
@@ -406,6 +421,7 @@ class MLArray:
             block_size: Optional[Union[int, List, Tuple]] = None,
             cparams: Optional[Union[Dict, blosc2.CParams]] = None,
             dparams: Optional[Union[Dict, blosc2.DParams]] = None,
+            compressed: bool = True,
         ):
         """Create an in-memory MLArray filled with ``fill_value``.
 
@@ -439,6 +455,7 @@ class MLArray:
                 dtype = np.dtype(type(fill_value))
         class_instance = cls()
         class_instance._construct_in_memory(
+            constructor="full",
             shape=shape,
             dtype=dtype,
             meta=meta,
@@ -447,7 +464,8 @@ class MLArray:
             block_size=block_size,
             cparams=cparams,
             dparams=dparams,
-            store_builder=lambda **kwargs: blosc2.full(fill_value=fill_value, **kwargs),
+            compressed=compressed,
+            constructor_kwargs={"fill_value": fill_value},
         )
         return class_instance
 
@@ -466,6 +484,7 @@ class MLArray:
             block_size: Optional[Union[int, List, Tuple]] = None,
             cparams: Optional[Union[Dict, blosc2.CParams]] = None,
             dparams: Optional[Union[Dict, blosc2.DParams]] = None,
+            compressed: bool = True,
         ):
         """Create an in-memory MLArray with evenly spaced values.
 
@@ -525,6 +544,7 @@ class MLArray:
 
         class_instance = cls()
         class_instance._construct_in_memory(
+            constructor="arange",
             shape=shape,
             dtype=dtype,
             meta=meta,
@@ -533,13 +553,13 @@ class MLArray:
             block_size=block_size,
             cparams=cparams,
             dparams=dparams,
-            store_builder=lambda **kwargs: blosc2.arange(
-                start=start,
-                stop=stop,
-                step=step,
-                c_order=c_order,
-                **kwargs,
-            ),
+            compressed=compressed,
+            constructor_kwargs={
+                "start": start,
+                "stop": stop,
+                "step": step,
+                "c_order": c_order,
+            },
         )
         return class_instance
 
@@ -559,6 +579,7 @@ class MLArray:
             block_size: Optional[Union[int, List, Tuple]] = None,
             cparams: Optional[Union[Dict, blosc2.CParams]] = None,
             dparams: Optional[Union[Dict, blosc2.DParams]] = None,
+            compressed: bool = True,
         ):
         """Create an in-memory MLArray with evenly spaced samples.
 
@@ -617,6 +638,7 @@ class MLArray:
 
         class_instance = cls()
         class_instance._construct_in_memory(
+            constructor="linspace",
             shape=shape,
             dtype=dtype,
             meta=meta,
@@ -625,14 +647,14 @@ class MLArray:
             block_size=block_size,
             cparams=cparams,
             dparams=dparams,
-            store_builder=lambda **kwargs: blosc2.linspace(
-                start=start,
-                stop=stop,
-                num=num,
-                endpoint=endpoint,
-                c_order=c_order,
-                **kwargs,
-            ),
+            compressed=compressed,
+            constructor_kwargs={
+                "start": start,
+                "stop": stop,
+                "num": num,
+                "endpoint": endpoint,
+                "c_order": c_order,
+            },
         )
         return class_instance
 
@@ -645,7 +667,8 @@ class MLArray:
             chunk_size: Optional[Union[int, List, Tuple]]= None,
             block_size: Optional[Union[int, List, Tuple]] = None,
             cparams: Optional[Union[Dict, blosc2.CParams]] = None,
-            dparams: Optional[Union[Dict, blosc2.DParams]] = None
+            dparams: Optional[Union[Dict, blosc2.DParams]] = None,
+            compressed: bool = True,
         ):
         """Convert a NumPy array into an in-memory Blosc2-backed MLArray.
 
@@ -688,7 +711,16 @@ class MLArray:
                 implemented for the provided dimensionality.
         """
         class_instance = cls()
-        class_instance._asarray(array, meta, patch_size, chunk_size, block_size, cparams, dparams)
+        class_instance._asarray(
+            array,
+            meta,
+            patch_size,
+            chunk_size,
+            block_size,
+            cparams,
+            dparams,
+            compressed=compressed,
+        )
         return class_instance
 
     @classmethod
@@ -702,6 +734,7 @@ class MLArray:
             block_size: Optional[Union[int, List, Tuple]] = None,
             cparams: Optional[Union[Dict, blosc2.CParams]] = None,
             dparams: Optional[Union[Dict, blosc2.DParams]] = None,
+            compressed: bool = True,
         ):
         """Create an in-memory MLArray with the same shape as ``x``.
 
@@ -730,6 +763,7 @@ class MLArray:
         class_instance = cls()
         shape, dtype, meta = class_instance._resolve_like_input(x, dtype, meta)
         class_instance._construct_in_memory(
+            constructor="empty",
             shape=shape,
             dtype=dtype,
             meta=meta,
@@ -738,7 +772,7 @@ class MLArray:
             block_size=block_size,
             cparams=cparams,
             dparams=dparams,
-            store_builder=lambda **kwargs: blosc2.empty(**kwargs),
+            compressed=compressed,
         )
         return class_instance
 
@@ -753,6 +787,7 @@ class MLArray:
             block_size: Optional[Union[int, List, Tuple]] = None,
             cparams: Optional[Union[Dict, blosc2.CParams]] = None,
             dparams: Optional[Union[Dict, blosc2.DParams]] = None,
+            compressed: bool = True,
         ):
         """Create an in-memory MLArray of zeros with the same shape as ``x``.
 
@@ -781,6 +816,7 @@ class MLArray:
         class_instance = cls()
         shape, dtype, meta = class_instance._resolve_like_input(x, dtype, meta)
         class_instance._construct_in_memory(
+            constructor="zeros",
             shape=shape,
             dtype=dtype,
             meta=meta,
@@ -789,7 +825,7 @@ class MLArray:
             block_size=block_size,
             cparams=cparams,
             dparams=dparams,
-            store_builder=lambda **kwargs: blosc2.zeros(**kwargs),
+            compressed=compressed,
         )
         return class_instance
 
@@ -804,6 +840,7 @@ class MLArray:
             block_size: Optional[Union[int, List, Tuple]] = None,
             cparams: Optional[Union[Dict, blosc2.CParams]] = None,
             dparams: Optional[Union[Dict, blosc2.DParams]] = None,
+            compressed: bool = True,
         ):
         """Create an in-memory MLArray of ones with the same shape as ``x``.
 
@@ -832,6 +869,7 @@ class MLArray:
         class_instance = cls()
         shape, dtype, meta = class_instance._resolve_like_input(x, dtype, meta)
         class_instance._construct_in_memory(
+            constructor="ones",
             shape=shape,
             dtype=dtype,
             meta=meta,
@@ -840,7 +878,7 @@ class MLArray:
             block_size=block_size,
             cparams=cparams,
             dparams=dparams,
-            store_builder=lambda **kwargs: blosc2.ones(**kwargs),
+            compressed=compressed,
         )
         return class_instance
 
@@ -856,6 +894,7 @@ class MLArray:
             block_size: Optional[Union[int, List, Tuple]] = None,
             cparams: Optional[Union[Dict, blosc2.CParams]] = None,
             dparams: Optional[Union[Dict, blosc2.DParams]] = None,
+            compressed: bool = True,
         ):
         """Create an in-memory MLArray filled with ``fill_value`` and shape of ``x``.
 
@@ -886,6 +925,7 @@ class MLArray:
         class_instance = cls()
         shape, dtype, meta = class_instance._resolve_like_input(x, dtype, meta)
         class_instance._construct_in_memory(
+            constructor="full",
             shape=shape,
             dtype=dtype,
             meta=meta,
@@ -894,7 +934,8 @@ class MLArray:
             block_size=block_size,
             cparams=cparams,
             dparams=dparams,
-            store_builder=lambda **kwargs: blosc2.full(fill_value=fill_value, **kwargs),
+            compressed=compressed,
+            constructor_kwargs={"fill_value": fill_value},
         )
         return class_instance
 
@@ -923,7 +964,8 @@ class MLArray:
 
         if Path(filepath).is_file():
             os.remove(str(filepath))
-        
+
+        self._ensure_blosc2_store()
         self._write_metadata(force=True)
         self._store.save(str(filepath))
         self._update_blosc2_meta()
@@ -937,6 +979,7 @@ class MLArray:
         """
         self._write_metadata()
         self._store = None
+        self._backend = None
         self.filepath = None
         self.support_metadata = None
         self.mode = None  
@@ -1360,6 +1403,7 @@ class MLArray:
         dparams = MLArray._resolve_dparams(dparams)
         
         self._store = blosc2.open(urlpath=str(filepath), dparams=dparams, mode=mode, mmap_mode=mmap_mode)
+        self._backend = "blosc2"
         self._read_meta()
         self._update_blosc2_meta()
         self.mode = mode
@@ -1445,6 +1489,7 @@ class MLArray:
         self.support_metadata = str(filepath).endswith(f".{MLARRAY_SUFFIX}")
         
         self._store = blosc2.empty(shape=shape, dtype=np.dtype(dtype), urlpath=str(filepath), chunks=self.meta.blosc2.chunk_size, blocks=self.meta.blosc2.block_size, cparams=MLArray._resolve_cparams(self.meta.blosc2.cparams), dparams=MLArray._resolve_dparams(self.meta.blosc2.dparams), mmap_mode=mmap_mode)
+        self._backend = "blosc2"
         self._update_blosc2_meta()
         self.mode = mode
         self.mmap_mode = mmap_mode
@@ -1455,6 +1500,7 @@ class MLArray:
             self,
             filepath: Union[str, Path], 
             dparams: Optional[Union[Dict, blosc2.DParams]] = None,
+            compressed: bool = True,
         ):
         """Internal MLArray load method. Loads a MLArray file. Both MLArray ('.mla') and Blosc2 ('.b2nd') files are supported.
 
@@ -1481,10 +1527,14 @@ class MLArray:
         ondisk = blosc2.open(str(filepath), dparams=dparams, mode="r")
         cframe = ondisk.to_cframe()
         self._store = blosc2.ndarray_from_cframe(cframe, copy=True)
+        self._backend = "blosc2"
         self.mode = None
         self.mmap_mode = None
         self._read_meta()        
         self._update_blosc2_meta()
+        if not compressed:
+            self._store = np.asarray(self._store[...])
+            self._backend = "numpy"
 
     def _asarray(
             self,
@@ -1494,7 +1544,8 @@ class MLArray:
             chunk_size: Optional[Union[int, List, Tuple]]= None,
             block_size: Optional[Union[int, List, Tuple]] = None,
             cparams: Optional[Union[Dict, blosc2.CParams]] = None,
-            dparams: Optional[Union[Dict, blosc2.DParams]] = None
+            dparams: Optional[Union[Dict, blosc2.DParams]] = None,
+            compressed: bool = True,
         ):
         """Internal MLArray asarray method.
 
@@ -1536,25 +1587,20 @@ class MLArray:
         if not isinstance(array, np.ndarray):
             raise TypeError("array must be a numpy.ndarray")
         self._construct_in_memory(
-            source_array=array,
+            constructor="asarray",
+            source_array=np.ascontiguousarray(array[...]),
             meta=meta,
             patch_size=patch_size,
             chunk_size=chunk_size,
             block_size=block_size,
             cparams=cparams,
             dparams=dparams,
-            store_builder=lambda **kwargs: blosc2.asarray(
-                kwargs["source_array"],
-                chunks=kwargs["chunks"],
-                blocks=kwargs["blocks"],
-                cparams=kwargs["cparams"],
-                dparams=kwargs["dparams"],
-            ),
+            compressed=compressed,
         )
 
     def _construct_in_memory(
             self,
-            store_builder,
+            constructor: str,
             shape: Optional[Union[int, List, Tuple, np.ndarray]] = None,
             dtype: Optional[np.dtype] = None,
             source_array: Optional[np.ndarray] = None,
@@ -1564,6 +1610,8 @@ class MLArray:
             block_size: Optional[Union[int, List, Tuple]] = None,
             cparams: Optional[Union[Dict, blosc2.CParams]] = None,
             dparams: Optional[Union[Dict, blosc2.DParams]] = None,
+            compressed: bool = True,
+            constructor_kwargs: Optional[dict[str, Any]] = None,
         ):
         """Internal generic constructor for in-memory Blosc2-backed MLArrays.
 
@@ -1572,8 +1620,7 @@ class MLArray:
                 array shape, required when ``source_array`` is None.
             dtype (Optional[np.dtype]): Target dtype, required when
                 ``source_array`` is None.
-            store_builder (Callable): Callable receiving normalized kwargs and
-                returning a Blosc2 NDArray.
+            constructor (str): Constructor operation name.
             source_array (Optional[np.ndarray]): Source array that should be
                 converted into an in-memory Blosc2-backed store.
             meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
@@ -1596,12 +1643,13 @@ class MLArray:
         Raises:
             ValueError: If constructor inputs are inconsistent.
         """
+        constructor_kwargs = {} if constructor_kwargs is None else dict(constructor_kwargs)
+
         if source_array is not None:
             if shape is not None or dtype is not None:
                 raise ValueError(
                     "shape/dtype must not be set when source_array is provided."
                 )
-            source_array = np.ascontiguousarray(source_array[...])
             shape = self._normalize_shape(source_array.shape)
             dtype = np.dtype(source_array.dtype)
         else:
@@ -1632,18 +1680,110 @@ class MLArray:
         )
         self.meta._has_array.has_array = True
 
-        builder_kwargs = dict(
-            shape=shape,
-            dtype=dtype,
-            chunks=self.meta.blosc2.chunk_size,
-            blocks=self.meta.blosc2.block_size,
-            cparams=MLArray._resolve_cparams(self.meta.blosc2.cparams),
-            dparams=MLArray._resolve_dparams(self.meta.blosc2.dparams),
-        )
-        if source_array is not None:
-            builder_kwargs["source_array"] = source_array
-
-        self._store = store_builder(**builder_kwargs)
+        if compressed:
+            cparams = MLArray._resolve_cparams(self.meta.blosc2.cparams)
+            dparams = MLArray._resolve_dparams(self.meta.blosc2.dparams)
+            if constructor == "asarray":
+                self._store = blosc2.asarray(
+                    source_array,
+                    chunks=self.meta.blosc2.chunk_size,
+                    blocks=self.meta.blosc2.block_size,
+                    cparams=cparams,
+                    dparams=dparams,
+                )
+            elif constructor in ("empty", "zeros", "ones"):
+                func = getattr(blosc2, constructor)
+                self._store = func(
+                    shape=shape,
+                    dtype=dtype,
+                    chunks=self.meta.blosc2.chunk_size,
+                    blocks=self.meta.blosc2.block_size,
+                    cparams=cparams,
+                    dparams=dparams,
+                )
+            elif constructor == "full":
+                self._store = blosc2.full(
+                    shape=shape,
+                    fill_value=constructor_kwargs["fill_value"],
+                    dtype=dtype,
+                    chunks=self.meta.blosc2.chunk_size,
+                    blocks=self.meta.blosc2.block_size,
+                    cparams=cparams,
+                    dparams=dparams,
+                )
+            elif constructor == "arange":
+                self._store = blosc2.arange(
+                    start=constructor_kwargs["start"],
+                    stop=constructor_kwargs["stop"],
+                    step=constructor_kwargs["step"],
+                    dtype=dtype,
+                    shape=shape,
+                    c_order=constructor_kwargs.get("c_order", True),
+                    chunks=self.meta.blosc2.chunk_size,
+                    blocks=self.meta.blosc2.block_size,
+                    cparams=cparams,
+                    dparams=dparams,
+                )
+            elif constructor == "linspace":
+                self._store = blosc2.linspace(
+                    start=constructor_kwargs["start"],
+                    stop=constructor_kwargs["stop"],
+                    num=constructor_kwargs["num"],
+                    dtype=dtype,
+                    shape=shape,
+                    endpoint=constructor_kwargs.get("endpoint", True),
+                    c_order=constructor_kwargs.get("c_order", True),
+                    chunks=self.meta.blosc2.chunk_size,
+                    blocks=self.meta.blosc2.block_size,
+                    cparams=cparams,
+                    dparams=dparams,
+                )
+            else:
+                raise ValueError(f"Unknown constructor '{constructor}'.")
+            self._backend = "blosc2"
+        else:
+            if constructor == "asarray":
+                self._store = np.asarray(source_array, dtype=dtype)
+            elif constructor == "empty":
+                self._store = np.empty(shape=shape, dtype=dtype)
+            elif constructor == "zeros":
+                self._store = np.zeros(shape=shape, dtype=dtype)
+            elif constructor == "ones":
+                self._store = np.ones(shape=shape, dtype=dtype)
+            elif constructor == "full":
+                self._store = np.full(
+                    shape=shape,
+                    fill_value=constructor_kwargs["fill_value"],
+                    dtype=dtype,
+                )
+            elif constructor == "arange":
+                arr = np.arange(
+                    constructor_kwargs["start"],
+                    constructor_kwargs["stop"],
+                    constructor_kwargs["step"],
+                    dtype=dtype,
+                )
+                self._store = np.reshape(
+                    arr,
+                    shape,
+                    order="C" if constructor_kwargs.get("c_order", True) else "F",
+                )
+            elif constructor == "linspace":
+                arr = np.linspace(
+                    constructor_kwargs["start"],
+                    constructor_kwargs["stop"],
+                    constructor_kwargs["num"],
+                    endpoint=constructor_kwargs.get("endpoint", True),
+                    dtype=dtype,
+                )
+                self._store = np.reshape(
+                    arr,
+                    shape,
+                    order="C" if constructor_kwargs.get("c_order", True) else "F",
+                )
+            else:
+                raise ValueError(f"Unknown constructor '{constructor}'.")
+            self._backend = "numpy"
 
         self.support_metadata = True
 
@@ -1755,6 +1895,8 @@ class MLArray:
         Updates ``self.meta.blosc2`` from the underlying store when the array
         is present.
         """
+        if self._backend != "blosc2":
+            return
         if self.support_metadata and self.meta._has_array.has_array == True:
             self.meta.blosc2.chunk_size = list(self._store.chunks)
             self.meta.blosc2.block_size = list(self._store.blocks)
@@ -1762,7 +1904,7 @@ class MLArray:
     def _read_meta(self):
         """Read MLArray metadata from the underlying store, if available."""
         meta = Meta()
-        if self.support_metadata:
+        if self.support_metadata and self._backend == "blosc2":
             meta = self._store.vlmeta["mlarray"]
             meta = Meta.from_mapping(meta)
         self._validate_and_add_meta(meta)
@@ -1784,11 +1926,56 @@ class MLArray:
         
         if not is_writable:
             return
-        
+
+        if self._backend != "blosc2":
+            return
+
         metadata = self.meta.to_mapping()
         if not is_serializable(metadata):
             raise RuntimeError("Metadata is not serializable.")
         self._store.vlmeta["mlarray"] = metadata
+
+    def _ensure_blosc2_store(self):
+        """Ensure underlying store is Blosc2, converting from NumPy when needed."""
+        if self._store is None:
+            self._store = blosc2.empty((0,))
+            self._backend = "blosc2"
+            return
+
+        if self._backend == "blosc2":
+            return
+
+        array = np.asarray(self._store)
+        if not self.meta._has_array.has_array:
+            self._store = blosc2.empty((0,))
+            self._backend = "blosc2"
+            return
+
+        shape = self._normalize_shape(array.shape)
+        spatial_axis_mask = (
+            [True] * len(shape)
+            if self.meta.spatial.axis_labels is None
+            else _spatial_axis_mask(self.meta.spatial.axis_labels)
+        )
+        self.meta.blosc2 = self._comp_and_validate_blosc2_meta(
+            self.meta.blosc2,
+            patch_size="default",
+            chunk_size=self.meta.blosc2.chunk_size,
+            block_size=self.meta.blosc2.block_size,
+            shape=shape,
+            dtype_itemsize=np.dtype(array.dtype).itemsize,
+            spatial_axis_mask=spatial_axis_mask,
+            cparams=self.meta.blosc2.cparams,
+            dparams=self.meta.blosc2.dparams,
+        )
+        self._store = blosc2.asarray(
+            np.ascontiguousarray(array),
+            chunks=self.meta.blosc2.chunk_size,
+            blocks=self.meta.blosc2.block_size,
+            cparams=MLArray._resolve_cparams(self.meta.blosc2.cparams),
+            dparams=MLArray._resolve_dparams(self.meta.blosc2.dparams),
+        )
+        self._backend = "blosc2"
 
     @staticmethod
     def _normalize_shape(shape: Union[int, List, Tuple, np.ndarray]) -> Tuple[int, ...]:

@@ -64,6 +64,22 @@ class TestAsArray(unittest.TestCase):
         self.assertEqual(image.meta.source.to_plain(), {"patient_id": "p-001"})
         self.assertTrue(image.meta.is_seg)
 
+    def test_asarray_uncompressed_numpy_store_and_save(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            array = _make_array(seed=3)
+            image = MLArray.asarray(array, meta={"case_id": "np"}, compressed=False)
+
+            self.assertTrue(isinstance(image._store, np.ndarray))
+            self.assertTrue(np.allclose(image.to_numpy(), array))
+            self.assertEqual(image.meta.source.to_plain(), {"case_id": "np"})
+
+            path = Path(tmpdir) / "asarray-numpy-save.mla"
+            image.save(path)
+            loaded = MLArray(path)
+            self.assertFalse(isinstance(loaded._store, np.ndarray))
+            self.assertTrue(np.allclose(loaded.to_numpy(), array))
+            self.assertEqual(loaded.meta.source.to_plain(), {"case_id": "np"})
+
 
 if __name__ == "__main__":
     unittest.main()
