@@ -1648,6 +1648,8 @@ class MLArray:
 
         self._store = store_builder(**builder_kwargs)
 
+        self.support_metadata = True
+
         self._update_blosc2_meta()
         self._validate_and_add_meta(self.meta)
 
@@ -1747,14 +1749,14 @@ class MLArray:
         Updates ``self.meta.blosc2`` from the underlying store when the array
         is present.
         """
-        if self.meta._has_array.has_array == True:
+        if self.support_metadata and self.meta._has_array.has_array == True:
             self.meta.blosc2.chunk_size = list(self._store.chunks)
             self.meta.blosc2.block_size = list(self._store.blocks)
 
     def _read_meta(self):
         """Read MLArray metadata from the underlying store, if available."""
         meta = Meta()
-        if self.support_metadata and isinstance(self._store, blosc2.ndarray.NDArray):
+        if self.support_metadata:
             meta = self._store.vlmeta["mlarray"]
             meta = Meta.from_mapping(meta)
         self._validate_and_add_meta(meta)
@@ -1766,7 +1768,7 @@ class MLArray:
             force (bool): If True, write even when mmap_mode is read-only.
         """
         is_writable = False
-        if self.support_metadata and isinstance(self._store, blosc2.ndarray.NDArray):
+        if self.support_metadata:
             if self.mode in ('a', 'w') and self.mmap_mode is None:
                 is_writable = True
             elif self.mmap_mode in ('r+', 'w+'):
