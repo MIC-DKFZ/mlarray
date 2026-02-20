@@ -20,6 +20,7 @@ class MLArray:
             spacing: Optional[Union[List, Tuple, np.ndarray]] = None,
             origin: Optional[Union[List, Tuple, np.ndarray]] = None,
             direction: Optional[Union[List, Tuple, np.ndarray]] = None,
+            affine: Optional[Union[List, Tuple, np.ndarray]] = None,
             meta: Optional[Union[Dict, Meta]] = None,
             axis_labels: Optional[List[Union[str, AxisLabel]]] = None,
             copy: Optional['MLArray'] = None,
@@ -49,6 +50,9 @@ class MLArray:
             direction (Optional[Union[List, Tuple, np.ndarray]]): Direction
                 cosine matrix. Provide a 2D list/tuple/ndarray with shape
                 (ndims, ndims) for spatial dimensions.
+            affine (Optional[Union[List, Tuple, np.ndarray]]): Homogeneous
+                affine matrix. Provide a 2D list/tuple/ndarray with shape
+                (spatial_ndims + 1, spatial_ndims + 1).
             meta (Optional[Dict | Meta]): Free-form metadata dictionary or Meta
                 instance. Must be JSON-serializable when saving. 
                 If meta is passed as a Dict, it is internally converted into a
@@ -81,6 +85,7 @@ class MLArray:
             spacing is not None
             or origin is not None
             or direction is not None
+            or affine is not None
             or meta is not None
             or axis_labels is not None
             or copy is not None
@@ -91,14 +96,23 @@ class MLArray:
             or dparams is not None
         ):
             raise RuntimeError(
-                "Spacing, origin, direction, meta, axis_labels, copy, patch_size, "
+                "Spacing, origin, direction, affine, meta, axis_labels, copy, patch_size, "
                 "chunk_size, block_size, cparams or dparams cannot be set when "
                 "array is a filepath."
             )
         if isinstance(array, (str, Path)):
             self._load(array, compressed=compressed)
         else:
-            self._validate_and_add_meta(meta, spacing, origin, direction, axis_labels, False, validate=False)
+            self._validate_and_add_meta(
+                meta,
+                spacing=spacing,
+                origin=origin,
+                direction=direction,
+                affine=affine,
+                axis_labels=axis_labels,
+                has_array=False,
+                validate=False,
+            )
             if array is not None:
                 self._asarray(
                     array,
@@ -1112,6 +1126,8 @@ class MLArray:
         """
         if self._store is None or self.meta._has_array.has_array == False:
             return None
+        if self.meta.spatial.affine is not None:
+            return self.meta.spatial.affine
         spacing  = np.array(self.spacing) if self.spacing is not None else np.ones(self.spatial_ndim)
         origin  = np.array(self.origin) if self.origin is not None else np.zeros(self.spatial_ndim)
         direction = np.array(self.direction) if self.direction is not None else np.eye(self.spatial_ndim)
@@ -1824,7 +1840,17 @@ class MLArray:
         meta_blosc2._validate_and_cast(ndims=len(shape), spatial_ndims=num_spatial_axes)
         return meta_blosc2
 
-    def _validate_and_add_meta(self, meta, spacing=None, origin=None, direction=None, axis_labels=None, has_array=None, validate=True):
+    def _validate_and_add_meta(
+            self,
+            meta,
+            spacing=None,
+            origin=None,
+            direction=None,
+            affine=None,
+            axis_labels=None,
+            has_array=None,
+            validate=True,
+        ):
         """Validate and attach metadata to the MLArray instance.
 
         Args:
@@ -1836,6 +1862,8 @@ class MLArray:
                 spatial axis.
             direction (Optional[Union[List, Tuple, np.ndarray]]): Direction
                 cosine matrix with shape (ndims, ndims).
+            affine (Optional[Union[List, Tuple, np.ndarray]]): Homogeneous
+                affine matrix with shape (spatial_ndims + 1, spatial_ndims + 1).
             axis_labels (Optional[List[Union[str, AxisLabel]]]): Per-axis labels or roles. Length must match ndims.
             has_array (Optional[bool]): Explicitly set whether array data is
                 present. When True, metadata is validated with array-dependent
@@ -1853,12 +1881,22 @@ class MLArray:
             meta = Meta()
         self.meta = meta
         self.meta._mlarray_version = MLARRAY_VERSION
+
+        if affine is not None and (
+            spacing is not None or origin is not None or direction is not None
+        ):
+            raise ValueError(
+                "affine cannot be provided together with spacing, origin, or direction."
+            )
+
         if spacing is not None:
             self.meta.spatial.spacing = spacing
         if origin is not None:
             self.meta.spatial.origin = origin
         if direction is not None:
             self.meta.spatial.direction = direction
+        if affine is not None:
+            self.meta.spatial.affine = affine
         if axis_labels is not None:
             self.meta.spatial.axis_labels = axis_labels
         if has_array == True:

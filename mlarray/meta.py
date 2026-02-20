@@ -676,6 +676,7 @@ class MetaSpatial(BaseMeta):
         spacing: Per-dimension spacing values. Length must match ndims.
         origin: Per-dimension origin values. Length must match ndims.
         direction: Direction cosine matrix of shape [ndims, ndims].
+        affine: Homogeneous affine matrix of shape [ndims + 1, ndims + 1].
         shape: Array shape. Length must match (spatial + non-spatial) ndims.
         axis_labels: Per-axis labels or roles. Length must match ndims.
         axis_units: Per-axis units. Length must match ndims.
@@ -686,6 +687,7 @@ class MetaSpatial(BaseMeta):
     spacing: Optional[list[Union[int,float]]] = None
     origin: Optional[list[Union[int,float]]] = None
     direction: Optional[list[list[Union[int,float]]]] = None
+    affine: Optional[list[list[Union[int,float]]]] = None
     shape: Optional[list[int]] = None
     axis_labels: Optional[list[Union[str,AxisLabel]]] = None
     axis_units: Optional[list[str]] = None
@@ -715,6 +717,21 @@ class MetaSpatial(BaseMeta):
         if self.direction is not None:
             self.direction = _cast_to_list(self.direction, "meta.spatial.direction")
             _validate_float_int_matrix(self.direction, "meta.spatial.direction", spatial_ndims)
+
+        if self.affine is not None:
+            self.affine = _cast_to_list(self.affine, "meta.spatial.affine")
+            if spatial_ndims is not None:
+                _validate_float_int_matrix(
+                    self.affine,
+                    "meta.spatial.affine",
+                    spatial_ndims + 1,
+                )
+            else:
+                _validate_float_int_matrix(self.affine, "meta.spatial.affine")
+                n_rows = len(self.affine)
+                for row in self.affine:
+                    if len(row) != n_rows:
+                        raise ValueError("meta.spatial.affine must be a square matrix")
 
         if self.shape is not None:
             self.shape = _cast_to_list(self.shape, "meta.spatial.shape")
@@ -915,7 +932,7 @@ class Meta(BaseMeta):
     Attributes:
         source: Source metadata from the original image source (JSON-serializable dict).
         extra: Additional metadata (JSON-serializable dict).
-        spatial: Spatial metadata (spacing, origin, direction, shape).
+        spatial: Spatial metadata (spacing, origin, direction, affine, shape).
         stats: Summary statistics.
         bbox: Bounding boxes.
         is_seg: Segmentation flag.

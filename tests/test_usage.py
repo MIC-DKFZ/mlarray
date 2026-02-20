@@ -88,6 +88,32 @@ class TestUsage(unittest.TestCase):
             self.assertEqual(loaded.origin, [10.0, 10.0, 30.0])
             self.assertEqual(loaded.meta.source["study_id"], "study-001")
 
+    def test_affine_stored_in_meta_spatial(self):
+        array = _make_array(shape=(8, 8, 8))
+        affine = [
+            [1.0, 0.0, 0.0, 10.0],
+            [0.0, 2.0, 0.0, 20.0],
+            [0.0, 0.0, 3.0, 30.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+        image = MLArray(array, affine=affine)
+
+        self.assertEqual(image.meta.spatial.affine, affine)
+        self.assertIsNone(image.meta.spatial.spacing)
+        self.assertIsNone(image.meta.spatial.origin)
+        self.assertIsNone(image.meta.spatial.direction)
+
+    def test_affine_and_spacing_origin_direction_mix_raises(self):
+        array = _make_array(shape=(8, 8, 8))
+        affine = [
+            [1.0, 0.0, 0.0, 10.0],
+            [0.0, 1.0, 0.0, 20.0],
+            [0.0, 0.0, 1.0, 30.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+        with self.assertRaises(ValueError):
+            MLArray(array, spacing=(1.0, 1.0, 1.0), affine=affine)
+
     def test_copy_metadata_with_override(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             array = _make_array()
