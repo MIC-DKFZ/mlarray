@@ -1680,115 +1680,94 @@ class MLArray:
         )
         self.meta._has_array.has_array = True
 
+        backend_lib = blosc2 if compressed else np
+        blosc2_storage_kwargs = {}
         if compressed:
-            cparams = MLArray._resolve_cparams(self.meta.blosc2.cparams)
-            dparams = MLArray._resolve_dparams(self.meta.blosc2.dparams)
-            if constructor == "asarray":
-                self._store = blosc2.asarray(
-                    source_array,
-                    chunks=self.meta.blosc2.chunk_size,
-                    blocks=self.meta.blosc2.block_size,
-                    cparams=cparams,
-                    dparams=dparams,
-                )
-            elif constructor in ("empty", "zeros", "ones"):
-                func = getattr(blosc2, constructor)
-                self._store = func(
-                    shape=shape,
-                    dtype=dtype,
-                    chunks=self.meta.blosc2.chunk_size,
-                    blocks=self.meta.blosc2.block_size,
-                    cparams=cparams,
-                    dparams=dparams,
-                )
-            elif constructor == "full":
-                self._store = blosc2.full(
-                    shape=shape,
-                    fill_value=constructor_kwargs["fill_value"],
-                    dtype=dtype,
-                    chunks=self.meta.blosc2.chunk_size,
-                    blocks=self.meta.blosc2.block_size,
-                    cparams=cparams,
-                    dparams=dparams,
-                )
-            elif constructor == "arange":
-                self._store = blosc2.arange(
-                    start=constructor_kwargs["start"],
-                    stop=constructor_kwargs["stop"],
-                    step=constructor_kwargs["step"],
-                    dtype=dtype,
-                    shape=shape,
-                    c_order=constructor_kwargs.get("c_order", True),
-                    chunks=self.meta.blosc2.chunk_size,
-                    blocks=self.meta.blosc2.block_size,
-                    cparams=cparams,
-                    dparams=dparams,
-                )
-            elif constructor == "linspace":
-                self._store = blosc2.linspace(
-                    start=constructor_kwargs["start"],
-                    stop=constructor_kwargs["stop"],
-                    num=constructor_kwargs["num"],
-                    dtype=dtype,
-                    shape=shape,
-                    endpoint=constructor_kwargs.get("endpoint", True),
-                    c_order=constructor_kwargs.get("c_order", True),
-                    chunks=self.meta.blosc2.chunk_size,
-                    blocks=self.meta.blosc2.block_size,
-                    cparams=cparams,
-                    dparams=dparams,
-                )
+            blosc2_storage_kwargs = {
+                "chunks": self.meta.blosc2.chunk_size,
+                "blocks": self.meta.blosc2.block_size,
+                "cparams": MLArray._resolve_cparams(self.meta.blosc2.cparams),
+                "dparams": MLArray._resolve_dparams(self.meta.blosc2.dparams),
+            }
+
+        if constructor == "asarray":
+            if compressed:
+                self._store = blosc2.asarray(source_array, **blosc2_storage_kwargs)
             else:
-                raise ValueError(f"Unknown constructor '{constructor}'.")
-            self._backend = "blosc2"
-        else:
-            if constructor == "asarray":
                 self._store = np.asarray(source_array, dtype=dtype)
-            elif constructor == "empty":
-                self._store = np.empty(shape=shape, dtype=dtype)
-            elif constructor == "zeros":
-                self._store = np.zeros(shape=shape, dtype=dtype)
-            elif constructor == "ones":
-                self._store = np.ones(shape=shape, dtype=dtype)
-            elif constructor == "full":
-                self._store = np.full(
-                    shape=shape,
-                    fill_value=constructor_kwargs["fill_value"],
-                    dtype=dtype,
-                )
-            elif constructor == "arange":
-                arr = np.arange(
-                    constructor_kwargs["start"],
-                    constructor_kwargs["stop"],
-                    constructor_kwargs["step"],
-                    dtype=dtype,
-                )
-                self._store = np.reshape(
-                    arr,
-                    shape,
-                    order="C" if constructor_kwargs.get("c_order", True) else "F",
-                )
-            elif constructor == "linspace":
-                arr = np.linspace(
-                    constructor_kwargs["start"],
-                    constructor_kwargs["stop"],
-                    constructor_kwargs["num"],
-                    endpoint=constructor_kwargs.get("endpoint", True),
-                    dtype=dtype,
-                )
-                self._store = np.reshape(
-                    arr,
-                    shape,
-                    order="C" if constructor_kwargs.get("c_order", True) else "F",
-                )
+        else:
+            call_kwargs = self._build_constructor_call_kwargs(
+                constructor=constructor,
+                shape=shape,
+                dtype=dtype,
+                constructor_kwargs=constructor_kwargs,
+            )
+
+            if not compressed and constructor in ("arange", "linspace"):
+                self._store = self._construct_numpy_range(constructor, call_kwargs)
             else:
-                raise ValueError(f"Unknown constructor '{constructor}'.")
-            self._backend = "numpy"
+                func = getattr(backend_lib, constructor, None)
+                if func is None:
+                    raise ValueError(f"Unknown constructor '{constructor}'.")
+                if compressed:
+                    call_kwargs.update(blosc2_storage_kwargs)
+                self._store = func(**call_kwargs)
+
+        self._backend = "blosc2" if compressed else "numpy"
 
         self.support_metadata = True
 
         self._update_blosc2_meta()
         self._validate_and_add_meta(self.meta)
+
+    @staticmethod
+    def _build_constructor_call_kwargs(
+            constructor: str,
+            shape: Tuple[int, ...],
+            dtype: np.dtype,
+            constructor_kwargs: dict[str, Any],
+        ) -> dict[str, Any]:
+        """Build constructor kwargs shared by NumPy and Blosc2 backends."""
+        if constructor in ("empty", "zeros", "ones"):
+            return {"shape": shape, "dtype": dtype}
+        if constructor == "full":
+            return {
+                "shape": shape,
+                "fill_value": constructor_kwargs["fill_value"],
+                "dtype": dtype,
+            }
+        if constructor == "arange":
+            return {
+                "start": constructor_kwargs["start"],
+                "stop": constructor_kwargs["stop"],
+                "step": constructor_kwargs["step"],
+                "dtype": dtype,
+                "shape": shape,
+                "c_order": constructor_kwargs.get("c_order", True),
+            }
+        if constructor == "linspace":
+            return {
+                "start": constructor_kwargs["start"],
+                "stop": constructor_kwargs["stop"],
+                "num": constructor_kwargs["num"],
+                "dtype": dtype,
+                "shape": shape,
+                "endpoint": constructor_kwargs.get("endpoint", True),
+                "c_order": constructor_kwargs.get("c_order", True),
+            }
+        raise ValueError(f"Unknown constructor '{constructor}'.")
+
+    @staticmethod
+    def _construct_numpy_range(
+            constructor: str,
+            call_kwargs: dict[str, Any],
+        ) -> np.ndarray:
+        """Construct NumPy arange/linspace arrays and apply shape/order reshaping."""
+        shape = call_kwargs.pop("shape")
+        c_order = call_kwargs.pop("c_order", True)
+        func = getattr(np, constructor)
+        arr = func(**call_kwargs)
+        return np.reshape(arr, shape, order="C" if c_order else "F")
 
     def _comp_and_validate_blosc2_meta(self, meta_blosc2, patch_size, chunk_size, block_size, shape, dtype_itemsize, spatial_axis_mask, cparams, dparams):
         """Compute and validate Blosc2 chunk/block metadata.
