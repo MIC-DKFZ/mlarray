@@ -393,6 +393,44 @@ def _cast_to_list(value: Any, label: str):
     return out
 
 
+def _to_jsonable(value: Any) -> Any:
+    """Recursively convert values to JSON-serializable plain Python objects."""
+    if isinstance(value, Enum):
+        return value.value
+
+    if isinstance(value, Mapping):
+        return {str(k): _to_jsonable(v) for k, v in value.items()}
+
+    if isinstance(value, (list, tuple)):
+        return [_to_jsonable(v) for v in value]
+
+    if isinstance(value, np.generic):
+        return value.item()
+
+    return value
+
+
+def _cast_to_jsonable_mapping(value: Any, label: str) -> dict[str, Any]:
+    """Cast a value to a JSON-serializable mapping.
+
+    Accepts mappings directly or objects exposing ``__dict__`` (for example
+    Blosc2 ``CParams`` / ``DParams`` objects).
+    """
+    if isinstance(value, Mapping):
+        out = dict(value)
+    elif hasattr(value, "__dict__"):
+        out = dict(vars(value))
+    else:
+        raise TypeError(f"{label} must be a mapping or object with __dict__")
+
+    out = _to_jsonable(out)
+    if not isinstance(out, dict):
+        raise TypeError(f"{label} could not be converted to a mapping")
+    if not is_serializable(out):
+        raise TypeError(f"{label} is not JSON-serializable")
+    return out
+
+
 def _validate_int(value: Any, label: str) -> None:
     """Validate that value is an int.
 
@@ -565,10 +603,14 @@ class MetaBlosc2(BaseMeta):
         chunk_size: List of per-dimension chunk sizes. Length must match ndims.
         block_size: List of per-dimension block sizes. Length must match ndims.
         patch_size: List of per-dimension patch sizes. Length must match spatial ndims.
+        cparams: Blosc2 compression parameters as a JSON-serializable dict.
+        dparams: Blosc2 decompression parameters as a JSON-serializable dict.
     """
     chunk_size: Optional[list] = None
     block_size: Optional[list] = None
     patch_size: Optional[list] = None
+    cparams: Optional[dict[str, Any]] = None
+    dparams: Optional[dict[str, Any]] = None
 
     def _validate_and_cast(self, *, ndims: Optional[int] = None, spatial_ndims: Optional[int] = None, **_: Any) -> None:
         """Validate and normalize tiling sizes.
@@ -590,6 +632,12 @@ class MetaBlosc2(BaseMeta):
             spatial_ndims = ndims if spatial_ndims is None else spatial_ndims
             self.patch_size = _cast_to_list(self.patch_size, "meta.blosc2.patch_size")
             _validate_float_int_list(self.patch_size, "meta.blosc2.patch_size", spatial_ndims)
+
+        if self.cparams is not None:
+            self.cparams = _cast_to_jsonable_mapping(self.cparams, "meta.blosc2.cparams")
+
+        if self.dparams is not None:
+            self.dparams = _cast_to_jsonable_mapping(self.dparams, "meta.blosc2.dparams")
 
 
 class AxisLabelEnum(str, Enum):

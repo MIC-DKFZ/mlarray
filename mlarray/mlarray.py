@@ -1439,15 +1439,12 @@ class MLArray:
     
         self._validate_and_add_meta(meta, has_array=True)
         spatial_axis_mask = [True] * len(shape) if self.meta.spatial.axis_labels is None else _spatial_axis_mask(self.meta.spatial.axis_labels)
-        self.meta.blosc2 = self._comp_and_validate_blosc2_meta(self.meta.blosc2, patch_size, chunk_size, block_size, shape, np.dtype(dtype).itemsize, spatial_axis_mask)   
+        self.meta.blosc2 = self._comp_and_validate_blosc2_meta(self.meta.blosc2, patch_size, chunk_size, block_size, shape, np.dtype(dtype).itemsize, spatial_axis_mask, cparams, dparams)   
         self.meta._has_array.has_array = True
         
         self.support_metadata = str(filepath).endswith(f".{MLARRAY_SUFFIX}")
-
-        cparams = MLArray._resolve_cparams(cparams)
-        dparams = MLArray._resolve_dparams(dparams)
         
-        self._store = blosc2.empty(shape=shape, dtype=np.dtype(dtype), urlpath=str(filepath), chunks=self.meta.blosc2.chunk_size, blocks=self.meta.blosc2.block_size, cparams=cparams, dparams=dparams, mmap_mode=mmap_mode)
+        self._store = blosc2.empty(shape=shape, dtype=np.dtype(dtype), urlpath=str(filepath), chunks=self.meta.blosc2.chunk_size, blocks=self.meta.blosc2.block_size, cparams=MLArray._resolve_cparams(self.meta.blosc2.cparams), dparams=MLArray._resolve_dparams(self.meta.blosc2.dparams), mmap_mode=mmap_mode)
         self._update_blosc2_meta()
         self.mode = mode
         self.mmap_mode = mmap_mode
@@ -1621,6 +1618,7 @@ class MLArray:
             if self.meta.spatial.axis_labels is None
             else _spatial_axis_mask(self.meta.spatial.axis_labels)
         )
+
         self.meta.blosc2 = self._comp_and_validate_blosc2_meta(
             self.meta.blosc2,
             patch_size,
@@ -1629,19 +1627,18 @@ class MLArray:
             shape,
             dtype.itemsize,
             spatial_axis_mask,
+            cparams,
+            dparams,
         )
         self.meta._has_array.has_array = True
-
-        cparams = MLArray._resolve_cparams(cparams)
-        dparams = MLArray._resolve_dparams(dparams)
 
         builder_kwargs = dict(
             shape=shape,
             dtype=dtype,
             chunks=self.meta.blosc2.chunk_size,
             blocks=self.meta.blosc2.block_size,
-            cparams=cparams,
-            dparams=dparams,
+            cparams=MLArray._resolve_cparams(self.meta.blosc2.cparams),
+            dparams=MLArray._resolve_dparams(self.meta.blosc2.dparams),
         )
         if source_array is not None:
             builder_kwargs["source_array"] = source_array
@@ -1653,7 +1650,7 @@ class MLArray:
         self._update_blosc2_meta()
         self._validate_and_add_meta(self.meta)
 
-    def _comp_and_validate_blosc2_meta(self, meta_blosc2, patch_size, chunk_size, block_size, shape, dtype_itemsize, spatial_axis_mask):
+    def _comp_and_validate_blosc2_meta(self, meta_blosc2, patch_size, chunk_size, block_size, shape, dtype_itemsize, spatial_axis_mask, cparams, dparams):
         """Compute and validate Blosc2 chunk/block metadata.
 
         Args:
@@ -1695,7 +1692,16 @@ class MLArray:
         if patch_size is not None:
             chunk_size, block_size = MLArray.comp_blosc2_params(shape, patch_size, spatial_axis_mask, bytes_per_pixel=dtype_itemsize)
 
-        meta_blosc2 = MetaBlosc2(chunk_size, block_size, patch_size)
+        cparams = MLArray._resolve_cparams(cparams)
+        dparams = MLArray._resolve_dparams(dparams)
+
+        meta_blosc2 = MetaBlosc2(
+            chunk_size=chunk_size,
+            block_size=block_size,
+            patch_size=patch_size,
+            cparams=cparams,
+            dparams=dparams,
+        )
         meta_blosc2._validate_and_cast(ndims=len(shape), spatial_ndims=num_spatial_axes)
         return meta_blosc2
 
@@ -1814,6 +1820,19 @@ class MLArray:
         """Resolve compression params with MLArray defaults."""
         if cparams is None:
             return {"codec": blosc2.Codec.LZ4HC, "clevel": 8}
+        if isinstance(cparams, dict):
+            cparams = dict(cparams)
+            if "codec" in cparams and not isinstance(cparams["codec"], blosc2.Codec):
+                cparams["codec"] = blosc2.Codec(cparams["codec"])
+            if "splitmode" in cparams and not isinstance(cparams["splitmode"], blosc2.SplitMode):
+                cparams["splitmode"] = blosc2.SplitMode(cparams["splitmode"])
+            if "tuner" in cparams and not isinstance(cparams["tuner"], blosc2.Tuner):
+                cparams["tuner"] = blosc2.Tuner(cparams["tuner"])
+            if "filters" in cparams and isinstance(cparams["filters"], (list, tuple)):
+                cparams["filters"] = [
+                    f if isinstance(f, blosc2.Filter) else blosc2.Filter(f)
+                    for f in cparams["filters"]
+                ]
         return cparams
 
     @staticmethod
