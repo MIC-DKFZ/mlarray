@@ -8,7 +8,7 @@ The CLI currently focuses on core workflows (header inspection and conversion). 
 
 ## `mlarray_header`
 
-Print the metadata header from a `.mla` or `.b2nd` file.
+Print the metadata header from a `.mla` file.
 
 This command is useful for quickly checking spatial metadata, stored schemas, and other file-level information without loading the full array into memory.
 

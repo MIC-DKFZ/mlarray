@@ -182,23 +182,16 @@ class TestUsage(unittest.TestCase):
             self.assertEqual(loaded.meta.blosc2.chunk_size, [1, 16, 16])
             self.assertEqual(loaded.meta.blosc2.block_size, [1, 8, 8])
 
-    def test_b2nd_metadata_ignored_on_load(self):
+    def test_b2nd_extension_not_supported(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             array = _make_array()
             path = Path(tmpdir) / "plain.b2nd"
-            image = MLArray(
-                array,
-                spacing=(1.0, 2.0, 3.0),
-                origin=(1.0, 2.0, 3.0),
-                direction=[[1, 0, 0], [0, 1, 0], [0, 0, 1]],
-                meta=Meta(source={"tag": "value"}, is_seg=True),
-            )
-            image.save(path)
+            image = MLArray(array)
 
-            loaded = MLArray(path)
-            self.assertIsNone(loaded.spacing)
-            self.assertIsNone(loaded.origin)
-            self.assertIsNone(loaded.direction)
+            with self.assertRaises(RuntimeError):
+                image.save(path)
+            with self.assertRaises(RuntimeError):
+                MLArray(path)
 
 
 if __name__ == "__main__":

@@ -194,7 +194,7 @@ image.save("blosc2-auto.mla")
 
 ### mlarray_header
 
-Print the metadata header from a `.mla` or `.b2nd` file.
+Print the metadata header from a `.mla` file.
 
 ```bash
 mlarray_header sample.mla

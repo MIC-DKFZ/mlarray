@@ -14,7 +14,7 @@ def print_header(filepath: Union[str, Path]) -> None:
     """Print the MLArray metadata header for a file.
 
     Args:
-        filepath: Path to a ".mla" or ".b2nd" file.
+        filepath: Path to a ".mla" file.
     """
     meta = MLArray(filepath).meta
     if meta is None:
@@ -42,7 +42,7 @@ def cli_print_header() -> None:
         prog="mlarray_header",
         description="Print the MLArray metadata header for a file.",
     )
-    parser.add_argument("filepath", help="Path to a .mla or .b2nd file.")
+    parser.add_argument("filepath", help="Path to a .mla file.")
     args = parser.parse_args()
     print_header(args.filepath)
 
