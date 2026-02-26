@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import MISSING, dataclass, field, fields
 from typing import Any, Mapping, Optional, Type, TypeVar, Union, TypeAlias, Iterable
 from enum import Enum
@@ -9,6 +11,110 @@ from mlarray.utils import is_serializable
 
 T = TypeVar("T", bound="BaseMeta")
 SK = TypeVar("SK", bound="SingleKeyBaseMeta")
+
+
+_INTERNAL_META_WRITE: ContextVar[bool] = ContextVar(
+    "_INTERNAL_META_WRITE",
+    default=False,
+)
+
+
+@contextmanager
+def _meta_internal_write():
+    """Allow internal metadata writes within a bounded context."""
+    token = _INTERNAL_META_WRITE.set(True)
+    try:
+        yield
+    finally:
+        _INTERNAL_META_WRITE.reset(token)
+
+
+def _is_meta_internal_write() -> bool:
+    return _INTERNAL_META_WRITE.get()
+
+
+def _has_initialized_attr(obj: Any, name: str) -> bool:
+    try:
+        object.__getattribute__(obj, name)
+        return True
+    except AttributeError:
+        return False
+
+
+def _raise_internal_only(label: str) -> None:
+    raise AttributeError(f"{label} is managed by MLArray and is read-only.")
+
+
+def _public_dataclass_fields(obj_or_cls: Any):
+    return [
+        f for f in fields(obj_or_cls)
+        if not f.metadata.get("mlarray_internal_state", False)
+    ]
+
+
+class _FrozenList(list):
+    """A list that disallows in-place mutation."""
+
+    def _readonly(self, *_: Any, **__: Any) -> None:
+        raise AttributeError("This metadata field is read-only.")
+
+    __setitem__ = _readonly
+    __delitem__ = _readonly
+    __iadd__ = _readonly
+    __imul__ = _readonly
+    append = _readonly
+    clear = _readonly
+    extend = _readonly
+    insert = _readonly
+    pop = _readonly
+    remove = _readonly
+    reverse = _readonly
+    sort = _readonly
+
+    def __reduce_ex__(self, protocol: int):
+        return (_FrozenList, (list(self),))
+
+    def __copy__(self):
+        return _FrozenList(self)
+
+    def __deepcopy__(self, memo):
+        copied = _FrozenList(self)
+        memo[id(self)] = copied
+        return copied
+
+
+class _FrozenDict(dict):
+    """A dict that disallows in-place mutation."""
+
+    def _readonly(self, *_: Any, **__: Any) -> None:
+        raise AttributeError("This metadata field is read-only.")
+
+    __setitem__ = _readonly
+    __delitem__ = _readonly
+    clear = _readonly
+    pop = _readonly
+    popitem = _readonly
+    setdefault = _readonly
+    update = _readonly
+
+    def __reduce_ex__(self, protocol: int):
+        return (_FrozenDict, (dict(self),))
+
+    def __copy__(self):
+        return _FrozenDict(self)
+
+    def __deepcopy__(self, memo):
+        copied = _FrozenDict(self)
+        memo[id(self)] = copied
+        return copied
+
+
+def _freeze_jsonable(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return _FrozenDict({k: _freeze_jsonable(v) for k, v in value.items()})
+    if isinstance(value, list):
+        return _FrozenList([_freeze_jsonable(v) for v in value])
+    return value
 
 
 def _is_unset_value(v: Any) -> bool:
@@ -37,10 +143,67 @@ class BaseMeta:
     Subclasses should implement _validate_and_cast to coerce and validate
     fields after initialization or mutation.
     """
+    _validate_ndims: Optional[int] = field(
+        default=None,
+        init=False,
+        repr=False,
+        compare=False,
+        metadata={"mlarray_internal_state": True},
+    )
+    _validate_spatial_ndims: Optional[int] = field(
+        default=None,
+        init=False,
+        repr=False,
+        compare=False,
+        metadata={"mlarray_internal_state": True},
+    )
+    _PROTECTED_FIELDS = frozenset()
+    _PROTECTED_FIELD_PREFIX = ""
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name in {"_validate_ndims", "_validate_spatial_ndims"}:
+            object.__setattr__(self, name, value)
+            return
+
+        if _is_meta_internal_write() or not _has_initialized_attr(self, name):
+            object.__setattr__(self, name, value)
+            return
+
+        if name in self._PROTECTED_FIELDS:
+            prefix = self._PROTECTED_FIELD_PREFIX
+            label = f"{prefix}{name}" if prefix else name
+            _raise_internal_only(label)
+
+        current = getattr(self, name)
+        if isinstance(current, BaseMeta) and not isinstance(value, current.__class__):
+            value = current.__class__.ensure(value)
+
+        object.__setattr__(self, name, value)
+        try:
+            with _meta_internal_write():
+                self._validate_and_cast(
+                    ndims=self._validate_ndims,
+                    spatial_ndims=self._validate_spatial_ndims,
+                )
+        except Exception:
+            object.__setattr__(self, name, current)
+            raise
 
     def __post_init__(self) -> None:
         """Validate and normalize fields after dataclass initialization."""
-        self._validate_and_cast()
+        with _meta_internal_write():
+            self._validate_and_cast()
+
+    def _remember_validation_context(
+        self,
+        *,
+        ndims: Optional[int] = None,
+        spatial_ndims: Optional[int] = None,
+    ) -> None:
+        if ndims is not None:
+            object.__setattr__(self, "_validate_ndims", ndims)
+        if spatial_ndims is not None:
+            object.__setattr__(self, "_validate_spatial_ndims", spatial_ndims)
 
     def _validate_and_cast(self, **_: Any) -> None:
         """Validate and normalize fields in subclasses.
@@ -68,7 +231,7 @@ class BaseMeta:
             A dict of field names to serialized values.
         """
         out: dict[str, Any] = {}
-        for f in fields(self):
+        for f in _public_dataclass_fields(self):
             v = getattr(self, f.name)
             if v is None and not include_none:
                 continue
@@ -98,14 +261,14 @@ class BaseMeta:
             )
 
         dd = dict(d)
-        known = {f.name for f in fields(cls)}
+        known = {f.name for f in _public_dataclass_fields(cls)}
         unknown = set(dd) - known
         if unknown:
             raise KeyError(
                 f"Unknown {cls.__name__} keys in from_mapping: {sorted(unknown)}"
             )
 
-        for f in fields(cls):
+        for f in _public_dataclass_fields(cls):
             if f.name not in dd:
                 continue
             v = dd[f.name]
@@ -127,7 +290,7 @@ class BaseMeta:
             overrides this to return its wrapped value.
         """
         out: dict[str, Any] = {}
-        for f in fields(self):
+        for f in _public_dataclass_fields(self):
             v = getattr(self, f.name)
             if v is None and not include_none:
                 continue
@@ -141,7 +304,7 @@ class BaseMeta:
         """Return True if this equals a default-constructed instance."""
         default = self.__class__()  # type: ignore[call-arg]
 
-        for f in fields(self):
+        for f in _public_dataclass_fields(self):
             a = getattr(self, f.name)
             b = getattr(default, f.name)
 
@@ -155,7 +318,7 @@ class BaseMeta:
 
     def reset(self) -> None:
         """Reset all fields to their default or None."""
-        for f in fields(self):
+        for f in _public_dataclass_fields(self):
             if f.default_factory is not MISSING:  # type: ignore[attr-defined]
                 setattr(self, f.name, f.default_factory())  # type: ignore[misc]
             elif f.default is not MISSING:
@@ -179,7 +342,7 @@ class BaseMeta:
         if other.__class__ is not self.__class__:
             raise TypeError(f"copy_from expects {self.__class__.__name__}")
 
-        for f in fields(self):
+        for f in _public_dataclass_fields(self):
             src = getattr(other, f.name)
             dst = getattr(self, f.name)
 
@@ -230,7 +393,7 @@ class SingleKeyBaseMeta(BaseMeta):
         Raises:
             TypeError: If the subclass does not define exactly one field.
         """
-        flds = fields(cls)
+        flds = _public_dataclass_fields(cls)
         if len(flds) != 1:
             raise TypeError(
                 f"{cls.__name__} must define exactly one dataclass field (found {len(flds)})"
@@ -611,6 +774,10 @@ class MetaBlosc2(BaseMeta):
     patch_size: Optional[list] = None
     cparams: Optional[dict[str, Any]] = None
     dparams: Optional[dict[str, Any]] = None
+    _PROTECTED_FIELDS = frozenset(
+        {"chunk_size", "block_size", "patch_size", "cparams", "dparams"}
+    )
+    _PROTECTED_FIELD_PREFIX = "meta.blosc2."
 
     def _validate_and_cast(self, *, ndims: Optional[int] = None, spatial_ndims: Optional[int] = None, **_: Any) -> None:
         """Validate and normalize tiling sizes.
@@ -620,24 +787,37 @@ class MetaBlosc2(BaseMeta):
             spatial_ndims: Number of spatial dimensions.
             **_: Unused extra context.
         """
+        self._remember_validation_context(
+            ndims=ndims,
+            spatial_ndims=spatial_ndims,
+        )
         if self.chunk_size is not None:
-            self.chunk_size = _cast_to_list(self.chunk_size, "meta.blosc2.chunk_size")
-            _validate_float_int_list(self.chunk_size, "meta.blosc2.chunk_size", ndims)
+            chunk_size = _cast_to_list(self.chunk_size, "meta.blosc2.chunk_size")
+            _validate_float_int_list(chunk_size, "meta.blosc2.chunk_size", ndims)
+            self.chunk_size = _FrozenList(chunk_size)
 
         if self.block_size is not None:
-            self.block_size = _cast_to_list(self.block_size, "meta.blosc2.block_size")
-            _validate_float_int_list(self.block_size, "meta.blosc2.block_size", ndims)
+            block_size = _cast_to_list(self.block_size, "meta.blosc2.block_size")
+            _validate_float_int_list(block_size, "meta.blosc2.block_size", ndims)
+            self.block_size = _FrozenList(block_size)
 
         if self.patch_size is not None:
             spatial_ndims = ndims if spatial_ndims is None else spatial_ndims
-            self.patch_size = _cast_to_list(self.patch_size, "meta.blosc2.patch_size")
-            _validate_float_int_list(self.patch_size, "meta.blosc2.patch_size", spatial_ndims)
+            patch_size = _cast_to_list(self.patch_size, "meta.blosc2.patch_size")
+            _validate_float_int_list(
+                patch_size,
+                "meta.blosc2.patch_size",
+                spatial_ndims,
+            )
+            self.patch_size = _FrozenList(patch_size)
 
         if self.cparams is not None:
-            self.cparams = _cast_to_jsonable_mapping(self.cparams, "meta.blosc2.cparams")
+            cparams = _cast_to_jsonable_mapping(self.cparams, "meta.blosc2.cparams")
+            self.cparams = _freeze_jsonable(cparams)
 
         if self.dparams is not None:
-            self.dparams = _cast_to_jsonable_mapping(self.dparams, "meta.blosc2.dparams")
+            dparams = _cast_to_jsonable_mapping(self.dparams, "meta.blosc2.dparams")
+            self.dparams = _freeze_jsonable(dparams)
 
 
 class AxisLabelEnum(str, Enum):
@@ -693,6 +873,8 @@ class MetaSpatial(BaseMeta):
     axis_units: Optional[list[str]] = None
     _num_spatial_axes: Optional[int] = None
     _num_non_spatial_axes: Optional[int] = None
+    _PROTECTED_FIELDS = frozenset({"shape"})
+    _PROTECTED_FIELD_PREFIX = "meta.spatial."
 
     def _validate_and_cast(self, *, ndims: Optional[int] = None, spatial_ndims: Optional[int] = None, **_: Any) -> None:
         """Validate and normalize spatial fields.
@@ -702,6 +884,20 @@ class MetaSpatial(BaseMeta):
             spatial_ndims: Number of spatial dimensions.
             **_: Unused extra context.
         """
+        self._remember_validation_context(
+            ndims=ndims,
+            spatial_ndims=spatial_ndims,
+        )
+
+        if self.affine is not None and (
+            self.spacing is not None
+            or self.origin is not None
+            or self.direction is not None
+        ):
+            raise ValueError(
+                "meta.spatial.affine cannot be set together with spacing, origin, or direction."
+            )
+
         if self.axis_labels is not None:
             self.axis_labels, self._num_spatial_axes, self._num_non_spatial_axes = validate_and_cast_axis_labels(self.axis_labels, "meta.spatial.axis_labels", ndims)
         spatial_ndims = spatial_ndims if self._num_spatial_axes is None else self._num_spatial_axes
@@ -734,8 +930,34 @@ class MetaSpatial(BaseMeta):
                         raise ValueError("meta.spatial.affine must be a square matrix")
 
         if self.shape is not None:
-            self.shape = _cast_to_list(self.shape, "meta.spatial.shape")
-            _validate_float_int_list(self.shape, "meta.spatial.shape", ndims)
+            shape = _cast_to_list(self.shape, "meta.spatial.shape")
+            _validate_float_int_list(shape, "meta.spatial.shape", ndims)
+            self.shape = _FrozenList(shape)
+
+    def copy_from(self, other: "MetaSpatial", *, overwrite: bool = False) -> None:
+        if other.__class__ is not self.__class__:
+            raise TypeError(f"copy_from expects {self.__class__.__name__}")
+
+        for f in _public_dataclass_fields(self):
+            if f.name == "shape" and not _is_meta_internal_write():
+                continue
+
+            src = getattr(other, f.name)
+            dst = getattr(self, f.name)
+
+            if overwrite:
+                setattr(self, f.name, src)
+                continue
+
+            if isinstance(dst, BaseMeta) and isinstance(src, BaseMeta):
+                if dst.is_default():
+                    setattr(self, f.name, src)
+                else:
+                    dst.copy_from(src, overwrite=False)
+                continue
+
+            if _is_unset_value(dst):
+                setattr(self, f.name, src)
 
 
 @dataclass(slots=True)
@@ -888,6 +1110,8 @@ class MetaHasArray(SingleKeyBaseMeta):
         has_array: True when array data is present.
     """
     has_array: bool = False
+    _PROTECTED_FIELDS = frozenset({"has_array"})
+    _PROTECTED_FIELD_PREFIX = "meta._has_array."
 
     def _validate_and_cast(self, **_: Any) -> None:
         """Validate has_array as bool."""
@@ -903,6 +1127,8 @@ class MetaImageFormat(SingleKeyBaseMeta):
         image_meta_format: Format identifier, or None.
     """
     image_meta_format: Optional[str] = None
+    _PROTECTED_FIELDS = frozenset({"image_meta_format"})
+    _PROTECTED_FIELD_PREFIX = "meta._image_meta_format."
 
     def _validate_and_cast(self, **_: Any) -> None:
         """Validate image_meta_format as str or None."""
@@ -918,6 +1144,8 @@ class MetaVersion(SingleKeyBaseMeta):
         mlarray_version: Version string, or None.
     """
     mlarray_version: Optional[str] = None
+    _PROTECTED_FIELDS = frozenset({"mlarray_version"})
+    _PROTECTED_FIELD_PREFIX = "meta._mlarray_version."
 
     def _validate_and_cast(self, **_: Any) -> None:
         """Validate mlarray_version as str or None."""
@@ -951,6 +1179,10 @@ class Meta(BaseMeta):
     _has_array: "MetaHasArray" = field(default_factory=lambda: MetaHasArray())
     _image_meta_format: "MetaImageFormat" = field(default_factory=lambda: MetaImageFormat())
     _mlarray_version: "MetaVersion" = field(default_factory=lambda: MetaVersion())
+    _USER_FIELDS = ("source", "extra", "spatial", "stats", "bbox", "is_seg")
+    _INTERNAL_FIELDS = ("blosc2", "_has_array", "_image_meta_format", "_mlarray_version")
+    _PROTECTED_FIELDS = frozenset(_INTERNAL_FIELDS)
+    _PROTECTED_FIELD_PREFIX = "meta."
 
     def _validate_and_cast(self, *, ndims: Optional[int] = None, spatial_ndims: Optional[int] = None, **_: Any) -> None:
         """Coerce child metas and validate with optional context.
@@ -960,19 +1192,140 @@ class Meta(BaseMeta):
             spatial_ndims: Number of spatial dimensions for context-aware validation.
             **_: Unused extra context.
         """
-        self.source = MetaSource.ensure(self.source)
-        self.extra = MetaExtra.ensure(self.extra)
-        self.spatial = MetaSpatial.ensure(self.spatial)
-        self.stats = MetaStatistics.ensure(self.stats)
-        self.bbox = MetaBbox.ensure(self.bbox)
-        self.is_seg = MetaIsSeg.ensure(self.is_seg)
-        self.blosc2 = MetaBlosc2.ensure(self.blosc2)
-        self._has_array = MetaHasArray.ensure(self._has_array)
-        self._image_meta_format = MetaImageFormat.ensure(self._image_meta_format)
-        self._mlarray_version = MetaVersion.ensure(self._mlarray_version)
+        self._remember_validation_context(
+            ndims=ndims,
+            spatial_ndims=spatial_ndims,
+        )
+        object.__setattr__(self, "source", MetaSource.ensure(self.source))
+        object.__setattr__(self, "extra", MetaExtra.ensure(self.extra))
+        object.__setattr__(self, "spatial", MetaSpatial.ensure(self.spatial))
+        object.__setattr__(self, "stats", MetaStatistics.ensure(self.stats))
+        object.__setattr__(self, "bbox", MetaBbox.ensure(self.bbox))
+        object.__setattr__(self, "is_seg", MetaIsSeg.ensure(self.is_seg))
+        object.__setattr__(self, "blosc2", MetaBlosc2.ensure(self.blosc2))
+        object.__setattr__(self, "_has_array", MetaHasArray.ensure(self._has_array))
+        object.__setattr__(
+            self,
+            "_image_meta_format",
+            MetaImageFormat.ensure(self._image_meta_format),
+        )
+        object.__setattr__(self, "_mlarray_version", MetaVersion.ensure(self._mlarray_version))
 
         self.spatial._validate_and_cast(ndims=ndims, spatial_ndims=spatial_ndims)
         self.blosc2._validate_and_cast(ndims=ndims, spatial_ndims=spatial_ndims)
+
+    def copy_from(self, other: "Meta", *, overwrite: bool = False) -> None:
+        if other.__class__ is not self.__class__:
+            raise TypeError(f"copy_from expects {self.__class__.__name__}")
+
+        field_names = list(self._USER_FIELDS)
+        if _is_meta_internal_write():
+            field_names.extend(self._INTERNAL_FIELDS)
+
+        for name in field_names:
+            src = getattr(other, name)
+            dst = getattr(self, name)
+
+            if overwrite:
+                object.__setattr__(self, name, src)
+                continue
+
+            if isinstance(dst, BaseMeta) and isinstance(src, BaseMeta):
+                if dst.is_default():
+                    object.__setattr__(self, name, src)
+                else:
+                    dst.copy_from(src, overwrite=False)
+                continue
+
+            if _is_unset_value(dst):
+                object.__setattr__(self, name, src)
+
+    def set_source(self, value: Union["MetaSource", Mapping[str, Any]]) -> "Meta":
+        object.__setattr__(self, "source", MetaSource.ensure(value))
+        return self
+
+    def set_extra(self, value: Union["MetaExtra", Mapping[str, Any]]) -> "Meta":
+        object.__setattr__(self, "extra", MetaExtra.ensure(value))
+        return self
+
+    def set_spatial(self, value: Union["MetaSpatial", Mapping[str, Any]]) -> "Meta":
+        spatial = MetaSpatial.ensure(value)
+        if spatial.shape is not None and not _is_meta_internal_write():
+            _raise_internal_only("meta.spatial.shape")
+        object.__setattr__(self, "spatial", spatial)
+        return self
+
+    def set_stats(self, value: Union["MetaStatistics", Mapping[str, Any]]) -> "Meta":
+        object.__setattr__(self, "stats", MetaStatistics.ensure(value))
+        return self
+
+    def set_bbox(
+        self,
+        value: Union["MetaBbox", Mapping[str, Any], list[list[list[Union[int, float]]]]],
+    ) -> "Meta":
+        bbox = MetaBbox.ensure(value) if isinstance(value, (MetaBbox, Mapping)) else MetaBbox(bboxes=value)
+        object.__setattr__(self, "bbox", bbox)
+        return self
+
+    def set_is_seg(self, value: Union["MetaIsSeg", Optional[bool]]) -> "Meta":
+        is_seg = (
+            MetaIsSeg.ensure(value)
+            if isinstance(value, (MetaIsSeg, Mapping))
+            else MetaIsSeg(is_seg=value)
+        )
+        object.__setattr__(self, "is_seg", is_seg)
+        return self
+
+    def update_source(self, value: Mapping[str, Any]) -> "Meta":
+        if not isinstance(value, Mapping):
+            raise TypeError("source update value must be a mapping")
+        self.source.data.update(dict(value))
+        self.source._validate_and_cast()
+        return self
+
+    def update_extra(self, value: Mapping[str, Any]) -> "Meta":
+        if not isinstance(value, Mapping):
+            raise TypeError("extra update value must be a mapping")
+        self.extra.data.update(dict(value))
+        self.extra._validate_and_cast()
+        return self
+
+    def add_bbox(
+        self,
+        bbox: list[list[Union[int, float]]],
+        score: Optional[Union[int, float]] = None,
+        label: Optional[Union[str, int, float]] = None,
+    ) -> "Meta":
+        prev_n = 0 if self.bbox.bboxes is None else len(self.bbox.bboxes)
+        if prev_n > 0 and self.bbox.scores is None and score is not None:
+            raise ValueError(
+                "Cannot add a scored bbox when existing bboxes have no scores."
+            )
+        if prev_n > 0 and self.bbox.labels is None and label is not None:
+            raise ValueError(
+                "Cannot add a labeled bbox when existing bboxes have no labels."
+            )
+
+        if self.bbox.bboxes is None:
+            self.bbox.bboxes = []
+        self.bbox.bboxes.append(_cast_to_list(bbox, "meta.bbox.bbox"))
+
+        if score is not None:
+            if self.bbox.scores is None:
+                self.bbox.scores = []
+            self.bbox.scores.append(score)
+        elif self.bbox.scores is not None:
+            raise ValueError("score must be provided because meta.bbox.scores already exists")
+
+        if label is not None:
+            if self.bbox.labels is None:
+                self.bbox.labels = []
+            self.bbox.labels.append(label)
+        elif self.bbox.labels is not None:
+            raise ValueError("label must be provided because meta.bbox.labels already exists")
+
+        self.bbox._validate_and_cast()
+        return self
 
     def to_plain(self, *, include_none: bool = False) -> Any:
         """Convert to plain values, suppressing default sub-metas.
@@ -985,7 +1338,7 @@ class Meta(BaseMeta):
             as None and optionally filtered out.
         """
         out: dict[str, Any] = {}
-        for f in fields(self):
+        for f in _public_dataclass_fields(self):
             v = getattr(self, f.name)
 
             if isinstance(v, BaseMeta):

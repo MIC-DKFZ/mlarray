@@ -88,6 +88,42 @@ class TestUsage(unittest.TestCase):
             self.assertEqual(loaded.origin, [10.0, 10.0, 30.0])
             self.assertEqual(loaded.meta.source["study_id"], "study-001")
 
+    def test_mlarray_spatial_property_setters(self):
+        array = _make_array(shape=(8, 8, 8))
+        image = MLArray(array)
+
+        image.spacing = [0.1, 0.2, 0.3]
+        image.origin = [1.0, 2.0, 3.0]
+        image.direction = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+
+        self.assertEqual(image.spacing, [0.1, 0.2, 0.3])
+        self.assertEqual(image.origin, [1.0, 2.0, 3.0])
+        self.assertEqual(image.direction, [[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+
+        with self.assertRaises(ValueError):
+            image.affine = [
+                [1.0, 0.0, 0.0, 10.0],
+                [0.0, 1.0, 0.0, 20.0],
+                [0.0, 0.0, 1.0, 30.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ]
+
+        image.spacing = None
+        image.origin = None
+        image.direction = None
+        image.affine = [
+            [1.0, 0.0, 0.0, 10.0],
+            [0.0, 1.0, 0.0, 20.0],
+            [0.0, 0.0, 1.0, 30.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ]
+        self.assertEqual(image.affine, [
+            [1.0, 0.0, 0.0, 10.0],
+            [0.0, 1.0, 0.0, 20.0],
+            [0.0, 0.0, 1.0, 30.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ])
+
     def test_affine_stored_in_meta_spatial(self):
         array = _make_array(shape=(8, 8, 8))
         affine = [

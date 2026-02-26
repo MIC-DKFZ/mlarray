@@ -5,7 +5,13 @@ import math
 from typing import Any, Dict, Optional, Union, List, Tuple
 from pathlib import Path
 import os
-from mlarray.meta import Meta, MetaBlosc2, AxisLabel, _spatial_axis_mask
+from mlarray.meta import (
+    Meta,
+    MetaBlosc2,
+    AxisLabel,
+    _spatial_axis_mask,
+    _meta_internal_write,
+)
 from mlarray.utils import is_serializable
 import pickle
 import gzip
@@ -80,7 +86,7 @@ class MLArray:
         self.support_metadata = None
         self.mode = None
         self.mmap_mode = None
-        self.meta = None
+        self._meta = None
         self._store = None
         self._backend = None
         if isinstance(array, (str, Path)) and (
@@ -136,7 +142,8 @@ class MLArray:
                     self._backend = "numpy"
                 has_array = False
             if copy is not None:
-                self.meta.copy_from(copy.meta)
+                with _meta_internal_write():
+                    self.meta.copy_from(copy.meta)
             self._validate_and_add_meta(self.meta, has_array=has_array, validate=True)
 
     @classmethod
@@ -980,7 +987,7 @@ class MLArray:
         self.support_metadata = None
         self.mode = None  
         self.mmap_mode = None
-        self.meta = None
+        self._meta = None
 
     def to_numpy(self):
         """Return the underlying data as a NumPy array.
@@ -1070,6 +1077,10 @@ class MLArray:
         return len(self._store)
 
     @property
+    def meta(self) -> Optional[Meta]:
+        return self._meta
+
+    @property
     def spacing(self):
         """Returns the image spacing.
 
@@ -1078,6 +1089,10 @@ class MLArray:
             spatial dimensions.
         """
         return self.meta.spatial.spacing
+
+    @spacing.setter
+    def spacing(self, value):
+        self.meta.spatial.spacing = value
 
     @property
     def origin(self):
@@ -1089,6 +1104,10 @@ class MLArray:
         """
         return self.meta.spatial.origin
 
+    @origin.setter
+    def origin(self, value):
+        self.meta.spatial.origin = value
+
     @property
     def direction(self):
         """Returns the image direction.
@@ -1097,6 +1116,10 @@ class MLArray:
             list: Direction cosine matrix with shape (ndims, ndims).
         """
         return self.meta.spatial.direction
+
+    @direction.setter
+    def direction(self, value):
+        self.meta.spatial.direction = value
 
     @property
     def affine(self) -> np.ndarray:
@@ -1117,6 +1140,10 @@ class MLArray:
         affine[:self.spatial_ndim, :self.spatial_ndim] = direction @ np.diag(spacing)
         affine[:self.spatial_ndim, self.spatial_ndim] = origin
         return affine.tolist()
+
+    @affine.setter
+    def affine(self, value):
+        self.meta.spatial.affine = value
 
     @property
     def translation(self):
@@ -1471,8 +1498,9 @@ class MLArray:
     
         self._validate_and_add_meta(meta, has_array=True)
         spatial_axis_mask = [True] * len(shape) if self.meta.spatial.axis_labels is None else _spatial_axis_mask(self.meta.spatial.axis_labels)
-        self.meta.blosc2 = self._comp_and_validate_blosc2_meta(self.meta.blosc2, patch_size, chunk_size, block_size, shape, np.dtype(dtype).itemsize, spatial_axis_mask, cparams, dparams)   
-        self.meta._has_array.has_array = True
+        with _meta_internal_write():
+            self.meta.blosc2 = self._comp_and_validate_blosc2_meta(self.meta.blosc2, patch_size, chunk_size, block_size, shape, np.dtype(dtype).itemsize, spatial_axis_mask, cparams, dparams)
+            self.meta._has_array.has_array = True
         
         self.support_metadata = True
         
@@ -1650,18 +1678,19 @@ class MLArray:
             else _spatial_axis_mask(self.meta.spatial.axis_labels)
         )
 
-        self.meta.blosc2 = self._comp_and_validate_blosc2_meta(
-            self.meta.blosc2,
-            patch_size,
-            chunk_size,
-            block_size,
-            shape,
-            dtype.itemsize,
-            spatial_axis_mask,
-            cparams,
-            dparams,
-        )
-        self.meta._has_array.has_array = True
+        with _meta_internal_write():
+            self.meta.blosc2 = self._comp_and_validate_blosc2_meta(
+                self.meta.blosc2,
+                patch_size,
+                chunk_size,
+                block_size,
+                shape,
+                dtype.itemsize,
+                spatial_axis_mask,
+                cparams,
+                dparams,
+            )
+            self.meta._has_array.has_array = True
 
         backend_lib = blosc2 if compressed else np
         blosc2_storage_kwargs = {}
@@ -1846,8 +1875,9 @@ class MLArray:
                 meta = Meta(source=meta)
         else:
             meta = Meta()
-        self.meta = meta
-        self.meta._mlarray_version = MLARRAY_VERSION
+        self._meta = meta
+        with _meta_internal_write():
+            self.meta._mlarray_version = MLARRAY_VERSION
 
         if affine is not None and (
             spacing is not None or origin is not None or direction is not None
@@ -1867,11 +1897,14 @@ class MLArray:
         if axis_labels is not None:
             self.meta.spatial.axis_labels = axis_labels
         if has_array == True:
-            self.meta._has_array.has_array = True
+            with _meta_internal_write():
+                self.meta._has_array.has_array = True
         if self.meta._has_array.has_array:
-            self.meta.spatial.shape = self.shape
+            with _meta_internal_write():
+                self.meta.spatial.shape = self.shape
         if validate:
-            self.meta.spatial._validate_and_cast(ndims=self.ndim, spatial_ndims=self.spatial_ndim)
+            with _meta_internal_write():
+                self.meta.spatial._validate_and_cast(ndims=self.ndim, spatial_ndims=self.spatial_ndim)
 
     def _update_blosc2_meta(self):
         """Sync Blosc2 chunk and block sizes into metadata.
@@ -1882,8 +1915,13 @@ class MLArray:
         if self._backend != "blosc2":
             return
         if self.support_metadata and self.meta._has_array.has_array == True:
-            self.meta.blosc2.chunk_size = list(self._store.chunks)
-            self.meta.blosc2.block_size = list(self._store.blocks)
+            with _meta_internal_write():
+                self.meta.blosc2.chunk_size = list(self._store.chunks)
+                self.meta.blosc2.block_size = list(self._store.blocks)
+                self.meta.blosc2._validate_and_cast(
+                    ndims=self.ndim,
+                    spatial_ndims=self.spatial_ndim,
+                )
 
     def _read_meta(self):
         """Read MLArray metadata from the underlying store, if available."""
@@ -1944,17 +1982,18 @@ class MLArray:
             if self.meta.spatial.axis_labels is None
             else _spatial_axis_mask(self.meta.spatial.axis_labels)
         )
-        self.meta.blosc2 = self._comp_and_validate_blosc2_meta(
-            self.meta.blosc2,
-            patch_size="default",
-            chunk_size=self.meta.blosc2.chunk_size,
-            block_size=self.meta.blosc2.block_size,
-            shape=shape,
-            dtype_itemsize=np.dtype(array.dtype).itemsize,
-            spatial_axis_mask=spatial_axis_mask,
-            cparams=self.meta.blosc2.cparams,
-            dparams=self.meta.blosc2.dparams,
-        )
+        with _meta_internal_write():
+            self.meta.blosc2 = self._comp_and_validate_blosc2_meta(
+                self.meta.blosc2,
+                patch_size="default",
+                chunk_size=self.meta.blosc2.chunk_size,
+                block_size=self.meta.blosc2.block_size,
+                shape=shape,
+                dtype_itemsize=np.dtype(array.dtype).itemsize,
+                spatial_axis_mask=spatial_axis_mask,
+                cparams=self.meta.blosc2.cparams,
+                dparams=self.meta.blosc2.dparams,
+            )
         self._store = blosc2.asarray(
             np.ascontiguousarray(array),
             chunks=self.meta.blosc2.chunk_size,

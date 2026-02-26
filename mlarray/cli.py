@@ -3,6 +3,7 @@ import json
 from typing import Union
 from pathlib import Path
 from mlarray import MLArray
+from mlarray.meta import _meta_internal_write
 
 try:
     from medvol import MedVol
@@ -33,7 +34,8 @@ def convert_to_mlarray(load_filepath: Union[str, Path], save_filepath: Union[str
         image_meta_format = "nrrd"
     image_medvol = MedVol(load_filepath)
     image_mlarray = MLArray(image_medvol.array, spacing=image_medvol.spacing, origin=image_medvol.origin, direction=image_medvol.direction, meta=image_medvol.header)
-    image_mlarray.meta._image_meta_format = image_meta_format
+    with _meta_internal_write():
+        image_mlarray.meta._image_meta_format = image_meta_format
     image_mlarray.save(save_filepath)
 
 
