@@ -1,0 +1,1260 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="MLArray documentation">
+      
+      
+      
+      
+        <link rel="prev" href="../optimization/">
+      
+      
+        <link rel="next" href="../api/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.3">
+    
+    
+      
+        <title>Schema - MLArray</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#mlarray-metadata-schema" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="MLArray" class="md-header__button md-logo" aria-label="MLArray" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            MLArray
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Schema
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="MLArray" class="md-nav__button md-logo" aria-label="MLArray" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    MLArray
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../why/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why MLArray
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#representation-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Representation notes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meta" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Meta
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Meta">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        source
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#extra" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        extra
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#spatial" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        spatial
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="spatial">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#axislabel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AxisLabel
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        stats
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bbox" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        bbox
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#is_seg" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        is_seg
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#blosc2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        blosc2
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_has_array" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        _has_array
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_image_meta_format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        _image_meta_format
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_mlarray_version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        _mlarray_version
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#representation-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Representation notes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#meta" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Meta
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Meta">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        source
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#extra" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        extra
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#spatial" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        spatial
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="spatial">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#axislabel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AxisLabel
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        stats
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bbox" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        bbox
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#is_seg" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        is_seg
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#blosc2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        blosc2
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_has_array" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        _has_array
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_image_meta_format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        _image_meta_format
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_mlarray_version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        _mlarray_version
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="mlarray-metadata-schema">MLArray Metadata Schema<a class="headerlink" href="#mlarray-metadata-schema" title="Permanent link">&para;</a></h1>
+<p>This section defines the <strong>MLArray metadata schema</strong>: the standardized structure used to store and retrieve metadata alongside array data.</p>
+<p>The schema is designed around a few core goals:</p>
+<ul>
+<li><strong>Interoperability:</strong> tools can reliably access common fields (e.g., spacing, orientation, statistics) without guessing conventions.</li>
+<li><strong>Flexibility:</strong> users can still store arbitrary metadata (including raw metadata from existing formats) without being forced into a rigid structure.</li>
+<li><strong>Format preservation:</strong> MLArray can act as a storage and ML-optimized alternative to existing image formats (e.g., DICOM, NIfTI, NRRD) while retaining their metadata in a consistent place.</li>
+<li><strong>Practicality for ML workflows:</strong> fields like <code>is_seg</code>, <code>bbox</code>, and <code>blosc2</code> directly support common training, preprocessing, and patch-based access patterns.</li>
+</ul>
+<p>All fields in the schema are <strong>JSON-serializable</strong> unless otherwise noted. Fields marked as <code>Optional[...]</code> may be omitted if unknown or not applicable.</p>
+<h3 id="representation-notes">Representation notes<a class="headerlink" href="#representation-notes" title="Permanent link">&para;</a></h3>
+<p>Many namespaces are implemented as <strong>single-key dataclasses</strong> (subclasses of <code>SingleKeyBaseMeta</code>). In Python, these behave like their wrapped value (e.g., <code>meta.is_seg</code> is a <code>bool</code>, <code>meta.source</code> is a <code>dict</code>). When serialized via <code>Meta.to_mapping()</code>, they appear as a one-field object keyed by their internal field name (e.g., <code>is_seg: {"is_seg": true}</code> or <code>source: {"data": {...}}</code>). <code>Meta.from_mapping()</code> accepts either the one-field object or the raw value and will coerce it to the correct class.</p>
+<hr />
+<h2 id="meta">Meta<a class="headerlink" href="#meta" title="Permanent link">&para;</a></h2>
+<p>Top-level metadata container.</p>
+<h3 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h3>
+<p><code>Meta</code> is the root object that groups all metadata into well-defined namespaces. Some namespaces are <strong>standardized</strong> (e.g., <code>spatial</code>, <code>stats</code>), while others are intentionally <strong>free-form</strong> (<code>source</code>, <code>extra</code>) to support arbitrary metadata and long-term extensibility. Several entries are single-key dataclasses that wrap a primitive value while still allowing schema-aware validation.</p>
+<hr />
+<h3 id="source">source<a class="headerlink" href="#source" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Description:</strong> Arbitrary JSON-serializable dictionary for metadata from the original image source.
+  Stores information from image sources such as DICOM, NIfTI, NRRD,
+  or other imaging formats.</li>
+<li><strong>Dataclass:</strong> <code>MetaSource</code> (single-key wrapper).</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>field</th>
+<th>type</th>
+<th>description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>data</td>
+<td>Dict[str, Any]</td>
+<td>JSON-serializable metadata from the source.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="extra">extra<a class="headerlink" href="#extra" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Description:</strong> Flexible container for arbitrary, JSON-serializable metadata
+  when no schema exists. Intended for experimental or application-specific
+  fields that are not part of the standard.</li>
+<li><strong>Dataclass:</strong> <code>MetaExtra</code> (single-key wrapper).</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>field</th>
+<th>type</th>
+<th>description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>data</td>
+<td>Dict[str, Any]</td>
+<td>JSON-serializable metadata for extra fields.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="spatial">spatial<a class="headerlink" href="#spatial" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Description:</strong> Spatial metadata for the image.</li>
+<li><strong>Dataclass:</strong> <code>MetaSpatial</code>.</li>
+</ul>
+<p>This section stores the information needed to interpret the array in physical space (e.g., voxel spacing, coordinate origin, and orientation). It also optionally captures array shape and axes layout to make downstream consumers more robust.</p>
+<table>
+<thead>
+<tr>
+<th>field</th>
+<th>type</th>
+<th>description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>spacing</td>
+<td>Optional[List[float]]</td>
+<td>Voxel spacing per spatial axis, length = <code>ndims</code>.</td>
+</tr>
+<tr>
+<td>origin</td>
+<td>Optional[List[float]]</td>
+<td>Origin per spatial axis, length = <code>ndims</code>.</td>
+</tr>
+<tr>
+<td>direction</td>
+<td>Optional[List[List[float]]]</td>
+<td>Direction matrix, shape <code>[ndims][ndims]</code>.</td>
+</tr>
+<tr>
+<td>shape</td>
+<td>Optional[List[int]]</td>
+<td>Full array shape, length = spatial + non-spatial axes.</td>
+</tr>
+<tr>
+<td>axis_labels</td>
+<td>Optional[List[str,AxisLabel]]</td>
+<td>Per-axis labels or roles, length = full array <code>ndims</code>.</td>
+</tr>
+<tr>
+<td>axis_units</td>
+<td>Optional[List[str]]</td>
+<td>Per-axis units, length = full array <code>ndims</code>.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h4 id="axislabel">AxisLabel<a class="headerlink" href="#axislabel" title="Permanent link">&para;</a></h4>
+<p>Axis labels describe the semantic role of each axis. They may be provided as strings or enum values.</p>
+<table>
+<thead>
+<tr>
+<th>value</th>
+<th>description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>spatial</td>
+<td>Generic spatial axis (used when no axis-specific label).</td>
+</tr>
+<tr>
+<td>spatial_x</td>
+<td>Spatial axis representing X.</td>
+</tr>
+<tr>
+<td>spatial_y</td>
+<td>Spatial axis representing Y.</td>
+</tr>
+<tr>
+<td>spatial_z</td>
+<td>Spatial axis representing Z.</td>
+</tr>
+<tr>
+<td>non_spatial</td>
+<td>Generic non-spatial axis.</td>
+</tr>
+<tr>
+<td>channel</td>
+<td>Channel axis (e.g., color channels or feature maps).</td>
+</tr>
+<tr>
+<td>temporal</td>
+<td>Time axis.</td>
+</tr>
+<tr>
+<td>continuous</td>
+<td>Continuous-valued axis (non-spatial).</td>
+</tr>
+<tr>
+<td>components</td>
+<td>Component axis (e.g., vector components).</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="stats">stats<a class="headerlink" href="#stats" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Description:</strong> Summary statistics for the image.</li>
+<li><strong>Dataclass:</strong> <code>MetaStatistics</code>.</li>
+</ul>
+<p>This section stores precomputed global statistics for the array, which can be useful for normalization, QA, dataset inspection, and visualization defaults.</p>
+<table>
+<thead>
+<tr>
+<th>field</th>
+<th>type</th>
+<th>description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>min</td>
+<td>Optional[float]</td>
+<td>Minimum value.</td>
+</tr>
+<tr>
+<td>max</td>
+<td>Optional[float]</td>
+<td>Maximum value.</td>
+</tr>
+<tr>
+<td>mean</td>
+<td>Optional[float]</td>
+<td>Mean value.</td>
+</tr>
+<tr>
+<td>median</td>
+<td>Optional[float]</td>
+<td>Median value.</td>
+</tr>
+<tr>
+<td>std</td>
+<td>Optional[float]</td>
+<td>Standard deviation.</td>
+</tr>
+<tr>
+<td>percentile_min</td>
+<td>Optional[float]</td>
+<td>Minimum within a selected percentile range.</td>
+</tr>
+<tr>
+<td>percentile_max</td>
+<td>Optional[float]</td>
+<td>Maximum within a selected percentile range.</td>
+</tr>
+<tr>
+<td>percentile_mean</td>
+<td>Optional[float]</td>
+<td>Mean within a selected percentile range.</td>
+</tr>
+<tr>
+<td>percentile_median</td>
+<td>Optional[float]</td>
+<td>Median within a selected percentile range.</td>
+</tr>
+<tr>
+<td>percentile_std</td>
+<td>Optional[float]</td>
+<td>Standard deviation within a selected percentile range.</td>
+</tr>
+<tr>
+<td>percentile_min_key</td>
+<td>Optional[float]</td>
+<td>Minimum percentile key used to determine percentile_min (for example 0.05).</td>
+</tr>
+<tr>
+<td>percentile_max_key</td>
+<td>Optional[float]</td>
+<td>Maximum percentile key used to determine percentile_max (for example 0.95).</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="bbox">bbox<a class="headerlink" href="#bbox" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Description:</strong> Bounding boxes for objects/regions in the image.</li>
+<li><strong>Dataclass:</strong> <code>MetaBbox</code>.</li>
+<li><strong>Structure:</strong> List of bboxes, each bbox is a list with length equal to image <code>ndims</code>,
+  and each entry is <code>[min, max]</code>.</li>
+</ul>
+<p>Bounding boxes are stored in a normalized, axis-aligned representation that works across dimensionalities (2D, 3D, …). This is especially useful for detection-style workflows, ROI cropping, dataset summaries, and interactive visualization.</p>
+<table>
+<thead>
+<tr>
+<th>field</th>
+<th>type</th>
+<th>description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>bboxes</td>
+<td>Optional[List[List[List[Union[int, float]]]]]</td>
+<td>Bounding boxes shaped <code>[num_bboxes][ndims][2]</code> (min/max), ints or floats.</td>
+</tr>
+<tr>
+<td>scores</td>
+<td>Optional[List[Union[int, float]]]</td>
+<td>Optional confidence scores aligned with <code>bboxes</code>.</td>
+</tr>
+<tr>
+<td>labels</td>
+<td>Optional[List[Union[str, int, float]]]</td>
+<td>Optional labels aligned with <code>bboxes</code>.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="is_seg">is_seg<a class="headerlink" href="#is_seg" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Description:</strong> Whether the image is a segmentation mask.</li>
+<li><strong>Dataclass:</strong> <code>MetaIsSeg</code> (single-key wrapper).</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>field</th>
+<th>type</th>
+<th>description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>is_seg</td>
+<td>Optional[bool]</td>
+<td>True/False when known, None when unknown.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="blosc2">blosc2<a class="headerlink" href="#blosc2" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Description:</strong> Blosc2 layout parameters.</li>
+<li><strong>Dataclass:</strong> <code>MetaBlosc2</code>.</li>
+</ul>
+<p>This section records how the array was laid out on disk (chunking, blocking, patching). It is primarily intended for reproducibility, debugging, and performance introspection.</p>
+<table>
+<thead>
+<tr>
+<th>field</th>
+<th>type</th>
+<th>description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>chunk_size</td>
+<td>Optional[List[float]]</td>
+<td>Chunk size per axis, length = full array <code>ndims</code> (including non-spatial axes).</td>
+</tr>
+<tr>
+<td>block_size</td>
+<td>Optional[List[float]]</td>
+<td>Block size per axis, length = full array <code>ndims</code> (including non-spatial axes).</td>
+</tr>
+<tr>
+<td>patch_size</td>
+<td>Optional[List[float]]</td>
+<td>Patch size per spatial axis, length = <code>ndims</code> (non-spatial axes excluded).</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="_has_array">_has_array<a class="headerlink" href="#_has_array" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Description:</strong> Whether this metadata instance represents an on-disk array.</li>
+<li><strong>Dataclass:</strong> <code>MetaHasArray</code> (single-key wrapper).</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>field</th>
+<th>type</th>
+<th>description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>has_array</td>
+<td>bool</td>
+<td>True when an array payload is stored.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="_image_meta_format">_image_meta_format<a class="headerlink" href="#_image_meta_format" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Description:</strong> Source format identifier for the <code>image</code> metadata (e.g., "dicom",
+  "nifti", "nrrd"). This is advisory and application-defined.</li>
+<li><strong>Dataclass:</strong> <code>MetaImageFormat</code> (single-key wrapper).</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>field</th>
+<th>type</th>
+<th>description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>image_meta_format</td>
+<td>Optional[str]</td>
+<td>Identifier for the source metadata format.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="_mlarray_version">_mlarray_version<a class="headerlink" href="#_mlarray_version" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Description:</strong> MLArray version string used to write the file.</li>
+<li><strong>Dataclass:</strong> <code>MetaVersion</code> (single-key wrapper).</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>field</th>
+<th>type</th>
+<th>description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>mlarray_version</td>
+<td>Optional[str]</td>
+<td>Version string for the writer.</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": [], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
