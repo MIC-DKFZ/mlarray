@@ -537,6 +537,145 @@ def print_summary(summary_rows: list[dict[str, Any]]) -> None:
         )
 
 
+def build_final_summary(
+    rows: list[dict[str, Any]], summary_rows: list[dict[str, Any]]
+) -> dict[str, Any]:
+    total_runs = len(rows)
+    successful_runs = sum(1 for row in rows if row["success"])
+    failed_runs = total_runs - successful_runs
+    skipped_runs = sum(
+        1
+        for row in rows
+        if isinstance(row.get("error"), str) and row["error"].startswith("skipped_")
+    )
+    success_rate = (
+        float(successful_runs) / float(total_runs) if total_runs > 0 else 0.0
+    )
+
+    by_operation: dict[str, dict[str, Any]] = defaultdict(
+        lambda: {"total_runs": 0, "successful_runs": 0, "throughputs_gibps": []}
+    )
+    for row in rows:
+        op = row["operation"]
+        by_operation[op]["total_runs"] += 1
+        if row["success"]:
+            by_operation[op]["successful_runs"] += 1
+            by_operation[op]["throughputs_gibps"].append(float(row["throughput_GiBps"]))
+
+    by_operation_out: dict[str, Any] = {}
+    for op, stats in sorted(by_operation.items()):
+        values = stats["throughputs_gibps"]
+        total = int(stats["total_runs"])
+        successful = int(stats["successful_runs"])
+        by_operation_out[op] = {
+            "total_runs": total,
+            "successful_runs": successful,
+            "failed_runs": total - successful,
+            "success_rate": float(successful) / float(total) if total > 0 else 0.0,
+            "mean_throughput_GiBps": float(np.mean(values)) if values else 0.0,
+            "median_throughput_GiBps": float(np.median(values)) if values else 0.0,
+            "max_throughput_GiBps": float(np.max(values)) if values else 0.0,
+        }
+
+    best_by_operation: dict[str, Any] = {}
+    for op in sorted({row["operation"] for row in summary_rows}):
+        op_rows = [row for row in summary_rows if row["operation"] == op]
+        if not op_rows:
+            best_by_operation[op] = None
+            continue
+        best = max(op_rows, key=lambda row: row["throughput_GiBps"])
+        best_by_operation[op] = {
+            "throughput_GiBps": best["throughput_GiBps"],
+            "mean_seconds": best["mean_seconds"],
+            "runs": best["runs"],
+            "tier": best["tier"],
+            "case": best["case"],
+            "shape": best["shape"],
+            "patch_size": best["patch_size"],
+            "layout_method": best["layout_method"],
+            "mode": best["mode"],
+            "mmap_mode": best["mmap_mode"],
+            "cache_state": best["cache_state"],
+        }
+
+    best_overall = None
+    if summary_rows:
+        best = max(summary_rows, key=lambda row: row["throughput_GiBps"])
+        best_overall = {
+            "throughput_GiBps": best["throughput_GiBps"],
+            "mean_seconds": best["mean_seconds"],
+            "runs": best["runs"],
+            "tier": best["tier"],
+            "case": best["case"],
+            "shape": best["shape"],
+            "patch_size": best["patch_size"],
+            "layout_method": best["layout_method"],
+            "operation": best["operation"],
+            "mode": best["mode"],
+            "mmap_mode": best["mmap_mode"],
+            "cache_state": best["cache_state"],
+        }
+
+    return {
+        "totals": {
+            "total_runs": total_runs,
+            "successful_runs": successful_runs,
+            "failed_runs": failed_runs,
+            "skipped_runs": skipped_runs,
+            "success_rate": success_rate,
+        },
+        "by_operation": by_operation_out,
+        "best_by_operation": best_by_operation,
+        "best_overall": best_overall,
+    }
+
+
+def print_final_summary(summary: dict[str, Any]) -> None:
+    totals = summary["totals"]
+    print("\n=== Final Run Summary ===")
+    print(
+        f"runs={totals['total_runs']} success={totals['successful_runs']} "
+        f"failed={totals['failed_runs']} skipped={totals['skipped_runs']} "
+        f"success_rate={totals['success_rate'] * 100.0:.1f}%"
+    )
+
+    by_operation = summary["by_operation"]
+    if by_operation:
+        print("\nPer operation:")
+        for op, stats in by_operation.items():
+            print(
+                f"  {op:<18} runs={stats['total_runs']:<4d} "
+                f"success={stats['successful_runs']:<4d} "
+                f"mean_GiB/s={stats['mean_throughput_GiBps']:.3f} "
+                f"median_GiB/s={stats['median_throughput_GiBps']:.3f} "
+                f"max_GiB/s={stats['max_throughput_GiBps']:.3f}"
+            )
+
+    best_by_operation = summary["best_by_operation"]
+    if best_by_operation:
+        print("\nBest aggregated config per operation (by GiB/s):")
+        for op, best in best_by_operation.items():
+            if best is None:
+                print(f"  {op:<18} no successful runs")
+                continue
+            print(
+                f"  {op:<18} {best['throughput_GiBps']:.3f} GiB/s "
+                f"({best['tier']}:{best['case']}, patch={best['patch_size']}, "
+                f"method={best['layout_method']}, mode={best['mode']}, "
+                f"mmap={best['mmap_mode']}, cache={best['cache_state']})"
+            )
+
+    best_overall = summary["best_overall"]
+    if best_overall is not None:
+        print(
+            "\nBest overall: "
+            f"{best_overall['throughput_GiBps']:.3f} GiB/s "
+            f"({best_overall['operation']} | {best_overall['tier']}:{best_overall['case']} | "
+            f"patch={best_overall['patch_size']} | method={best_overall['layout_method']} | "
+            f"mode={best_overall['mode']} mmap={best_overall['mmap_mode']} cache={best_overall['cache_state']})"
+        )
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -898,10 +1037,13 @@ def main() -> None:
 
     summary_rows = summarize_rows(rows)
     print_summary(summary_rows)
+    final_summary = build_final_summary(rows, summary_rows)
+    print_final_summary(final_summary)
 
     args.results_dir.mkdir(parents=True, exist_ok=True)
     csv_path = args.results_dir / "bench_io_blosc2_layouts.csv"
     json_path = args.results_dir / "bench_io_blosc2_layouts.json"
+    summary_json_path = args.results_dir / "bench_io_blosc2_layouts_summary.json"
     write_rows_csv(csv_path, rows)
     with json_path.open("w", encoding="utf-8") as f:
         json.dump(
@@ -925,8 +1067,31 @@ def main() -> None:
             f,
             indent=2,
         )
+    with summary_json_path.open("w", encoding="utf-8") as f:
+        json.dump(
+            {
+                "config": {
+                    "tiers": args.tiers,
+                    "runs": args.runs,
+                    "patch_reads": args.patch_reads,
+                    "patch_writes": args.patch_writes,
+                    "cache_mode": args.cache_mode,
+                    "nthreads": args.nthreads,
+                    "isolate_runs": args.isolate_runs,
+                    "worker_timeout_seconds": args.worker_timeout_seconds,
+                    "dtype": str(dtype),
+                    "max_elements": args.max_elements,
+                    "seed": args.seed,
+                },
+                "aggregated_rows": summary_rows,
+                "final_summary": final_summary,
+            },
+            f,
+            indent=2,
+        )
     print(f"\nWrote CSV:  {csv_path}")
     print(f"Wrote JSON: {json_path}")
+    print(f"Wrote Summary JSON: {summary_json_path}")
 
 
 if __name__ == "__main__":
