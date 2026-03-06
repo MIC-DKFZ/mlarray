@@ -947,6 +947,81 @@ class MLArray:
         )
         return class_instance
 
+    def compress(
+            self,
+            patch_size: Optional[Union[int, List, Tuple]] = "default",
+            chunk_size: Optional[Union[int, List, Tuple]] = None,
+            block_size: Optional[Union[int, List, Tuple]] = None,
+            cparams: Optional[Union[Dict, blosc2.CParams]] = None,
+            dparams: Optional[Union[Dict, blosc2.DParams]] = None,
+        ) -> None:
+        """Compress this MLArray in-place using the Blosc2 backend.
+
+        The instance is detached from any previously opened file state and
+        becomes an in-memory object. Persist changes by calling ``save()``.
+
+        Args:
+            patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
+                chunk/block optimization. Use ``"default"`` to use the default
+                patch size of 192.
+            chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
+                Ignored when ``patch_size`` is provided.
+            block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
+                Ignored when ``patch_size`` is provided.
+            cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2 compression
+                parameters.
+            dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
+                decompression parameters.
+
+        Raises:
+            TypeError: If no array data is loaded.
+        """
+        if self._store is None or self.meta._has_array.has_array is False:
+            raise TypeError("MLArray has no array data loaded.")
+
+        source_meta = deepcopy(self.meta)
+        converted = MLArray.asarray(
+            self.to_numpy(),
+            meta=None,
+            patch_size=patch_size,
+            chunk_size=chunk_size,
+            block_size=block_size,
+            cparams=cparams,
+            dparams=dparams,
+            compressed=True,
+        )
+        converted.meta.copy_from(source_meta, overwrite=True)
+        self._replace_with_converted(converted)
+
+    def decompress(self) -> None:
+        """Decompress this MLArray in-place to a NumPy-backed array.
+
+        The instance is detached from any previously opened file state and
+        becomes an in-memory object. Persist changes by calling ``save()``.
+        ``meta.blosc2`` metadata is cleared.
+
+        Raises:
+            TypeError: If no array data is loaded.
+        """
+        if self._store is None or self.meta._has_array.has_array is False:
+            raise TypeError("MLArray has no array data loaded.")
+
+        source_meta = deepcopy(self.meta)
+        converted = MLArray.asarray(
+            self.to_numpy(),
+            meta=None,
+            patch_size=None,
+            chunk_size=None,
+            block_size=None,
+            cparams=None,
+            dparams=None,
+            compressed=False,
+        )
+        converted.meta.copy_from(source_meta, overwrite=True)
+        with _meta_internal_write():
+            converted.meta.blosc2 = MetaBlosc2()
+        self._replace_with_converted(converted)
+
     def save(
             self,
             filepath: Union[str, Path],
@@ -2008,6 +2083,18 @@ class MLArray:
         if isinstance(shape, (int, np.integer)):
             return (int(shape),)
         return tuple(int(v) for v in shape)
+
+    def _replace_with_converted(self, other: "MLArray") -> None:
+        """Replace in-memory state from another MLArray and detach file state."""
+        old_store = self._store
+        self._store = other._store
+        self._backend = other._backend
+        self._meta = other._meta
+        self.support_metadata = other.support_metadata
+        self.filepath = None
+        self.mode = None
+        self.mmap_mode = None
+        del old_store
 
     def _resolve_like_input(self, x, dtype, meta):
         if isinstance(x, MLArray):
