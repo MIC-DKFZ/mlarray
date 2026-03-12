@@ -18,13 +18,13 @@ import numpy as np
 from mlarray import MLArray
 
 try:
-    from bench.blosc2_layout_algos import (
+    from mlarray.blosc2_layout_strategies import (
         comp_blosc2_params_baseline,
         comp_blosc2_params_generalized,
         comp_blosc2_params_spatial_only,
     )
 except ModuleNotFoundError:
-    from blosc2_layout_algos import (
+    from mlarray.blosc2_layout_strategies import (
         comp_blosc2_params_baseline,
         comp_blosc2_params_generalized,
         comp_blosc2_params_spatial_only,
