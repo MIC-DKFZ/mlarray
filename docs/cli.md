@@ -1,6 +1,6 @@
 # CLI
 
-MLArray includes a small command-line interface for common tasks such as **inspecting file headers** and **converting existing image formats** into MLArray. This is especially useful when you want to quickly verify metadata, debug a dataset, or batch-convert files without writing Python code.
+MLArray includes a small command-line interface for common tasks such as **inspecting file headers** and **converting between MLArray and existing image formats**. This is especially useful when you want to quickly verify metadata, debug a dataset, or batch-convert files without writing Python code.
 
 The CLI currently focuses on core workflows (header inspection and conversion). Support for converting a wider range of image formats will be added over time.
 
@@ -20,10 +20,15 @@ mlarray_header sample.mla
 
 ## `mlarray_convert`
 
-Convert a NIfTI or NRRD file to MLArray and copy metadata.
+Convert between MLArray and NIfTI/NRRD files.
 
-This provides an easy way to bring existing medical imaging data into an MLArray-based workflow while preserving the original metadata for downstream analysis and visualization.
+This provides an easy way to move medical imaging data into or out of an MLArray-based workflow.
+
+When converting from NIfTI/NRRD to MLArray, the source header is copied into `meta.source`.
+
+When converting from MLArray to NIfTI/NRRD, only `meta.source` is copied into the output header. Other MLArray metadata is ignored, while `spacing`, `origin`, and `direction` are written explicitly from `meta.spatial`.
 
 ```bash
 mlarray_convert sample.nii.gz output.mla
+mlarray_convert sample.mla output.nrrd
 ```

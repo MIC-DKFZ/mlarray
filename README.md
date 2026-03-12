@@ -202,10 +202,18 @@ mlarray_header sample.mla
 
 ### mlarray_convert
 
-Convert a NIfTI or NRRD file to MLArray and copy metadata.
+Convert between MLArray and NIfTI/NRRD files.
+
+When converting from NIfTI/NRRD to MLArray, source metadata is copied into
+`meta.source`.
+
+When converting from MLArray to NIfTI/NRRD, only `meta.source` is copied into
+the output header. Spatial metadata (`spacing`, `origin`, `direction`) is set
+explicitly from `meta.spatial`.
 
 ```bash
 mlarray_convert sample.nii.gz output.mla
+mlarray_convert sample.mla output.nii.gz
 ```
 
 ## Contributing
