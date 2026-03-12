@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 
 from mlarray import MLArray, MLARRAY_DEFAULT_PATCH_SIZE
+from mlarray.meta import MetaSpatial
 
 
 def _make_array(shape=(16, 32, 32), seed=0, dtype=np.float32):
@@ -110,6 +111,43 @@ class TestOptimizationExamples(unittest.TestCase):
             self.assertIsNone(loaded.meta.blosc2.patch_size)
             self.assertIsNotNone(loaded.meta.blosc2.chunk_size)
             self.assertIsNotNone(loaded.meta.blosc2.block_size)
+
+    def test_patch_optimization_supports_multiple_non_spatial_axes(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            array = _make_array(shape=(2, 3, 16, 32, 32))
+            path = Path(tmpdir) / "multi-non-spatial.mla"
+            axis_labels = [
+                MetaSpatial.AxisLabel.channel,
+                MetaSpatial.AxisLabel.temporal,
+                MetaSpatial.AxisLabel.spatial_z,
+                MetaSpatial.AxisLabel.spatial_y,
+                MetaSpatial.AxisLabel.spatial_x,
+            ]
+
+            MLArray(array, axis_labels=axis_labels, patch_size=8).save(path)
+            loaded = MLArray(path)
+
+            self.assertEqual(loaded.meta.blosc2.patch_size, [8, 8, 8])
+            self.assertEqual(len(loaded.meta.blosc2.chunk_size), 5)
+            self.assertEqual(len(loaded.meta.blosc2.block_size), 5)
+            self.assertEqual(loaded.meta.blosc2.chunk_size[:2], [1, 1])
+            self.assertEqual(loaded.meta.blosc2.block_size[:2], [1, 1])
+
+    def test_patch_optimization_supports_more_than_three_spatial_axes(self):
+        array = _make_array(shape=(2, 6, 8, 10, 12))
+        axis_labels = [
+            MetaSpatial.AxisLabel.channel,
+            MetaSpatial.AxisLabel.spatial,
+            MetaSpatial.AxisLabel.spatial,
+            MetaSpatial.AxisLabel.spatial,
+            MetaSpatial.AxisLabel.spatial,
+        ]
+
+        image = MLArray(array, axis_labels=axis_labels, patch_size=(2, 4, 4, 6))
+
+        self.assertEqual(image.meta.blosc2.patch_size, [2, 4, 4, 6])
+        self.assertEqual(len(image.meta.blosc2.chunk_size), 5)
+        self.assertEqual(len(image.meta.blosc2.block_size), 5)
 
 
 if __name__ == "__main__":

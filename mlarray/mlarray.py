@@ -12,6 +12,9 @@ from mlarray.meta import (
     _spatial_axis_mask,
     _meta_internal_write,
 )
+from mlarray.blosc2_layout_strategies import (
+    comp_blosc2_params_spatial_only_magnitude,
+)
 from mlarray.utils import is_serializable
 import pickle
 import gzip
@@ -1324,8 +1327,8 @@ class MLArray:
     @classmethod
     def comp_blosc2_params(
             cls,
-            image_size: Union[Tuple[int, int], Tuple[int, int, int], Tuple[int, int, int, int]],
-            patch_size: Union[Tuple[int, int], Tuple[int, int, int]],
+            image_size: Tuple[int, ...],
+            patch_size: Tuple[int, ...],
             spatial_axis_mask: Optional[list[bool]] = None,
             bytes_per_pixel: int = 4,  # 4 byte are float32
             l1_cache_size_per_core_in_bytes: int = 32768,  # 1 Kibibyte (KiB) = 2^10 Byte;  32 KiB = 32768 Byte
@@ -1333,31 +1336,35 @@ class MLArray:
             safety_factor: float = 0.8  # we dont will the caches to the brim. 0.8 means we target 80% of the caches
         ):
         """
-        Computes a recommended block and chunk size for saving arrays with Blosc v2.
+        Compute recommended Blosc2 chunk and block sizes from a patch-size hint.
 
-        Blosc2 NDIM documentation:
-        "Having a second partition allows for greater flexibility in fitting different partitions to different CPU cache levels. 
-        Typically, the first partition (also known as chunks) should be sized to fit within the L3 cache, 
-        while the second partition (also known as blocks) should be sized to fit within the L2 or L1 caches, 
-        depending on whether the priority is compression ratio or speed." 
-        (Source: https://www.blosc.org/posts/blosc2-ndim-intro/)
+        This method uses the ``comp_blosc2_params_spatial_only_magnitude``
+        strategy from :mod:`mlarray.blosc2_layout_strategies`.
 
-        Our approach is not fully optimized for this yet. 
-        Currently, we aim to fit the uncompressed block within the L1 cache, accepting that it might occasionally spill over into L2, which we consider acceptable.
+        Strategy summary:
+            1. Split axes into spatial and non-spatial using
+               ``spatial_axis_mask``.
+            2. Keep non-spatial axes at ``1`` in both blocks and chunks so the
+               layout is driven by spatial patch sampling instead of stretching
+               cache budgets across non-spatial dimensions.
+            3. Grow block sizes along spatial axes under the L1 cache budget.
+               Growth is weighted by the relative magnitude of the requested
+               patch size, so larger patch axes are allowed to grow faster.
+            4. Grow chunk sizes in multiples of the block sizes under the L3
+               cache budget, again weighted by patch-size magnitude.
+            5. Enforce structural constraints that keep the layout regular:
+               non-clipped spatial axes stay even, and non-clipped chunk axes
+               remain multiples of their corresponding block axes.
 
-        Note: This configuration is specifically optimized for nnU-Net data loading, where each read operation is performed by a single core, so multi-threading is not an option.
-
-        The default cache values are based on an older Intel 4110 CPU with 32KB L1, 128KB L2, and 1408KB L3 cache per core. 
-        We haven't further optimized for modern CPUs with larger caches, as our data must still be compatible with the older systems.
+        This strategy supports arbitrary numbers of spatial and non-spatial axes 
+        as long as the patch size dimensionality matches the number of spatial axes.
 
         Args:
-            image_size (Union[Tuple[int, int], Tuple[int, int, int], Tuple[int, int, int, int]]):
-                Image shape. Use a 2D, 3D, or 4D size; 2D/3D inputs are
-                internally expanded to 4D (with non-spatial axes first).
-            patch_size (Union[Tuple[int, int], Tuple[int, int, int]]): Patch
-                size for spatial dimensions. Use a 2-tuple (x, y) or 3-tuple
-                (x, y, z).
-            spatial_axis_mask (Optional[list[bool]]): Mask indicating for every axis whether it is spatial or not.
+            image_size (Tuple[int, ...]): Full array shape.
+            patch_size (Tuple[int, ...]): Patch size over spatial axes only.
+            spatial_axis_mask (Optional[list[bool]]): Mask indicating for every
+                array axis whether it is spatial. If omitted, all axes are
+                treated as spatial.
             bytes_per_pixel (int): Number of bytes per element. Defaults to 4
                 for float32.
             l1_cache_size_per_core_in_bytes (int): L1 cache per core in bytes.
@@ -1367,93 +1374,15 @@ class MLArray:
         Returns:
             Tuple[List[int], List[int]]: Recommended chunk size and block size.
         """
-        def _move_index_list(a, src, dst):
-            a = list(a)
-            x = a.pop(src)
-            a.insert(dst, x)
-            return a
-
-        num_squeezes = 0
-        if len(image_size) == 2:
-            image_size = (1, 1, *image_size)
-            num_squeezes = 2
-        elif len(image_size) == 3:
-            image_size = (1, *image_size)
-            num_squeezes = 1
-
-        non_spatial_axis = None
-        if spatial_axis_mask is not None:
-            non_spatial_axis_mask = [not b for b in spatial_axis_mask]
-            if sum(non_spatial_axis_mask) > 1:
-                raise RuntimeError("Automatic blosc2 optimization currently only supports one non-spatial axis. Please set chunk and block size manually.")
-            non_spatial_axis = next((i for i, v in enumerate(non_spatial_axis_mask) if v), None)
-            if non_spatial_axis is not None:
-                image_size = _move_index_list(image_size, non_spatial_axis+num_squeezes, 0)
-
-        if len(image_size) != 4:
-            raise RuntimeError("Image size must be 4D.")
-        
-        if not (len(patch_size) == 2 or len(patch_size) == 3):
-            raise RuntimeError("Patch size must be 2D or 3D.")
-
-        non_spatial_size = image_size[0]
-        if len(patch_size) == 2:
-            patch_size = [1, *patch_size]
-        patch_size = np.array(patch_size)
-        block_size = np.array((non_spatial_size, *[2 ** (max(0, math.ceil(math.log2(i)))) for i in patch_size]))
-
-        # shrink the block size until it fits in L1
-        estimated_nbytes_block = np.prod(block_size) * bytes_per_pixel
-        while estimated_nbytes_block > (l1_cache_size_per_core_in_bytes * safety_factor):
-            # pick largest deviation from patch_size that is not 1
-            axis_order = np.argsort(block_size[1:] / patch_size)[::-1]
-            idx = 0
-            picked_axis = axis_order[idx]
-            while block_size[picked_axis + 1] == 1 or block_size[picked_axis + 1] == 1:
-                idx += 1
-                picked_axis = axis_order[idx]
-            # now reduce that axis to the next lowest power of 2
-            block_size[picked_axis + 1] = 2 ** (max(0, math.floor(math.log2(block_size[picked_axis + 1] - 1))))
-            block_size[picked_axis + 1] = min(block_size[picked_axis + 1], image_size[picked_axis + 1])
-            estimated_nbytes_block = np.prod(block_size) * bytes_per_pixel
-
-        block_size = np.array([min(i, j) for i, j in zip(image_size, block_size)])
-
-        # note: there is no use extending the chunk size to 3d when we have a 2d patch size! This would unnecessarily
-        # load data into L3
-        # now tile the blocks into chunks until we hit image_size or the l3 cache per core limit
-        chunk_size = deepcopy(block_size)
-        estimated_nbytes_chunk = np.prod(chunk_size) * bytes_per_pixel
-        while estimated_nbytes_chunk < (l3_cache_size_per_core_in_bytes * safety_factor):
-            if patch_size[0] == 1 and all([i == j for i, j in zip(chunk_size[2:], image_size[2:])]):
-                break
-            if all([i == j for i, j in zip(chunk_size, image_size)]):
-                break
-            # find axis that deviates from block_size the most
-            axis_order = np.argsort(chunk_size[1:] / block_size[1:])
-            idx = 0
-            picked_axis = axis_order[idx]
-            while chunk_size[picked_axis + 1] == image_size[picked_axis + 1] or patch_size[picked_axis] == 1:
-                idx += 1
-                picked_axis = axis_order[idx]
-            chunk_size[picked_axis + 1] += block_size[picked_axis + 1]
-            chunk_size[picked_axis + 1] = min(chunk_size[picked_axis + 1], image_size[picked_axis + 1])
-            estimated_nbytes_chunk = np.prod(chunk_size) * bytes_per_pixel
-            if np.mean([i / j for i, j in zip(chunk_size[1:], patch_size)]) > 1.5:
-                # chunk size should not exceed patch size * 1.5 on average
-                chunk_size[picked_axis + 1] -= block_size[picked_axis + 1]
-                break
-        # better safe than sorry
-        chunk_size = [min(i, j) for i, j in zip(image_size, chunk_size)]
-
-        if non_spatial_axis is not None:
-            block_size = _move_index_list(block_size, 0, non_spatial_axis+num_squeezes)
-            chunk_size = _move_index_list(chunk_size, 0, non_spatial_axis+num_squeezes)
-
-        block_size = block_size[num_squeezes:]
-        chunk_size = chunk_size[num_squeezes:]
-
-        return [int(value) for value in chunk_size], [int(value) for value in block_size]
+        return comp_blosc2_params_spatial_only_magnitude(
+            image_size=tuple(int(v) for v in image_size),
+            patch_size=tuple(int(v) for v in patch_size),
+            spatial_axis_mask=spatial_axis_mask,
+            bytes_per_pixel=bytes_per_pixel,
+            l1_cache_size_per_core_in_bytes=l1_cache_size_per_core_in_bytes,
+            l3_cache_size_per_core_in_bytes=l3_cache_size_per_core_in_bytes,
+            safety_factor=safety_factor,
+        )
 
     def _open(
             self,
@@ -1874,9 +1803,6 @@ class MLArray:
             MetaBlosc2: Validated Blosc2 metadata instance.
         """
         num_spatial_axes = sum(spatial_axis_mask)
-        num_non_spatial_axes = sum([not b for b in spatial_axis_mask])
-        if patch_size is not None and patch_size != "default" and (num_spatial_axes == 1 or num_spatial_axes > 3 or num_non_spatial_axes > 1):
-            raise NotImplementedError("Chunk and block size optimization based on patch size is only implemented for 2D and 3D spatial images with at most one further non-spatial axis. Please set the chunk and block size manually or set to None for blosc2 to determine a chunk and block size.")
         if patch_size is not None and patch_size != "default" and (chunk_size is not None or block_size is not None):
             raise RuntimeError("patch_size and chunk_size / block_size cannot both be explicitly set.")
         if (chunk_size is not None and block_size is None) or (chunk_size is None and block_size is not None):
@@ -1893,7 +1819,14 @@ class MLArray:
         if chunk_size is not None or block_size is not None:
             patch_size = None
 
-        patch_size = [patch_size] * len(shape) if isinstance(patch_size, int) else patch_size
+        patch_size = [patch_size] * num_spatial_axes if isinstance(patch_size, int) else patch_size
+
+        if patch_size is not None and num_spatial_axes == 0:
+            raise RuntimeError(
+                "Automatic patch-size optimization requires at least one spatial axis. "
+                "Set patch_size=None and provide chunk_size/block_size manually, "
+                "or let Blosc2 determine the layout."
+            )
 
         if patch_size is not None:
             chunk_size, block_size = MLArray.comp_blosc2_params(shape, patch_size, spatial_axis_mask, bytes_per_pixel=dtype_itemsize)
