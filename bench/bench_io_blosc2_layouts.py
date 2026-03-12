@@ -4,7 +4,6 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import math
 import os
 import subprocess
 import sys
@@ -18,113 +17,18 @@ import numpy as np
 
 from mlarray import MLArray
 
-
-# ---------------------------------------------------------------------------
-# Baseline layout method copied from MLArray.comp_blosc2_params (do not call
-# MLArray.comp_blosc2_params in this benchmark; this is a local baseline copy).
-# ---------------------------------------------------------------------------
-def comp_blosc2_params_baseline(
-    image_size: tuple[int, ...],
-    patch_size: tuple[int, ...],
-    spatial_axis_mask: Optional[list[bool]] = None,
-    bytes_per_pixel: int = 4,
-    l1_cache_size_per_core_in_bytes: int = 32768,
-    l3_cache_size_per_core_in_bytes: int = 1441792,
-    safety_factor: float = 0.8,
-) -> tuple[list[int], list[int]]:
-    def _move_index_list(a, src, dst):
-        a = list(a)
-        x = a.pop(src)
-        a.insert(dst, x)
-        return a
-
-    num_squeezes = 0
-    if len(image_size) == 2:
-        image_size = (1, 1, *image_size)
-        num_squeezes = 2
-    elif len(image_size) == 3:
-        image_size = (1, *image_size)
-        num_squeezes = 1
-
-    non_spatial_axis = None
-    if spatial_axis_mask is not None:
-        non_spatial_axis_mask = [not b for b in spatial_axis_mask]
-        if sum(non_spatial_axis_mask) > 1:
-            raise RuntimeError(
-                "Automatic blosc2 optimization currently only supports one "
-                "non-spatial axis. Please set chunk and block size manually."
-            )
-        non_spatial_axis = next((i for i, v in enumerate(non_spatial_axis_mask) if v), None)
-        if non_spatial_axis is not None:
-            image_size = _move_index_list(image_size, non_spatial_axis + num_squeezes, 0)
-
-    if len(image_size) != 4:
-        raise RuntimeError("Image size must be 4D.")
-
-    if not (len(patch_size) == 2 or len(patch_size) == 3):
-        raise RuntimeError("Patch size must be 2D or 3D.")
-
-    non_spatial_size = image_size[0]
-    if len(patch_size) == 2:
-        patch_size = [1, *patch_size]
-    patch_size = np.array(patch_size)
-    block_size = np.array(
-        (non_spatial_size, *[2 ** (max(0, math.ceil(math.log2(i)))) for i in patch_size])
+try:
+    from bench.blosc2_layout_algos import (
+        comp_blosc2_params_baseline,
+        comp_blosc2_params_generalized,
+        comp_blosc2_params_spatial_only,
     )
-
-    # Shrink block until it fits into L1 target.
-    estimated_nbytes_block = np.prod(block_size) * bytes_per_pixel
-    while estimated_nbytes_block > (l1_cache_size_per_core_in_bytes * safety_factor):
-        axis_order = np.argsort(block_size[1:] / patch_size)[::-1]
-        idx = 0
-        picked_axis = axis_order[idx]
-        while block_size[picked_axis + 1] == 1 or block_size[picked_axis + 1] == 1:
-            idx += 1
-            picked_axis = axis_order[idx]
-        block_size[picked_axis + 1] = 2 ** (
-            max(0, math.floor(math.log2(block_size[picked_axis + 1] - 1)))
-        )
-        block_size[picked_axis + 1] = min(
-            block_size[picked_axis + 1], image_size[picked_axis + 1]
-        )
-        estimated_nbytes_block = np.prod(block_size) * bytes_per_pixel
-
-    block_size = np.array([min(i, j) for i, j in zip(image_size, block_size)])
-
-    # Grow chunks from blocks toward L3 target.
-    chunk_size = block_size.copy()
-    estimated_nbytes_chunk = np.prod(chunk_size) * bytes_per_pixel
-    while estimated_nbytes_chunk < (l3_cache_size_per_core_in_bytes * safety_factor):
-        if patch_size[0] == 1 and all([i == j for i, j in zip(chunk_size[2:], image_size[2:])]):
-            break
-        if all([i == j for i, j in zip(chunk_size, image_size)]):
-            break
-        axis_order = np.argsort(chunk_size[1:] / block_size[1:])
-        idx = 0
-        picked_axis = axis_order[idx]
-        while (
-            chunk_size[picked_axis + 1] == image_size[picked_axis + 1]
-            or patch_size[picked_axis] == 1
-        ):
-            idx += 1
-            picked_axis = axis_order[idx]
-        chunk_size[picked_axis + 1] += block_size[picked_axis + 1]
-        chunk_size[picked_axis + 1] = min(
-            chunk_size[picked_axis + 1], image_size[picked_axis + 1]
-        )
-        estimated_nbytes_chunk = np.prod(chunk_size) * bytes_per_pixel
-        if np.mean([i / j for i, j in zip(chunk_size[1:], patch_size)]) > 1.5:
-            chunk_size[picked_axis + 1] -= block_size[picked_axis + 1]
-            break
-    chunk_size = [min(i, j) for i, j in zip(image_size, chunk_size)]
-
-    if non_spatial_axis is not None:
-        block_size = _move_index_list(block_size, 0, non_spatial_axis + num_squeezes)
-        chunk_size = _move_index_list(chunk_size, 0, non_spatial_axis + num_squeezes)
-
-    block_size = block_size[num_squeezes:]
-    chunk_size = chunk_size[num_squeezes:]
-    return [int(v) for v in chunk_size], [int(v) for v in block_size]
+except ModuleNotFoundError:
+    from blosc2_layout_algos import (
+        comp_blosc2_params_baseline,
+        comp_blosc2_params_generalized,
+        comp_blosc2_params_spatial_only,
+    )
 
 
 @dataclass
@@ -676,6 +580,171 @@ def print_final_summary(summary: dict[str, Any]) -> None:
         )
 
 
+def build_algo_summaries(
+    rows: list[dict[str, Any]],
+    summary_rows: list[dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    methods = sorted(
+        {
+            *(row["layout_method"] for row in rows),
+            *(row["layout_method"] for row in summary_rows),
+        }
+    )
+    out: dict[str, dict[str, Any]] = {}
+    for method in methods:
+        method_rows = [row for row in rows if row["layout_method"] == method]
+        method_summary_rows = [
+            row for row in summary_rows if row["layout_method"] == method
+        ]
+        out[method] = build_final_summary(method_rows, method_summary_rows)
+    return out
+
+
+def build_algo_comparison(
+    rows: list[dict[str, Any]],
+    algo_summaries: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    overall_ranking = []
+    for method, summary in algo_summaries.items():
+        method_success_rows = [
+            row
+            for row in rows
+            if row["layout_method"] == method and row["success"]
+        ]
+        throughputs = [float(row["throughput_GiBps"]) for row in method_success_rows]
+        overall_ranking.append(
+            {
+                "layout_method": method,
+                "successful_runs": summary["totals"]["successful_runs"],
+                "mean_throughput_GiBps": float(np.mean(throughputs))
+                if throughputs
+                else 0.0,
+                "median_throughput_GiBps": float(np.median(throughputs))
+                if throughputs
+                else 0.0,
+                "max_throughput_GiBps": float(np.max(throughputs))
+                if throughputs
+                else 0.0,
+            }
+        )
+    overall_ranking.sort(key=lambda x: x["mean_throughput_GiBps"], reverse=True)
+
+    operations = sorted(
+        {
+            op
+            for summary in algo_summaries.values()
+            for op in summary["by_operation"].keys()
+        }
+    )
+    operation_winners: dict[str, Any] = {}
+    for op in operations:
+        candidates = []
+        for method, summary in algo_summaries.items():
+            stats = summary["by_operation"].get(op)
+            if not stats or stats["successful_runs"] == 0:
+                continue
+            candidates.append(
+                {
+                    "layout_method": method,
+                    "mean_throughput_GiBps": stats["mean_throughput_GiBps"],
+                    "median_throughput_GiBps": stats["median_throughput_GiBps"],
+                    "max_throughput_GiBps": stats["max_throughput_GiBps"],
+                    "successful_runs": stats["successful_runs"],
+                }
+            )
+        if not candidates:
+            operation_winners[op] = None
+            continue
+        candidates.sort(key=lambda x: x["mean_throughput_GiBps"], reverse=True)
+        winner = candidates[0]
+        second = candidates[1] if len(candidates) > 1 else None
+        margin_vs_second = None
+        if second and second["mean_throughput_GiBps"] > 0:
+            margin_vs_second = (
+                winner["mean_throughput_GiBps"] - second["mean_throughput_GiBps"]
+            ) / second["mean_throughput_GiBps"]
+        operation_winners[op] = {
+            "winner": winner,
+            "margin_vs_second_pct": (margin_vs_second * 100.0)
+            if margin_vs_second is not None
+            else None,
+            "ranking": candidates,
+        }
+
+    return {
+        "overall_ranking": overall_ranking,
+        "operation_winners": operation_winners,
+    }
+
+
+def print_algo_summaries(algo_summaries: dict[str, dict[str, Any]]) -> None:
+    print("\n=== Algorithm Summaries ===")
+    if not algo_summaries:
+        print("No algorithm runs.")
+        return
+    for method, summary in sorted(algo_summaries.items()):
+        totals = summary["totals"]
+        print(
+            f"\n[{method}] runs={totals['total_runs']} "
+            f"success={totals['successful_runs']} "
+            f"failed={totals['failed_runs']} "
+            f"success_rate={totals['success_rate'] * 100.0:.1f}%"
+        )
+        if summary["by_operation"]:
+            for op, stats in summary["by_operation"].items():
+                print(
+                    f"  {op:<18} runs={stats['total_runs']:<4d} "
+                    f"success={stats['successful_runs']:<4d} "
+                    f"mean_GiB/s={stats['mean_throughput_GiBps']:.3f} "
+                    f"median_GiB/s={stats['median_throughput_GiBps']:.3f} "
+                    f"max_GiB/s={stats['max_throughput_GiBps']:.3f}"
+                )
+        if summary["best_overall"] is not None:
+            best = summary["best_overall"]
+            print(
+                f"  best_overall={best['throughput_GiBps']:.3f} GiB/s "
+                f"({best['operation']} | {best['tier']}:{best['case']} | "
+                f"patch={best['patch_size']} | mode={best['mode']} "
+                f"mmap={best['mmap_mode']} cache={best['cache_state']})"
+            )
+
+
+def print_algo_comparison(algo_comparison: dict[str, Any]) -> None:
+    print("\n=== Final Algorithm Comparison ===")
+
+    ranking = algo_comparison["overall_ranking"]
+    if ranking:
+        print("Overall ranking by mean GiB/s across successful runs:")
+        for rank_idx, item in enumerate(ranking, start=1):
+            print(
+                f"  #{rank_idx:<2d} {item['layout_method']:<12} "
+                f"mean={item['mean_throughput_GiBps']:.3f} "
+                f"median={item['median_throughput_GiBps']:.3f} "
+                f"max={item['max_throughput_GiBps']:.3f} "
+                f"(successful_runs={item['successful_runs']})"
+            )
+
+    winners = algo_comparison["operation_winners"]
+    if winners:
+        print("\nWinners per operation (by mean GiB/s):")
+        for op, payload in winners.items():
+            if payload is None:
+                print(f"  {op:<18} no successful runs")
+                continue
+            winner = payload["winner"]
+            margin = payload["margin_vs_second_pct"]
+            margin_txt = (
+                f", margin_vs_2nd={margin:.1f}%"
+                if margin is not None
+                else ", only_algo_with_success"
+            )
+            print(
+                f"  {op:<18} {winner['layout_method']:<12} "
+                f"mean={winner['mean_throughput_GiBps']:.3f} "
+                f"max={winner['max_throughput_GiBps']:.3f}{margin_txt}"
+            )
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -789,6 +858,8 @@ def main() -> None:
 
     layout_methods: dict[str, Callable[..., tuple[list[int], list[int]]]] = {
         "baseline": comp_blosc2_params_baseline,
+        "generalized": comp_blosc2_params_generalized,
+        "spatial_only": comp_blosc2_params_spatial_only,
     }
 
     mode_values = ("r", "a")
@@ -1039,6 +1110,10 @@ def main() -> None:
     print_summary(summary_rows)
     final_summary = build_final_summary(rows, summary_rows)
     print_final_summary(final_summary)
+    algo_summaries = build_algo_summaries(rows, summary_rows)
+    print_algo_summaries(algo_summaries)
+    algo_comparison = build_algo_comparison(rows, algo_summaries)
+    print_algo_comparison(algo_comparison)
 
     args.results_dir.mkdir(parents=True, exist_ok=True)
     csv_path = args.results_dir / "bench_io_blosc2_layouts.csv"
@@ -1063,6 +1138,9 @@ def main() -> None:
                 },
                 "rows": rows,
                 "summary": summary_rows,
+                "algorithm_summaries": algo_summaries,
+                "algorithm_comparison": algo_comparison,
+                "final_summary": final_summary,
             },
             f,
             indent=2,
@@ -1084,6 +1162,8 @@ def main() -> None:
                     "seed": args.seed,
                 },
                 "aggregated_rows": summary_rows,
+                "algorithm_summaries": algo_summaries,
+                "algorithm_comparison": algo_comparison,
                 "final_summary": final_summary,
             },
             f,
