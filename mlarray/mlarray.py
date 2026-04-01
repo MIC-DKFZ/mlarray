@@ -1611,8 +1611,19 @@ class MLArray:
         self.support_metadata = True
         dparams = MLArray._resolve_dparams(dparams)
         ondisk = blosc2.open(str(filepath), dparams=dparams, mode="r")
-        cframe = ondisk.to_cframe()
-        self._store = blosc2.ndarray_from_cframe(cframe, copy=True)
+        in_memory = blosc2.empty(
+            ondisk.shape,
+            dtype=ondisk.dtype,
+            chunks=ondisk.chunks,
+            blocks=ondisk.blocks,
+            cparams=ondisk.schunk.cparams,
+            dparams=ondisk.schunk.dparams,
+        )
+        for i in range(ondisk.schunk.nchunks):
+            in_memory.schunk.update_chunk(i, ondisk.schunk.get_chunk(i))
+        for key, value in ondisk.schunk.vlmeta.getall().items():
+            in_memory.schunk.vlmeta[key] = value
+        self._store = in_memory
         self._backend = "blosc2"
         self.mode = None
         self.mmap_mode = None
