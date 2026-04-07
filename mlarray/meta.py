@@ -848,6 +848,25 @@ class AxisLabelEnum(str, Enum):
 AxisLabel: TypeAlias = Union[str, AxisLabelEnum]
 
 
+class CoordSystemEnum(str, Enum):
+    """Standard world/anatomical coordinate system conventions.
+
+    Attributes:
+        RAS: Right-Anterior-Superior world convention.
+        LPS: Left-Posterior-Superior world convention.
+        unknown: Coordinate system is unknown.
+        other: Coordinate system exists but is outside the built-in vocabulary.
+    """
+
+    RAS = "RAS"
+    LPS = "LPS"
+    unknown = "unknown"
+    other = "other"
+
+
+CoordSystem: TypeAlias = Union[str, CoordSystemEnum]
+
+
 @dataclass(slots=True)
 class MetaSpatial(BaseMeta):
     """Spatial metadata describing geometry and layout.
@@ -859,17 +878,20 @@ class MetaSpatial(BaseMeta):
         affine: Homogeneous affine matrix of shape [ndims + 1, ndims + 1].
         shape: Array shape. Length must match (spatial + non-spatial) ndims.
         axis_labels: Per-axis labels or roles. Length must match ndims.
+        coord_system: World/anatomical coordinate convention for spatial metadata.
         axis_units: Per-axis units. Length must match ndims.
         _num_spatial_axes: Cached count of spatial axes derived from axis_labels.
         _num_non_spatial_axes: Cached count of non-spatial axes derived from axis_labels.
     """
     AxisLabel = AxisLabelEnum
+    CoordSystem = CoordSystemEnum
     spacing: Optional[list[Union[int,float]]] = None
     origin: Optional[list[Union[int,float]]] = None
     direction: Optional[list[list[Union[int,float]]]] = None
     affine: Optional[list[list[Union[int,float]]]] = None
     shape: Optional[list[int]] = None
     axis_labels: Optional[list[Union[str,AxisLabel]]] = None
+    coord_system: Optional[CoordSystem] = None
     axis_units: Optional[list[str]] = None
     _num_spatial_axes: Optional[int] = None
     _num_non_spatial_axes: Optional[int] = None
@@ -901,6 +923,14 @@ class MetaSpatial(BaseMeta):
         if self.axis_labels is not None:
             self.axis_labels, self._num_spatial_axes, self._num_non_spatial_axes = validate_and_cast_axis_labels(self.axis_labels, "meta.spatial.axis_labels", ndims)
         spatial_ndims = spatial_ndims if self._num_spatial_axes is None else self._num_spatial_axes
+
+        if self.coord_system is not None:
+            if isinstance(self.coord_system, CoordSystemEnum):
+                self.coord_system = self.coord_system.value
+            elif not isinstance(self.coord_system, str):
+                raise TypeError(
+                    "meta.spatial.coord_system must be a str, CoordSystemEnum, or None"
+                )
 
         if self.spacing is not None:
             self.spacing = _cast_to_list(self.spacing, "meta.spatial.spacing")

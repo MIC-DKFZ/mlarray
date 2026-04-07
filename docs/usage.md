@@ -164,6 +164,36 @@ image.meta.spatial.axis_units = ["s", "mm", "mm", "mm", ""]
 image.save("time-series.mla")
 ```
 
+---
+
+## Axis labels vs coordinate system
+
+`axis_labels` defines which array axes are `spatial_x`, `spatial_y`, and
+`spatial_z`. `coord_system` defines what world-space X/Y/Z mean for the spatial
+metadata. Standard values include `RAS` and `LPS`, but arbitrary strings are
+also allowed for conventions outside the built-in vocabulary. `coord_system`
+does not determine array axis order.
+
+```python
+import numpy as np
+from mlarray import MLArray, Meta
+
+array = np.random.random((64, 128, 128))
+image = MLArray(
+    array,
+    spacing=(1.0, 1.0, 1.5),
+    origin=(10.0, 10.0, 30.0),
+    direction=[[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+    axis_labels=["spatial_z", "spatial_y", "spatial_x"],
+    meta=Meta(spatial={"coord_system": "LPS"}),
+)
+
+print(image.meta.spatial.axis_labels)   # ["spatial_z", "spatial_y", "spatial_x"]
+print(image.meta.spatial.coord_system)  # "LPS"
+
+image.meta.spatial.coord_system = "my_custom_frame"
+```
+
 
 
 ## Patch size variants

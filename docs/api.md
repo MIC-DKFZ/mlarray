@@ -20,6 +20,8 @@
 
 ::: mlarray.meta.AxisLabelEnum
 
+::: mlarray.meta.CoordSystemEnum
+
 ::: mlarray.meta.MetaStatistics
 
 ::: mlarray.meta.MetaBbox

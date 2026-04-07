@@ -51,6 +51,34 @@ class TestMetaSafety(unittest.TestCase):
         with self.assertRaises(ValueError):
             image.meta.spatial.spacing = [0.1, 0.2]
 
+    def test_meta_spatial_coord_system_accepts_standard_and_custom_values(self):
+        cases = (
+            (None, None),
+            ("RAS", "RAS"),
+            ("LPS", "LPS"),
+            ("unknown", "unknown"),
+            ("other", "other"),
+            ("ENU", "ENU"),
+            ("my_custom_frame", "my_custom_frame"),
+            (MetaSpatial.CoordSystem.RAS, "RAS"),
+            (MetaSpatial.CoordSystem.LPS, "LPS"),
+        )
+
+        for value, expected in cases:
+            with self.subTest(value=value):
+                spatial = MetaSpatial(coord_system=value)
+                self.assertEqual(spatial.coord_system, expected)
+
+    def test_meta_spatial_coord_system_rejects_non_string_values(self):
+        with self.assertRaises(TypeError):
+            MetaSpatial(coord_system=123)
+
+    def test_meta_spatial_coord_system_serializes_as_string(self):
+        spatial = MetaSpatial(coord_system=MetaSpatial.CoordSystem.RAS)
+
+        self.assertEqual(spatial.to_mapping(include_none=True)["coord_system"], "RAS")
+        self.assertEqual(spatial.to_plain(include_none=True)["coord_system"], "RAS")
+
     def test_internal_cached_validation_state_is_hidden(self):
         image = MLArray(np.zeros((4, 4, 4), dtype=np.float32))
         mapping = image.meta.spatial.to_mapping(include_none=True)
@@ -103,6 +131,10 @@ class TestMetaSafety(unittest.TestCase):
         self.assertIsNone(meta.bbox.labels)
         self.assertEqual(meta.stats.mean, 0.5)
         self.assertEqual(meta.spatial.spacing, [1.0, 2.0, 3.0])
+
+    def test_meta_spatial_from_mapping_preserves_coord_system_string(self):
+        meta = Meta.from_mapping({"spatial": {"coord_system": "ENU"}})
+        self.assertEqual(meta.spatial.coord_system, "ENU")
 
     def test_user_copy_from_skips_internal_fields(self):
         dst = Meta()

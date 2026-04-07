@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 
 from mlarray import MLArray
-from mlarray.meta import Meta, MetaBbox, MetaStatistics
+from mlarray.meta import Meta, MetaBbox, MetaSpatial, MetaStatistics
 
 
 def _make_array(shape=(8, 16, 16), seed=0):
@@ -53,6 +53,45 @@ class TestMetadataStorage(unittest.TestCase):
             self.assertEqual(loaded.meta.stats.to_plain(), stats.to_plain())
             self.assertEqual(loaded.meta.bbox.to_plain(), bbox.to_plain())
             self.assertEqual(loaded.meta.extra.to_plain(), {"pipeline": "v1"})
+
+    def test_metadata_coord_system_roundtrip_with_spacing_origin_direction(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            array = _make_array()
+            image = MLArray(
+                array,
+                spacing=(1.0, 1.0, 1.5),
+                origin=(10.0, 20.0, 30.0),
+                direction=[[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+                meta=Meta(spatial={"coord_system": MetaSpatial.CoordSystem.RAS}),
+            )
+
+            path = Path(tmpdir) / "coord-system-spacing.mla"
+            image.save(path)
+
+            loaded = MLArray(path)
+            self.assertEqual(loaded.meta.spatial.coord_system, "RAS")
+            self.assertEqual(loaded.meta.to_mapping()["spatial"]["coord_system"], "RAS")
+            self.assertEqual(loaded.meta.to_plain()["spatial"]["coord_system"], "RAS")
+
+    def test_metadata_coord_system_roundtrip_with_affine_and_custom_string(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            array = _make_array()
+            image = MLArray(
+                array,
+                affine=[
+                    [1.0, 0.0, 0.0, 10.0],
+                    [0.0, 1.0, 0.0, 20.0],
+                    [0.0, 0.0, 1.0, 30.0],
+                    [0.0, 0.0, 0.0, 1.0],
+                ],
+                meta=Meta(spatial={"coord_system": "my_custom_frame"}),
+            )
+
+            path = Path(tmpdir) / "coord-system-affine.mla"
+            image.save(path)
+
+            loaded = MLArray(path)
+            self.assertEqual(loaded.meta.spatial.coord_system, "my_custom_frame")
 
     def test_metadata_mmap_readonly_no_write(self):
         with tempfile.TemporaryDirectory() as tmpdir:

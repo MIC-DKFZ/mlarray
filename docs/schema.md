@@ -67,6 +67,7 @@ This section stores the information needed to interpret the array in physical sp
 | direction    | Optional[List[List[float]]] | Direction matrix, shape `[ndims][ndims]`.                                                |
 | shape        | Optional[List[int]]         | Full array shape, length = spatial + non-spatial axes.                                   |
 | axis_labels  | Optional[List[str,AxisLabel]]   | Per-axis labels or roles, length = full array `ndims`.                                   |
+| coord_system | Optional[Union[str,CoordSystem]] | World/anatomical coordinate convention that `spacing`, `origin`, `direction`, or `affine` map into. |
 | axis_units   | Optional[List[str]]         | Per-axis units, length = full array `ndims`.                                             |
 
 ---
@@ -86,6 +87,35 @@ Axis labels describe the semantic role of each axis. They may be provided as str
 | temporal      | Time axis.                                               |
 | continuous    | Continuous-valued axis (non-spatial).                    |
 | components    | Component axis (e.g., vector components).                |
+
+`axis_labels` defines which array axes correspond to spatial axes such as
+`spatial_x`, `spatial_y`, and `spatial_z`. It does not define what world-space
+X/Y/Z mean.
+
+---
+
+#### CoordSystem
+
+`coord_system` describes the world/anatomical coordinate convention that the
+spatial metadata maps into. It applies to both geometry styles:
+`spacing`/`origin`/`direction` and `affine`.
+
+Built-in standard values are:
+
+| value   | description |
+| ------- | ----------- |
+| RAS     | Right-Anterior-Superior world convention. |
+| LPS     | Left-Posterior-Superior world convention. |
+| unknown | Coordinate system is unknown. |
+| other   | Coordinate system exists but falls outside the built-in vocabulary. |
+
+Arbitrary strings are also allowed and are preserved exactly as provided. This
+makes `coord_system` an extensible standard vocabulary rather than a closed
+enum.
+
+`coord_system` does not determine array axis order. `axis_labels` tells you
+which array axes are spatial axes; `coord_system` tells you what world
+X/Y/Z mean in those spatial coordinates.
 
 ---
 
