@@ -211,6 +211,20 @@ When converting from MLArray to NIfTI/NRRD, only `meta.source` is copied into
 the output header. Spatial metadata (`spacing`, `origin`, `direction`) is set
 explicitly from `meta.spatial`.
 
+`meta.spatial.coord_system` is propagated conservatively. For NRRD input, the
+CLI reads explicit NRRD space metadata when available and maps
+`right-anterior-superior` to `RAS` and `left-posterior-superior` to `LPS`,
+while preserving other explicit NRRD space strings verbatim. For NIfTI input,
+the CLI sets `coord_system` to `LPS` based on the current
+`MedVol -> SimpleITK/ITK` import path, where the imported geometry is
+represented in the ITK physical-space convention. MedVol's reindexing to NumPy
+layout does not change that world-space convention. On NRRD output, `RAS` and
+`LPS` are written back as NRRD `space` metadata when possible; arbitrary custom
+`coord_system` strings are not emitted as NRRD `space` declarations unless they
+already match a supported explicit NRRD space string. NIfTI output preserves
+geometry, but does not export `coord_system` as an explicit NIfTI metadata
+field.
+
 ```bash
 mlarray_convert sample.nii.gz output.mla
 mlarray_convert sample.mla output.nii.gz
