@@ -1,7 +1,9 @@
 import argparse
 import json
+from collections.abc import Mapping
 from typing import Optional, Union
 from pathlib import Path
+import numpy as np
 from mlarray import MLArray
 from mlarray.meta import _meta_internal_write
 
@@ -9,30 +11,6 @@ try:
     from medvol import MedVol
 except ImportError:
     MedVol = None
-
-
-_NRRD_SPACE_TO_COORD_SYSTEM = {
-    "right-anterior-superior": "RAS",
-    "left-posterior-superior": "LPS",
-}
-
-_COORD_SYSTEM_TO_NRRD_SPACE = {
-    value: key for key, value in _NRRD_SPACE_TO_COORD_SYSTEM.items()
-}
-
-# Only emit `space` values that are meaningful and commonly used in NRRD.
-# Arbitrary MLArray coord_system strings are not written as NRRD `space`
-# values because that would risk producing invalid or misleading metadata.
-_SUPPORTED_NRRD_SPACE_STRINGS = frozenset({
-    "right-anterior-superior",
-    "left-posterior-superior",
-    "scanner-xyz",
-    "scanner-xyz-time",
-    "3D-right-handed",
-    "3D-left-handed",
-    "3D-right-handed-time",
-    "3D-left-handed-time",
-})
 
 
 def _require_medvol() -> None:
@@ -67,78 +45,70 @@ def _source_format_for_path(filepath: Union[str, Path]) -> Optional[str]:
     return None
 
 
-def _spatial_components_for_medvol(image_mlarray: MLArray):
-    if image_mlarray.meta.spatial.affine is not None:
-        return image_mlarray.scale, image_mlarray.translation, image_mlarray.rotation
-    return image_mlarray.spacing, image_mlarray.origin, image_mlarray.direction
+def _medvol_backend_for_path(filepath: Union[str, Path]) -> Optional[str]:
+    """Return the explicit backend to use when creating a MedVol for saving.
 
-
-def _coord_system_from_nrrd_header(header) -> Optional[str]:
-    if not isinstance(header, dict):
-        return None
-
-    for key in ("space", "NRRD_space"):
-        space = header.get(key)
-        if not isinstance(space, str):
-            continue
-        if space.strip() == "":
-            continue
-
-        normalized = space.strip().lower()
-        if normalized in _NRRD_SPACE_TO_COORD_SYSTEM:
-            return _NRRD_SPACE_TO_COORD_SYSTEM[normalized]
-
-        # Preserve other explicit NRRD space strings verbatim in MLArray when
-        # present, even if they are outside the small built-in vocabulary.
-        return space
-
+    NIfTI: None → MedVol auto-selects nibabel (canonical RAS+ geometry,
+    fresh header from affine — dict source-metadata is intentionally not
+    passed through since nibabel expects a Nifti1Header object).
+    NRRD:  "pynrrd" → MedVol backend flag must match so pynrrd.save() picks
+    up the source-metadata dict as the base header.
+    """
+    if _is_nrrd_path(filepath):
+        return "pynrrd"
     return None
 
 
-def _coord_system_from_medvol_image(
-    load_filepath: Union[str, Path],
-    image_medvol,
-) -> Optional[str]:
-    if _is_nrrd_path(load_filepath):
-        return _coord_system_from_nrrd_header(getattr(image_medvol, "header", None))
 
-    if _is_nifti_path(load_filepath):
-        # MedVol reads NIfTI through SimpleITK/ITK and exposes geometry in that
-        # physical-space convention. MedVol's additional geometry handling only
-        # reindexes axes to match the NumPy array layout; it does not change the
-        # world/anatomical coordinate convention of the returned geometry.
-        return "LPS"
+def _jsonable_header_value(value):
+    if isinstance(value, np.ndarray):
+        if value.ndim == 0:
+            return _jsonable_header_value(value.item())
+        return [_jsonable_header_value(v) for v in value.tolist()]
+    if isinstance(value, bytes):
+        # Must precede np.generic: np.bytes_ is a subclass of both bytes and
+        # np.generic, and .item() on it returns Python bytes (not str).
+        return value.decode("utf-8", errors="replace")
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, Mapping):
+        return {str(k): _jsonable_header_value(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_jsonable_header_value(v) for v in value]
+    if hasattr(value, "tolist") and not isinstance(value, (str, bytes)):
+        converted = value.tolist()
+        return _jsonable_header_value(converted)
+    return value
 
-    return None
+
+def _header_to_source_meta(header) -> dict:
+    if header is None:
+        return {}
+
+    raw = None
+    if isinstance(header, Mapping):
+        raw = dict(header)
+    elif hasattr(header, "items"):
+        raw = {str(k): v for k, v in header.items()}
+    elif hasattr(header, "keys"):
+        raw = {str(k): header[k] for k in header.keys()}
+    else:
+        raise TypeError(
+            f"Unsupported MedVol header type for MLArray conversion: {type(header).__name__}"
+        )
+
+    converted = _jsonable_header_value(raw)
+    if not isinstance(converted, dict):
+        raise TypeError("Converted MedVol header must be a mapping.")
+    return converted
 
 
-def _header_for_medvol_output(
-    save_filepath: Union[str, Path],
-    source_header: dict,
-    coord_system: Optional[str],
-) -> dict:
-    header = dict(source_header)
-
-    if not _is_nrrd_path(save_filepath):
-        return header
-
-    header.pop("space", None)
-    header.pop("NRRD_space", None)
-
-    if coord_system in (None, "unknown", "other"):
-        return header
-
-    if coord_system in _COORD_SYSTEM_TO_NRRD_SPACE:
-        header["space"] = _COORD_SYSTEM_TO_NRRD_SPACE[coord_system]
-        return header
-
-    if coord_system in _SUPPORTED_NRRD_SPACE_STRINGS:
-        header["space"] = coord_system
-        return header
-
-    # Arbitrary MLArray coord_system strings do not have a reliable NRRD
-    # representation, so avoid writing a false explicit space declaration.
-    return header
+def _coord_system_alias(coord_system: Optional[str]) -> Optional[str]:
+    if coord_system in {"RAS", "RAS+"}:
+        return "RAS+"
+    if coord_system in {"LPS", "LPS+"}:
+        return "LPS+"
+    return coord_system
 
 
 def print_header(filepath: Union[str, Path]) -> None:
@@ -157,15 +127,15 @@ def print_header(filepath: Union[str, Path]) -> None:
 def convert_to_mlarray(load_filepath: Union[str, Path], save_filepath: Union[str, Path]):
     _require_medvol()
     image_meta_format = _source_format_for_path(load_filepath)
+    # Let MedVol auto-detect the backend (nibabel for NIfTI, pynrrd for NRRD).
+    # The default canonicalize=True reorients the array+affine to RAS+.
     image_medvol = MedVol(load_filepath)
     image_mlarray = MLArray(
         image_medvol.array,
-        spacing=image_medvol.spacing,
-        origin=image_medvol.origin,
-        direction=image_medvol.direction,
-        meta=image_medvol.header,
+        affine=image_medvol.affine,
+        meta=_header_to_source_meta(image_medvol.header),
     )
-    coord_system = _coord_system_from_medvol_image(load_filepath, image_medvol)
+    coord_system = _coord_system_alias(image_medvol.coordinate_system)
     if coord_system is not None:
         image_mlarray.meta.spatial.coord_system = coord_system
     with _meta_internal_write():
@@ -176,20 +146,31 @@ def convert_to_mlarray(load_filepath: Union[str, Path], save_filepath: Union[str
 def convert_from_mlarray(load_filepath: Union[str, Path], save_filepath: Union[str, Path]):
     _require_medvol()
     image_mlarray = MLArray(load_filepath)
-    spacing, origin, direction = _spatial_components_for_medvol(image_mlarray)
-    header = _header_for_medvol_output(
-        save_filepath,
-        image_mlarray.meta.source.to_plain(),
-        image_mlarray.meta.spatial.coord_system,
-    )
-    image_medvol = MedVol(
+    backend = _medvol_backend_for_path(save_filepath)
+
+    # MedVol always canonicalises to RAS+ on load, so data stored in an
+    # MLArray is in RAS+ orientation.  The only exception is legacy LPS+
+    # files created before that default existed.  Anything else (None,
+    # "unknown", custom strings) is therefore safely treated as RAS+.
+    stored_cs = image_mlarray.meta.spatial.coord_system
+    coordinate_system = "LPS+" if stored_cs in {"LPS", "LPS+"} else "RAS+"
+
+    header = dict(image_mlarray.meta.source.to_plain())
+    if _is_nrrd_path(save_filepath):
+        # Strip NRRD coordinate-system keys; pynrrd will re-set "space" from
+        # the coordinate_system we pass.  "NRRD_space" is a SimpleITK
+        # metadata artifact that must not appear in clean NRRD output.
+        header.pop("space", None)
+        header.pop("NRRD_space", None)
+
+    MedVol(
         image_mlarray.to_numpy(),
-        spacing=spacing,
-        origin=origin,
-        direction=direction,
+        affine=image_mlarray.affine,
         header=header,
-    )
-    image_medvol.save(save_filepath)
+        backend=backend,
+        coordinate_system=coordinate_system,
+        canonicalize=False,
+    ).save(save_filepath, backend=backend)
 
 
 def convert_image(load_filepath: Union[str, Path], save_filepath: Union[str, Path]):
