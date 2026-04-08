@@ -854,12 +854,16 @@ class CoordSystemEnum(str, Enum):
     Attributes:
         RAS: Right-Anterior-Superior world convention.
         LPS: Left-Posterior-Superior world convention.
+        RAS_PLUS: Right-Anterior-Superior positive world convention.
+        LPS_PLUS: Left-Posterior-Superior positive world convention.
         unknown: Coordinate system is unknown.
         other: Coordinate system exists but is outside the built-in vocabulary.
     """
 
     RAS = "RAS"
     LPS = "LPS"
+    RAS_PLUS = "RAS+"
+    LPS_PLUS = "LPS+"
     unknown = "unknown"
     other = "other"
 
