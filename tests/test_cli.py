@@ -134,6 +134,8 @@ class TestCLIConversion(unittest.TestCase):
             )
             self.assertEqual(loaded.meta._image_meta_format.to_plain(), "nifti")
             self.assertEqual(loaded.meta.spatial.coord_system, "RAS+")
+            # XYZ axis labels are set so Slicer uses the affine as-is (identity permutation).
+            self.assertEqual(loaded.meta.spatial.axis_labels, ["spatial_x", "spatial_y", "spatial_z"])
 
     def test_convert_to_mlarray_from_nrrd_uses_medvol_coord_system(self):
         with tempfile.TemporaryDirectory() as tmpdir:

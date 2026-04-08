@@ -130,10 +130,22 @@ def convert_to_mlarray(load_filepath: Union[str, Path], save_filepath: Union[str
     # Let MedVol auto-detect the backend (nibabel for NIfTI, pynrrd for NRRD).
     # The default canonicalize=True reorients the array+affine to RAS+.
     image_medvol = MedVol(load_filepath)
+    # MedVol canonical output uses nibabel's XYZ axis convention: axis 0 ≈ X, axis 1 ≈ Y,
+    # axis 2 ≈ Z, with affine column i = direction of array axis i.
+    # SlicerMLArray assumes ZYX order when axis_labels is None. Supply explicit XYZ labels so
+    # Slicer uses an identity permutation and the stored affine is used as-is.
+    ndim = image_medvol.array.ndim
+    if ndim == 3:
+        axis_labels = ["spatial_x", "spatial_y", "spatial_z"]
+    elif ndim == 2:
+        axis_labels = ["spatial_x", "spatial_y"]
+    else:
+        axis_labels = None  # 4D: non-spatial axis ambiguous; leave unlabeled
     image_mlarray = MLArray(
         image_medvol.array,
         affine=image_medvol.affine,
         meta=_header_to_source_meta(image_medvol.header),
+        axis_labels=axis_labels,
     )
     coord_system = _coord_system_alias(image_medvol.coordinate_system)
     if coord_system is not None:
