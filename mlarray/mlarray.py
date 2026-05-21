@@ -1280,9 +1280,10 @@ class MLArray:
         Returns:
             tuple: Shape of the underlying array, or None if no array is loaded.
         """
-        if self._store is None or self.meta._has_array.has_array == False:
+        if self.meta is None or self.meta._has_array.has_array == False:
             return None
-        return self._store.shape
+        shape = self.meta.spatial.shape
+        return tuple(shape) if shape is not None else None
 
     @property
     def dtype(self):
@@ -1303,9 +1304,10 @@ class MLArray:
         Returns:
             int: Number of dimensions, or None if no array is loaded.
         """
-        if self._store is None or self.meta._has_array.has_array == False:
+        if self.meta is None or self.meta._has_array.has_array == False:
             return None
-        return len(self._store.shape)
+        shape = self.meta.spatial.shape
+        return len(shape) if shape is not None else None
 
     @property
     def spatial_ndim(self) -> int:
@@ -1314,12 +1316,12 @@ class MLArray:
         Returns:
             int: Number of spatial dimensions, or None if no array is loaded.
         """
-        if self._store is None or self.meta._has_array.has_array == False:
+        if self.meta is None or self.meta._has_array.has_array == False:
             return None
-        ndim = len(self._store.shape)
         if self.meta.spatial._num_spatial_axes is not None:
-            ndim = self.meta.spatial._num_spatial_axes
-        return ndim
+            return self.meta.spatial._num_spatial_axes
+        shape = self.meta.spatial.shape
+        return len(shape) if shape is not None else None
 
     @classmethod
     def comp_blosc2_params(
@@ -1581,10 +1583,10 @@ class MLArray:
         
         self._store = blosc2.empty(shape=shape, dtype=np.dtype(dtype), urlpath=str(filepath), chunks=self.meta.blosc2.chunk_size, blocks=self.meta.blosc2.block_size, cparams=MLArray._resolve_cparams(self.meta.blosc2.cparams), dparams=MLArray._resolve_dparams(self.meta.blosc2.dparams), mmap_mode=mmap_mode)
         self._backend = "blosc2"
-        self._update_blosc2_meta()
         self.mode = mode
         self.mmap_mode = mmap_mode
         self._validate_and_add_meta(self.meta)
+        self._update_blosc2_meta()
         self._write_metadata()
 
     def _load(
@@ -1815,8 +1817,8 @@ class MLArray:
 
         self.support_metadata = True
 
-        self._update_blosc2_meta()
         self._validate_and_add_meta(self.meta)
+        self._update_blosc2_meta()
 
     @staticmethod
     def _build_constructor_call_kwargs(
@@ -1987,7 +1989,8 @@ class MLArray:
                 self.meta._has_array.has_array = True
         if self.meta._has_array.has_array:
             with _meta_internal_write():
-                self.meta.spatial.shape = self.shape
+                if self._store is not None and self._store.shape != (0,):
+                    self.meta.spatial.shape = list(self._store.shape)
         if validate:
             with _meta_internal_write():
                 self.meta.spatial._validate_and_cast(ndims=self.ndim, spatial_ndims=self.spatial_ndim)
