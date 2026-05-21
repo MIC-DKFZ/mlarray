@@ -1302,26 +1302,35 @@ class MLArray:
         """Returns the number of spatial and non-spatial dimensions of the array.
 
         Returns:
-            int: Number of dimensions, or None if no array is loaded.
+            int: Number of dimensions, or None if not determinable.
         """
-        if self.meta is None or self.meta._has_array.has_array == False:
+        if self.meta is None:
             return None
-        shape = self.meta.spatial.shape
-        return len(shape) if shape is not None else None
+        spatial = self.meta.spatial
+        if spatial.shape is not None:
+            return len(spatial.shape)
+        if spatial._num_spatial_axes is not None:
+            return spatial._num_spatial_axes + spatial._num_non_spatial_axes
+        for attr in (spatial.spacing, spatial.origin, spatial.direction):
+            if attr is not None:
+                return len(attr)
+        if spatial.affine is not None:
+            return len(spatial.affine) - 1
+        return None
 
     @property
     def spatial_ndim(self) -> int:
         """Returns the number of spatial dimensions.
 
         Returns:
-            int: Number of spatial dimensions, or None if no array is loaded.
+            int: Number of spatial dimensions, or None if not determinable.
         """
-        if self.meta is None or self.meta._has_array.has_array == False:
+        if self.meta is None:
             return None
-        if self.meta.spatial._num_spatial_axes is not None:
-            return self.meta.spatial._num_spatial_axes
-        shape = self.meta.spatial.shape
-        return len(shape) if shape is not None else None
+        spatial = self.meta.spatial
+        if spatial._num_spatial_axes is not None:
+            return spatial._num_spatial_axes
+        return self.ndim
 
     @classmethod
     def comp_blosc2_params(
