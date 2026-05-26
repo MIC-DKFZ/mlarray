@@ -1340,24 +1340,30 @@ class Meta(BaseMeta):
                 "Cannot add a labeled bbox when existing bboxes have no labels."
             )
 
-        if self.bbox.bboxes is None:
-            self.bbox.bboxes = []
-        self.bbox.bboxes.append(_cast_to_list(bbox, "meta.bbox.bbox"))
+        new_bbox = _cast_to_list(bbox, "meta.bbox.bbox")
+        new_bboxes = list(self.bbox.bboxes) if self.bbox.bboxes is not None else []
+        new_bboxes.append(new_bbox)
 
         if score is not None:
-            if self.bbox.scores is None:
-                self.bbox.scores = []
-            self.bbox.scores.append(score)
+            new_scores = list(self.bbox.scores) if self.bbox.scores is not None else []
+            new_scores.append(score)
         elif self.bbox.scores is not None:
             raise ValueError("score must be provided because meta.bbox.scores already exists")
+        else:
+            new_scores = None
 
         if label is not None:
-            if self.bbox.labels is None:
-                self.bbox.labels = []
-            self.bbox.labels.append(label)
+            new_labels = list(self.bbox.labels) if self.bbox.labels is not None else []
+            new_labels.append(label)
         elif self.bbox.labels is not None:
             raise ValueError("label must be provided because meta.bbox.labels already exists")
+        else:
+            new_labels = None
 
+        with _meta_internal_write():
+            object.__setattr__(self.bbox, "bboxes", new_bboxes)
+            object.__setattr__(self.bbox, "scores", new_scores)
+            object.__setattr__(self.bbox, "labels", new_labels)
         self.bbox._validate_and_cast()
         return self
 
