@@ -38,6 +38,9 @@ import h5py
 import nibabel as nib
 import numpy as np
 import zarr
+from rich.console import Console
+from rich.table import Table
+from rich import box
 from tqdm import tqdm
 from tqdmp import tqdmp
 
@@ -328,31 +331,55 @@ def run_benchmark(
 # ---------------------------------------------------------------------------
 
 def print_results_table(results: dict, source_disk_mb: float) -> None:
-    fmt_width = max(len(f) for f in results) + 2
-    header = (
-        f"{'Format':<{fmt_width}} {'Disk(MB)':>10} {'Ratio':>7}"
-        f" {'Mean(ms)':>10} {'Median(ms)':>11} {'Std(ms)':>8}"
-        f" {'P95(ms)':>8} {'Max(ms)':>8} {'MB/s':>8}"
+    best_mean   = min(r["mean_ms"]        for r in results.values())
+    best_mb     = min(r["disk_mb"]        for r in results.values())
+    best_tput   = max(r["throughput_mbs"] for r in results.values())
+
+    table = Table(
+        box=box.ROUNDED,
+        show_header=True,
+        header_style="bold cyan",
+        title="[bold]Random Patch Read Benchmark[/bold]",
+        title_style="bold white",
+        caption=(
+            f"Ratio = {source_disk_mb:.1f} MB uncompressed / format disk size  •  "
+            "Times include open + decompress + close per read  •  single process"
+        ),
+        caption_style="dim",
     )
-    sep = "-" * len(header)
-    print()
-    print(sep)
-    print(header)
-    print(sep)
+
+    table.add_column("Format",      style="bold",    justify="left",  no_wrap=True)
+    table.add_column("Disk (MB)",                    justify="right")
+    table.add_column("Ratio",                        justify="right")
+    table.add_column("Mean (ms)",                    justify="right")
+    table.add_column("Median (ms)",                  justify="right")
+    table.add_column("Std (ms)",                     justify="right")
+    table.add_column("P95 (ms)",                     justify="right")
+    table.add_column("Max (ms)",                     justify="right")
+    table.add_column("MB/s",        style="bold",    justify="right")
+
     for fmt, r in results.items():
         ratio = source_disk_mb / r["disk_mb"] if r["disk_mb"] > 0 else float("nan")
-        print(
-            f"{fmt:<{fmt_width}} {r['disk_mb']:>10.1f} {ratio:>7.2f}x"
-            f" {r['mean_ms']:>10.2f} {r['median_ms']:>11.2f} {r['std_ms']:>8.2f}"
-            f" {r['p95_ms']:>8.2f} {r['max_ms']:>8.2f} {r['throughput_mbs']:>8.1f}"
+
+        disk_str = f"[green]{r['disk_mb']:.1f}[/green]" if r["disk_mb"] == best_mb   else f"{r['disk_mb']:.1f}"
+        mean_str = f"[green]{r['mean_ms']:.2f}[/green]" if r["mean_ms"] == best_mean else f"{r['mean_ms']:.2f}"
+        tput_str = f"[green]{r['throughput_mbs']:.1f}[/green]" if r["throughput_mbs"] == best_tput else f"{r['throughput_mbs']:.1f}"
+
+        table.add_row(
+            fmt,
+            disk_str,
+            f"{ratio:.2f}×",
+            mean_str,
+            f"{r['median_ms']:.2f}",
+            f"{r['std_ms']:.2f}",
+            f"{r['p95_ms']:.2f}",
+            f"{r['max_ms']:.2f}",
+            tput_str,
         )
-    print(sep)
-    print(
-        f"  Ratio = source uncompressed size ({source_disk_mb:.1f} MB) / format disk size."
-    )
-    print(
-        f"  Times include file open + decompression + close per patch read (single-process)."
-    )
+
+    console = Console()
+    console.print()
+    console.print(table)
 
 
 # ---------------------------------------------------------------------------
