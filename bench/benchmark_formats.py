@@ -36,6 +36,7 @@ from pathlib import Path
 import blosc2
 import h5py
 import nibabel as nib
+import nrrd
 import numpy as np
 import zarr
 from rich.console import Console
@@ -47,16 +48,47 @@ from tqdmp import tqdmp
 from mlarray import MLArray
 
 ALL_FORMATS = ["npy", "npz", "zarr", "hdf5", "blosc2", "mlarray"]
+DEFAULT_FORMATS = ["npy", "zarr", "hdf5", "blosc2", "mlarray"]
 
 
 # ---------------------------------------------------------------------------
 # Source file loading
 # ---------------------------------------------------------------------------
 
+_NRRD_TYPE_TO_NUMPY = {
+    "signed char": "int8", "int8": "int8", "int8_t": "int8",
+    "uchar": "uint8", "unsigned char": "uint8", "uint8": "uint8", "uint8_t": "uint8",
+    "short": "int16", "short int": "int16", "signed short": "int16", "int16": "int16", "int16_t": "int16",
+    "ushort": "uint16", "unsigned short": "uint16", "uint16": "uint16", "uint16_t": "uint16",
+    "int": "int32", "signed int": "int32", "int32": "int32", "int32_t": "int32",
+    "uint": "uint32", "unsigned int": "uint32", "uint32": "uint32", "uint32_t": "uint32",
+    "longlong": "int64", "long long": "int64", "int64": "int64", "int64_t": "int64",
+    "ulonglong": "uint64", "unsigned long long": "uint64", "uint64": "uint64", "uint64_t": "uint64",
+    "float": "float32",
+    "double": "float64",
+}
+
+
+def _nbytes_from_header(filepath: Path) -> int:
+    """Return uncompressed byte count by reading only the file header."""
+    if str(filepath).endswith(".nrrd"):
+        with open(filepath, "rb") as fh:
+            header = nrrd.read_header(fh)
+        shape = tuple(int(x) for x in header["sizes"])
+        dtype = np.dtype(_NRRD_TYPE_TO_NUMPY[header["type"]])
+    else:
+        img = nib.load(str(filepath))
+        shape = img.shape
+        dtype = np.dtype(img.header.get_data_dtype())
+    return int(np.prod(shape)) * dtype.itemsize
+
+
 def load_source_array(filepath: Path) -> np.ndarray:
-    """Load a NIfTI/NRRD file as a contiguous float32 numpy array."""
-    img = nib.load(str(filepath))
-    arr = np.asarray(img.dataobj)
+    """Load a NIfTI or NRRD file as a contiguous numpy array."""
+    if str(filepath).endswith(".nrrd"):
+        arr, _ = nrrd.read(str(filepath))
+    else:
+        arr = np.asarray(nib.load(str(filepath)).dataobj)
     if not arr.flags["C_CONTIGUOUS"]:
         arr = np.ascontiguousarray(arr)
     return arr
@@ -409,12 +441,12 @@ def parse_args() -> argparse.Namespace:
         "--formats",
         nargs="+",
         choices=ALL_FORMATS,
-        default=ALL_FORMATS,
-        help=f"Formats to benchmark. Default: all ({', '.join(ALL_FORMATS)}).",
+        default=DEFAULT_FORMATS,
+        help=f"Formats to benchmark. Default: {', '.join(DEFAULT_FORMATS)} (npz excluded by default due to slow full-decompress reads).",
     )
     parser.add_argument("--max_images", type=int, default=None, help="Maximum number of images to use. The full list is shuffled then sliced. Default: all images.")
     parser.add_argument("--skip_convert", action="store_true", help="Skip Stage 1 (conversion).")
-    parser.add_argument("--num_workers", type=int, default=os.cpu_count(), help="Parallel workers for Stage 1 conversion. Default: all CPU cores.")
+    parser.add_argument("--num_workers", type=int, default=12, help="Parallel workers for Stage 1 conversion. Default: all CPU cores.")
     parser.add_argument("--seed", type=int, default=42, help="Random seed. Default: 42.")
     return parser.parse_args()
 
@@ -448,7 +480,7 @@ def main() -> None:
     if len(source_files) < len(all_source_files):
         print(f"Using {len(source_files)} image(s) (--max_images={args.max_images}).")
 
-    source_disk_mb = sum(load_source_array(f).nbytes / 1e6 for f in source_files)
+    source_disk_mb = sum(_nbytes_from_header(f) for f in source_files) / 1e6
     print(f"Total uncompressed data: {source_disk_mb:.1f} MB")
 
     # ------------------------------------------------------------------
