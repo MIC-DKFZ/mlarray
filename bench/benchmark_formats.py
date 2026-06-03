@@ -25,12 +25,13 @@ Usage:
 import argparse
 import json
 import math
+import os
 import random
 import shutil
-import time
-from pathlib import Path
-
 import sys
+import time
+from functools import partial
+from pathlib import Path
 
 import blosc2
 import h5py
@@ -38,6 +39,7 @@ import nibabel as nib
 import numpy as np
 import zarr
 from tqdm import tqdm
+from tqdmp import tqdmp
 
 from mlarray import MLArray
 
@@ -115,23 +117,29 @@ CONVERTERS = {
 }
 
 
-def run_conversion(source_files: list[Path], output_dir: Path, formats: list[str]) -> None:
+def _convert_one(src: Path, output_dir: Path, formats: list[str]) -> None:
+    """Convert a single source file to all requested formats. Top-level for pickling."""
+    arr = load_source_array(src)
+    stem = src.name.split(".")[0]
     for fmt in formats:
-        fmt_dir = output_dir / fmt
-        fmt_dir.mkdir(parents=True, exist_ok=True)
+        converter, suffix = CONVERTERS[fmt]
+        out_path = output_dir / fmt / (stem + suffix)
+        if out_path.exists():
+            continue
+        converter(arr, out_path)
 
-    n = len(source_files)
-    for i, src in enumerate(source_files):
-        print(f"  [{i+1}/{n}] {src.name}", flush=True)
-        arr = load_source_array(src)
-        stem = src.name.split(".")[0]
 
-        for fmt in formats:
-            converter, suffix = CONVERTERS[fmt]
-            out_path = output_dir / fmt / (stem + suffix)
-            if out_path.exists():
-                continue
-            converter(arr, out_path)
+def run_conversion(
+    source_files: list[Path],
+    output_dir: Path,
+    formats: list[str],
+    num_workers: int,
+) -> None:
+    for fmt in formats:
+        (output_dir / fmt).mkdir(parents=True, exist_ok=True)
+
+    fn = partial(_convert_one, output_dir=output_dir, formats=formats)
+    tqdmp(fn, source_files, num_workers, desc="  Converting")
 
 
 # ---------------------------------------------------------------------------
@@ -363,6 +371,7 @@ def parse_args() -> argparse.Namespace:
         help=f"Formats to benchmark. Default: all ({', '.join(ALL_FORMATS)}).",
     )
     parser.add_argument("--skip_convert", action="store_true", help="Skip Stage 1 (conversion).")
+    parser.add_argument("--num_workers", type=int, default=os.cpu_count(), help="Parallel workers for Stage 1 conversion. Default: all CPU cores.")
     parser.add_argument("--seed", type=int, default=42, help="Random seed. Default: 42.")
     return parser.parse_args()
 
@@ -382,6 +391,7 @@ def main() -> None:
     print(f"Formats    : {args.formats}")
     print(f"Patch size : {patch_size}")
     print(f"N reads    : {args.n_reads}")
+    print(f"Num workers: {args.num_workers}")
     print(f"Seed       : {args.seed}")
 
     source_files = discover_source_files(source_dir)
@@ -399,7 +409,7 @@ def main() -> None:
     # ------------------------------------------------------------------
     if not args.skip_convert:
         print("\n=== Stage 1: Converting ===")
-        run_conversion(source_files, output_dir, args.formats)
+        run_conversion(source_files, output_dir, args.formats, args.num_workers)
         print("Conversion complete.")
     else:
         print("\nStage 1 skipped (--skip_convert).")
