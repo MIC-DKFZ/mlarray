@@ -61,9 +61,23 @@ def load_source_array(filepath: Path) -> np.ndarray:
 
 def discover_source_files(source_dir: Path) -> list[Path]:
     files = []
-    for ext in ("*.nii.gz", "*.nii", "*.nrrd"):
+    for ext in ("**/*.nii.gz", "**/*.nii", "**/*.nrrd"):
         files.extend(source_dir.glob(ext))
     return sorted(files)
+
+
+def flat_stem(src: Path, source_dir: Path) -> str:
+    """Unique flat filename stem: relative path with separators replaced by '__'."""
+    rel = src.relative_to(source_dir)
+    parts = list(rel.parts)
+    # Strip all NIfTI/NRRD suffixes from the last part
+    name = parts[-1]
+    for suffix in (".nii.gz", ".nii", ".nrrd"):
+        if name.endswith(suffix):
+            name = name[: -len(suffix)]
+            break
+    parts[-1] = name
+    return "__".join(parts)
 
 
 # ---------------------------------------------------------------------------
@@ -117,10 +131,10 @@ CONVERTERS = {
 }
 
 
-def _convert_one(src: Path, output_dir: Path, formats: list[str]) -> None:
+def _convert_one(src: Path, output_dir: Path, source_dir: Path, formats: list[str]) -> None:
     """Convert a single source file to all requested formats. Top-level for pickling."""
     arr = load_source_array(src)
-    stem = src.name.split(".")[0]
+    stem = flat_stem(src, source_dir)
     for fmt in formats:
         converter, suffix = CONVERTERS[fmt]
         out_path = output_dir / fmt / (stem + suffix)
@@ -131,6 +145,7 @@ def _convert_one(src: Path, output_dir: Path, formats: list[str]) -> None:
 
 def run_conversion(
     source_files: list[Path],
+    source_dir: Path,
     output_dir: Path,
     formats: list[str],
     num_workers: int,
@@ -138,7 +153,7 @@ def run_conversion(
     for fmt in formats:
         (output_dir / fmt).mkdir(parents=True, exist_ok=True)
 
-    fn = partial(_convert_one, output_dir=output_dir, formats=formats)
+    fn = partial(_convert_one, output_dir=output_dir, source_dir=source_dir, formats=formats)
     tqdmp(fn, source_files, num_workers, desc="  Converting")
 
 
@@ -370,6 +385,7 @@ def parse_args() -> argparse.Namespace:
         default=ALL_FORMATS,
         help=f"Formats to benchmark. Default: all ({', '.join(ALL_FORMATS)}).",
     )
+    parser.add_argument("--max_images", type=int, default=None, help="Maximum number of images to use. The full list is shuffled then sliced. Default: all images.")
     parser.add_argument("--skip_convert", action="store_true", help="Skip Stage 1 (conversion).")
     parser.add_argument("--num_workers", type=int, default=os.cpu_count(), help="Parallel workers for Stage 1 conversion. Default: all CPU cores.")
     parser.add_argument("--seed", type=int, default=42, help="Random seed. Default: 42.")
@@ -391,25 +407,29 @@ def main() -> None:
     print(f"Formats    : {args.formats}")
     print(f"Patch size : {patch_size}")
     print(f"N reads    : {args.n_reads}")
+    print(f"Max images : {args.max_images if args.max_images is not None else 'all'}")
     print(f"Num workers: {args.num_workers}")
     print(f"Seed       : {args.seed}")
 
-    source_files = discover_source_files(source_dir)
-    if not source_files:
-        raise RuntimeError(f"No NIfTI/NRRD files found in {source_dir}")
-    print(f"\nFound {len(source_files)} source file(s).")
+    all_source_files = discover_source_files(source_dir)
+    if not all_source_files:
+        raise RuntimeError(f"No NIfTI/NRRD files found under {source_dir}")
+    print(f"\nFound {len(all_source_files)} source file(s).")
 
-    source_disk_mb = sum(
-        load_source_array(f).nbytes / 1e6 for f in source_files
-    )
-    print(f"Total uncompressed source data: {source_disk_mb:.1f} MB")
+    rng.shuffle(all_source_files)
+    source_files = all_source_files[: args.max_images] if args.max_images is not None else all_source_files
+    if len(source_files) < len(all_source_files):
+        print(f"Using {len(source_files)} image(s) (--max_images={args.max_images}).")
+
+    source_disk_mb = sum(load_source_array(f).nbytes / 1e6 for f in source_files)
+    print(f"Total uncompressed data: {source_disk_mb:.1f} MB")
 
     # ------------------------------------------------------------------
     # Stage 1: Conversion
     # ------------------------------------------------------------------
     if not args.skip_convert:
         print("\n=== Stage 1: Converting ===")
-        run_conversion(source_files, output_dir, args.formats, args.num_workers)
+        run_conversion(source_files, source_dir, output_dir, args.formats, args.num_workers)
         print("Conversion complete.")
     else:
         print("\nStage 1 skipped (--skip_convert).")
@@ -432,6 +452,7 @@ def main() -> None:
     payload = {
         "dataset_dir": str(dataset_dir),
         "source_dir": str(source_dir),
+        "n_images": len(source_files),
         "n_reads": args.n_reads,
         "patch_size": list(patch_size),
         "seed": args.seed,
