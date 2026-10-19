@@ -5,6 +5,7 @@ import math
 from typing import Any, Dict, Optional, Union, List, Tuple
 from pathlib import Path
 import os
+import tempfile
 from mlarray.meta import (
     Meta,
     MetaBlosc2,
@@ -1085,6 +1086,12 @@ class MLArray:
         ):
         """Save the array to a MLArray file.
 
+        The file is written to a temporary file next to the target and then
+        atomically moved into place, so an existing target is only replaced
+        once the new file is complete. The source file of an opened MLArray
+        is never modified. If an opened MLArray is saved to its own file, it
+        is reopened afterwards with the same mode and mmap_mode.
+
         Args:
             filepath (Union[str, Path]): Path to save the file. Must end with
                 ".mla".
@@ -1097,15 +1104,37 @@ class MLArray:
 
         self.support_metadata = True
 
-        if Path(filepath).is_file():
-            os.remove(str(filepath))
+        is_file_backed = self.mode is not None or self.mmap_mode is not None
+        saves_onto_source = (
+            is_file_backed
+            and self.filepath is not None
+            and Path(filepath).is_file()
+            and os.path.samefile(self.filepath, filepath)
+        )
 
         self._ensure_blosc2_store()
-        self._write_metadata(force=True)
-        self._store.save(str(filepath))
         self._update_blosc2_meta()
-        self.mode = None
-        self.mmap_mode = None
+
+        target_dir = os.path.dirname(os.path.abspath(str(filepath)))
+        fd, tmp_filepath = tempfile.mkstemp(prefix=".", suffix=f".{MLARRAY_SUFFIX}", dir=target_dir)
+        os.close(fd)
+        os.remove(tmp_filepath)
+        try:
+            self._store.save(tmp_filepath)
+            saved = blosc2.open(urlpath=tmp_filepath, mode="a")
+            saved.schunk.vlmeta["mlarray"] = self._serialize_metadata()
+            del saved
+            os.replace(tmp_filepath, str(filepath))
+        except BaseException:
+            if os.path.exists(tmp_filepath):
+                os.remove(tmp_filepath)
+            raise
+
+        if saves_onto_source:
+            # The open store still refers to the replaced file; rebind it to the new one.
+            reopen_mode = {'w': 'a'}.get(self.mode, self.mode)
+            reopen_mmap_mode = {'w+': 'r+'}.get(self.mmap_mode, self.mmap_mode)
+            self._open(filepath, reopen_mode, reopen_mmap_mode, self._store.schunk.dparams)
 
     def close(self):
         """Flush metadata and close the underlying store.
@@ -2027,33 +2056,29 @@ class MLArray:
             meta = Meta.from_mapping(meta)
         self._validate_and_add_meta(meta)
 
-    def _write_metadata(self, force=False):
-        """Write MLArray metadata to the underlying store if supported.
-
-        Args:
-            force (bool): If True, write even when mmap_mode is read-only.
-        """
+    def _write_metadata(self):
+        """Write MLArray metadata to the underlying store if it is writable."""
         is_writable = False
         if self.support_metadata:
             if self.mode in ('a', 'w') and self.mmap_mode is None:
                 is_writable = True
             elif self.mmap_mode in ('r+', 'w+'):
                 is_writable = True
-            elif force:
-                is_writable = True
-        
+
         if not is_writable:
             return
 
         if self._backend != "blosc2":
             return
 
+        self._store.vlmeta["mlarray"] = self._serialize_metadata()
+
+    def _serialize_metadata(self) -> bytes:
+        """Serialize MLArray metadata into the bytes stored in vlmeta."""
         meta = self.meta.to_mapping()
         if not is_serializable(meta):
             raise RuntimeError("Metadata is not serializable.")
-
-        meta = gzip.compress(pickle.dumps(meta, protocol=pickle.HIGHEST_PROTOCOL))
-        self._store.vlmeta["mlarray"] = meta
+        return gzip.compress(pickle.dumps(meta, protocol=pickle.HIGHEST_PROTOCOL))
 
     def _ensure_blosc2_store(self):
         """Ensure underlying store is Blosc2, converting from NumPy when needed."""
