@@ -89,5 +89,23 @@ class TestOpen(unittest.TestCase):
                 MLArray.open(path)
 
 
+    def test_open_does_not_modify_file(self):
+        for mode, mmap_mode in (("a", None), ("r", "r+")):
+            with self.subTest(mode=mode, mmap_mode=mmap_mode), tempfile.TemporaryDirectory() as tmpdir:
+                path = Path(tmpdir) / "unchanged.mla"
+                MLArray(_make_array(seed=6), meta={"case": "unchanged"}).save(path)
+                original_bytes = path.read_bytes()
+
+                MLArray.open(path, mode=mode, mmap_mode=mmap_mode)
+
+                self.assertEqual(path.read_bytes(), original_bytes)
+
+    def test_failed_open_leaves_filepath_unset(self):
+        image = MLArray()
+        with self.assertRaises(RuntimeError):
+            image._open("not-mlarray.txt")
+        self.assertIsNone(image.filepath)
+
+
 if __name__ == "__main__":
     unittest.main()

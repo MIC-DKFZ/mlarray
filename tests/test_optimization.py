@@ -150,5 +150,20 @@ class TestOptimizationExamples(unittest.TestCase):
         self.assertEqual(len(image.meta.blosc2.block_size), 5)
 
 
+    def test_patch_size_accepts_numpy_ints(self):
+        array = _make_array()
+        for patch_size in (np.int64(8), np.array([8, 8, 8]), (np.int32(8), 8, 8)):
+            with self.subTest(patch_size=patch_size):
+                image = MLArray(array, patch_size=patch_size)
+                self.assertEqual(image.meta.blosc2.patch_size, [8, 8, 8])
+
+    def test_patch_size_rejects_invalid_values(self):
+        array = _make_array()
+        for patch_size in (-5, 0, (0, 8, 8), (7.9, 8, 8), True, "auto"):
+            with self.subTest(patch_size=patch_size):
+                with self.assertRaises(ValueError):
+                    MLArray(array, patch_size=patch_size)
+
+
 if __name__ == "__main__":
     unittest.main()

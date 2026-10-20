@@ -1163,7 +1163,7 @@ class MLArray:
             raise TypeError("MLArray has no array data loaded.")
         return self._store[...]
 
-    def __array__(self, dtype=None):
+    def __array__(self, dtype=None, copy=None):
         """NumPy array interface for implicit conversion.
 
         Args:
@@ -1177,9 +1177,13 @@ class MLArray:
         """
         if self._store is None or self.meta._has_array.has_array == False:
             raise TypeError("MLArray has no array data loaded.")
-        arr = np.asarray(self._store)
+        if self._backend == "numpy":
+            return np.array(self._store, dtype=dtype, copy=copy)
+        if copy is False:
+            raise ValueError("A Blosc2-backed MLArray cannot be converted to a NumPy array without copying.")
+        arr = self._store[...]
         if dtype is not None:
-            return arr.astype(dtype)
+            return arr.astype(dtype, copy=False)
         return arr
 
     def __getitem__(self, key):
@@ -1497,9 +1501,9 @@ class MLArray:
         Raises:
             RuntimeError: If the file extension is invalid or if mode/mmap_mode is invalid for opening.
         """
-        self.filepath = str(filepath)
         if not str(filepath).endswith(f".{MLARRAY_SUFFIX}"):
             raise RuntimeError(f"MLArray requires '.{MLARRAY_SUFFIX}' as extension.")
+        self.filepath = str(filepath)
         
         if not Path(filepath).is_file():
             raise RuntimeError(f"No MLArray file exists under {filepath}.")
@@ -1519,7 +1523,6 @@ class MLArray:
         self._update_blosc2_meta()
         self.mode = mode
         self.mmap_mode = mmap_mode
-        self._write_metadata()
 
     def _create(            
             self,
@@ -1580,15 +1583,16 @@ class MLArray:
         Raises:
             RuntimeError: If the file extension is invalid or if mode/mmap_mode is invalid for creation.
         """
-        self.filepath = str(filepath)
         if not str(filepath).endswith(f".{MLARRAY_SUFFIX}"):
             raise RuntimeError(f"MLArray requires '.{MLARRAY_SUFFIX}' as extension.")
+        self.filepath = str(filepath)
 
         if mode != 'w':
             raise RuntimeError("mode must be 'w'.")
         if mmap_mode not in ('w+', None):
             raise RuntimeError("mmap_mode must be one of the following: 'w+', None")
     
+        shape = self._normalize_shape(shape)
         self._validate_and_add_meta(meta, has_array=True)
         spatial_axis_mask = [True] * len(shape) if self.meta.spatial.axis_labels is None else _spatial_axis_mask(self.meta.spatial.axis_labels)
         with _meta_internal_write():
@@ -1597,7 +1601,7 @@ class MLArray:
         
         self.support_metadata = True
         
-        self._store = blosc2.empty(shape=shape, dtype=np.dtype(dtype), urlpath=str(filepath), chunks=self.meta.blosc2.chunk_size, blocks=self.meta.blosc2.block_size, cparams=MLArray._resolve_cparams(self.meta.blosc2.cparams), dparams=MLArray._resolve_dparams(self.meta.blosc2.dparams), mmap_mode=mmap_mode)
+        self._store = blosc2.empty(shape=shape, dtype=np.dtype(dtype), urlpath=str(filepath), chunks=self.meta.blosc2.chunk_size, blocks=self.meta.blosc2.block_size, cparams=MLArray._resolve_cparams(self.meta.blosc2.cparams), dparams=MLArray._resolve_dparams(self.meta.blosc2.dparams), mode=mode, mmap_mode=mmap_mode)
         self._backend = "blosc2"
         self.mode = mode
         self.mmap_mode = mmap_mode
@@ -1623,9 +1627,9 @@ class MLArray:
         Raises:
             RuntimeError: If the file extension is not ".mla".
         """
-        self.filepath = str(filepath)
         if not str(filepath).endswith(f".{MLARRAY_SUFFIX}"):
             raise RuntimeError(f"MLArray requires '.{MLARRAY_SUFFIX}' as extension.")
+        self.filepath = str(filepath)
         self.support_metadata = True
         dparams = MLArray._resolve_dparams(dparams)
         ondisk = blosc2.open(str(filepath), dparams=dparams, mode="r")
@@ -1705,7 +1709,7 @@ class MLArray:
             raise TypeError("array must be a numpy.ndarray")
         self._construct_in_memory(
             constructor="asarray",
-            source_array=np.ascontiguousarray(array[...]),
+            source_array=np.require(array, requirements="C"),
             meta=meta,
             patch_size=patch_size,
             chunk_size=chunk_size,
@@ -1912,12 +1916,13 @@ class MLArray:
             MetaBlosc2: Validated Blosc2 metadata instance.
         """
         num_spatial_axes = sum(spatial_axis_mask)
-        if patch_size is not None and patch_size != "default" and (chunk_size is not None or block_size is not None):
+        is_default_patch_size = isinstance(patch_size, str) and patch_size == "default"
+        if patch_size is not None and not is_default_patch_size and (chunk_size is not None or block_size is not None):
             raise RuntimeError("patch_size and chunk_size / block_size cannot both be explicitly set.")
         if (chunk_size is not None and block_size is None) or (chunk_size is None and block_size is not None):
             raise RuntimeError("If either chunk/block size is used then both must be set.")
 
-        if patch_size == "default": 
+        if is_default_patch_size:
             if meta_blosc2 is not None and meta_blosc2.patch_size is not None:  # Use previously loaded patch size, when patch size is not explicitly set and a patch size from a previously loaded image exists
                 patch_size = meta_blosc2.patch_size
             elif meta_blosc2 is not None and (meta_blosc2.chunk_size is not None):
@@ -1928,7 +1933,7 @@ class MLArray:
         if chunk_size is not None or block_size is not None:
             patch_size = None
 
-        patch_size = [patch_size] * num_spatial_axes if isinstance(patch_size, int) else patch_size
+        patch_size = MLArray._normalize_patch_size(patch_size, num_spatial_axes)
 
         if patch_size is not None and num_spatial_axes == 0:
             raise RuntimeError(
@@ -2123,6 +2128,22 @@ class MLArray:
             dparams=MLArray._resolve_dparams(self.meta.blosc2.dparams),
         )
         self._backend = "blosc2"
+
+    @staticmethod
+    def _normalize_patch_size(patch_size, num_spatial_axes: int) -> Optional[List[int]]:
+        """Expand an int patch size and validate that all entries are positive ints."""
+        if patch_size is None:
+            return None
+        if isinstance(patch_size, (int, np.integer)) and not isinstance(patch_size, (bool, np.bool_)):
+            patch_size = [patch_size] * num_spatial_axes
+        elif isinstance(patch_size, (list, tuple, np.ndarray)):
+            patch_size = list(patch_size)
+        else:
+            raise ValueError(f"patch_size must be 'default', None, an int or a sequence of ints, got {patch_size!r}.")
+        for value in patch_size:
+            if not isinstance(value, (int, np.integer)) or isinstance(value, (bool, np.bool_)) or value < 1:
+                raise ValueError(f"patch_size values must be positive ints, got {patch_size!r}.")
+        return [int(value) for value in patch_size]
 
     @staticmethod
     def _normalize_shape(shape: Union[int, List, Tuple, np.ndarray]) -> Tuple[int, ...]:

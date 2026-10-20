@@ -106,5 +106,25 @@ class TestCreate(unittest.TestCase):
                 MLArray.create(path, shape=(4, 8, 8), dtype=np.float32)
 
 
+    def test_create_accepts_int_shape(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "int-shape.mla"
+            image = MLArray.create(path, shape=10, dtype=np.uint8, patch_size=None)
+            self.assertEqual(image.shape, (10,))
+
+    def test_create_without_mmap_overwrites_existing_file(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "existing.mla"
+            MLArray(_make_array()).save(path)
+
+            image = MLArray.create(path, shape=(10, 10), dtype=np.uint8, mmap_mode=None)
+            image[...] = 3
+            image.close()
+
+            reloaded = MLArray(path)
+            self.assertEqual(reloaded.shape, (10, 10))
+            self.assertTrue(np.all(reloaded.to_numpy() == 3))
+
+
 if __name__ == "__main__":
     unittest.main()

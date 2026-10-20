@@ -1,4 +1,5 @@
 import tempfile
+import warnings
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -80,6 +81,27 @@ class TestAsArray(unittest.TestCase):
             self.assertFalse(isinstance(loaded._store, np.ndarray))
             self.assertTrue(np.allclose(loaded.to_numpy(), array))
             self.assertEqual(loaded.meta.source.to_plain(), {"case_id": "np"})
+
+
+    def test_asarray_keeps_zero_dimensional_shape(self):
+        image = MLArray.asarray(np.array(5.0), patch_size=None)
+        self.assertEqual(image.to_numpy().shape, ())
+        self.assertEqual(float(image[()]), 5.0)
+
+    def test_numpy_conversion_honors_copy(self):
+        array = _make_array(seed=7)
+        compressed = MLArray.asarray(array)
+        uncompressed = MLArray.asarray(array, compressed=False)
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            self.assertTrue(np.allclose(np.asarray(compressed), array))
+            self.assertEqual(np.asarray(compressed, dtype=np.float64).dtype, np.float64)
+        with self.assertRaises(ValueError):
+            np.asarray(compressed, copy=False)
+
+        self.assertTrue(np.shares_memory(np.asarray(uncompressed, copy=False), uncompressed._store))
+        self.assertFalse(np.shares_memory(np.array(uncompressed, copy=True), uncompressed._store))
 
 
 if __name__ == "__main__":
