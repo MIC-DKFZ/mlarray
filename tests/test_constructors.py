@@ -69,6 +69,14 @@ class TestInMemoryConstructors(unittest.TestCase):
         arr2 = MLArray.arange(0, 12, 2, shape=(2, 3), patch_size=None)
         self.assertTrue(np.array_equal(arr2[...], np.arange(0, 12, 2).reshape(2, 3)))
 
+        for args in ((0, 10, 3), (10, 0, -3), (0, 1, 0.3)):
+            arr = MLArray.arange(*args, patch_size=None)
+            self.assertTrue(np.allclose(arr[...], np.arange(*args)))
+
+        arr3 = MLArray.arange(np.float32(0), np.float32(2), np.float32(0.5), patch_size=None)
+        self.assertTrue(np.issubdtype(arr3.dtype, np.floating))
+        self.assertTrue(np.allclose(arr3[...], [0.0, 0.5, 1.0, 1.5]))
+
         lin = MLArray.linspace(
             0.0, 1.0, num=6, shape=(2, 3), endpoint=False, patch_size=None
         )

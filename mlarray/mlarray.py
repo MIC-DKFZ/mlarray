@@ -589,9 +589,9 @@ class MLArray:
             stop = start
             start = 0
 
-        num = int((stop - start) / step)
+        num = max(math.ceil((stop - start) / step), 0)
         if shape is None:
-            shape = (max(num, 0),)
+            shape = (num,)
         else:
             shape = cls._normalize_shape(shape)
             if math.prod(shape) != num:
@@ -602,7 +602,7 @@ class MLArray:
         if dtype is None:
             dtype = (
                 blosc2.DEFAULT_FLOAT
-                if np.any([np.issubdtype(type(d), float) for d in (start, stop, step)])
+                if np.any([np.issubdtype(type(d), np.floating) for d in (start, stop, step)])
                 else blosc2.DEFAULT_INT
             )
 
