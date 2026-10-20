@@ -14,9 +14,10 @@ classifiers = [
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Operating System :: OS Independent",
 ]
-keywords = ["copier", "template", "python"]
+keywords = ["machine learning", "medical imaging", "blosc2", "array", "file format"]
 dependencies = [
   "blosc2>=3",
   "numpy>=2",
@@ -37,7 +38,7 @@ docs = [
   "pymdown-extensions>=10.0",
 ]
 all = [
-  "medvol",
+  "medvol>=0.0.22",
 ]
 
 [project.urls]
@@ -52,9 +53,6 @@ mlarray_convert = "mlarray.cli:cli_convert_to_mlarray"
 [tool.setuptools]
 package-dir = { "" = "." }
 include-package-data = true
-
-[tool.setuptools.data-files]
-"mlarray/assets" = ["assets/*"]
 
 [tool.setuptools.packages.find]
 where = ["."]
