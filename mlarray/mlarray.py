@@ -1150,6 +1150,21 @@ class MLArray:
         self.mmap_mode = None
         self._meta = None
 
+    def flush(self):
+        """Write pending metadata changes to the opened file.
+
+        Array data written through a writable memory map is persisted by
+        Blosc2 directly; metadata changes are only written on ``flush()`` or
+        ``close()``. Does nothing for read-only or in-memory arrays.
+        """
+        self._write_metadata()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.close()
+
     def to_numpy(self):
         """Return the underlying data as a NumPy array.
 

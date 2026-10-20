@@ -107,5 +107,30 @@ class TestOpen(unittest.TestCase):
         self.assertIsNone(image.filepath)
 
 
+    def test_flush_persists_metadata_without_close(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "flush.mla"
+            MLArray(_make_array(seed=8)).save(path)
+
+            opened = MLArray.open(path, mmap_mode="r+")
+            opened.spacing = [3, 3, 3]
+            opened.flush()
+
+            self.assertEqual(MLArray(path).spacing, [3.0, 3.0, 3.0])
+
+    def test_context_manager_closes_and_persists_metadata(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "context.mla"
+            array = _make_array(seed=9)
+            with MLArray.create(path, shape=array.shape, dtype=array.dtype) as created:
+                created[...] = array
+                created.spacing = [2, 2, 2]
+            self.assertIsNone(created.meta)
+
+            with MLArray.open(path) as opened:
+                self.assertTrue(np.allclose(opened[...], array))
+                self.assertEqual(opened.spacing, [2.0, 2.0, 2.0])
+
+
 if __name__ == "__main__":
     unittest.main()
