@@ -56,7 +56,7 @@ remote → a GitHub Actions workflow on a `v*` tag publishes to PyPI.
 - [x] Box drawing moved to the new package **napari-bboxes** (`~/projects/napari-bboxes`, GitHub
   `Karol-G/napari-bboxes`, pushed directly to GitHub, CI green, trusted publisher configured); napari-mlarray
   `74bdaf9` depends on `napari-bboxes>=0.1`.
-- [x] napari-bboxes 0.1.0 released (2026-11-06).
+- [x] napari-bboxes 0.1.0 and 0.1.1 released (2026-11-06; 0.1.1: 3-D wireframe, slice-following texts, cut outlines).
 - [ ] Release napari-mlarray (trusted publisher; version
   from the git tag via setuptools_scm).
 - [ ] napari-nifti should reuse `napari_mlarray._display` (the same convention) on top of MedVol.
