@@ -1165,6 +1165,52 @@ class MLArray:
     def __exit__(self, exc_type, exc, tb):
         self.close()
 
+    def __getstate__(self):
+        """Pickle support, e.g. for spawn/forkserver DataLoader workers.
+
+        - Opened files are pickled by reference (filepath, mode, mmap_mode,
+          dparams) and reopened on unpickling. Files created with ``create``
+          are reopened with ``mode='a'`` / ``mmap_mode='r+'`` so they are not
+          truncated. Metadata in memory, including changes not yet flushed,
+          is carried over; array changes made through a copy-on-write map
+          (``mmap_mode='c'``) are not.
+        - In-memory Blosc2 arrays are pickled as a compressed frame.
+        - NumPy-backed arrays pickle the NumPy array.
+        """
+        state = self.__dict__.copy()
+        store = state.pop("_store")
+        if store is None or self._backend == "numpy":
+            state["_store_state"] = ("value", store)
+        elif self.mode is not None or self.mmap_mode is not None:
+            state["_store_state"] = ("file", {
+                "mode": {'w': 'a'}.get(self.mode, self.mode),
+                "mmap_mode": {'w+': 'r+'}.get(self.mmap_mode, self.mmap_mode),
+                "dparams": store.schunk.dparams,
+            })
+        else:
+            state["_store_state"] = ("cframe", {
+                "cframe": store.to_cframe(),
+                "cparams": store.schunk.cparams,
+                "dparams": store.schunk.dparams,
+            })
+        return state
+
+    def __setstate__(self, state):
+        kind, payload = state.pop("_store_state")
+        self.__dict__.update(state)
+        if kind == "value":
+            self._store = payload
+        elif kind == "cframe":
+            store = blosc2.ndarray_from_cframe(payload["cframe"])
+            store.schunk.cparams = payload["cparams"]
+            store.schunk.dparams = payload["dparams"]
+            self._store = store
+        else:
+            meta = self._meta
+            self._store = None
+            self._open(self.filepath, payload["mode"], payload["mmap_mode"], payload["dparams"])
+            self._meta = meta
+
     def to_numpy(self):
         """Return the underlying data as a NumPy array.
 
