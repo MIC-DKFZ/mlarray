@@ -30,7 +30,8 @@ class TestAsArray(unittest.TestCase):
         with patch("mlarray.mlarray.blosc2.asarray", wraps=blosc2.asarray) as mocked_blosc_asarray:
             image = MLArray.asarray(array, dparams={"nthreads": 2})
 
-        mocked_blosc_asarray.assert_called_once()
+        # the last call builds the store; earlier ones are the filter choice's trial compressions
+        self.assertEqual(mocked_blosc_asarray.call_args.kwargs["dparams"], {"nthreads": 2})
         self.assertFalse(isinstance(image._store, np.ndarray))
         self.assertTrue(np.allclose(image.to_numpy(), array))
 

@@ -227,7 +227,9 @@ class MLArray:
                 creating/writing array data (for example codec, compression
                 level, and filters). Controls how data is compressed when
                 stored. If None, defaults to ``{'codec': blosc2.Codec.LZ4HC,
-                'clevel': 8}``.
+                'clevel': 5, 'nthreads': 4}`` with blosc2's default filter
+                (SHUFFLE); the data is not known yet, so no filter is chosen
+                from it.
             dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
                 decompression parameters used when
                 reading/accessing compressed chunks (for example number of
@@ -702,7 +704,9 @@ class MLArray:
                 compression parameters used when creating the in-memory Blosc2
                 container (for example codec, compression level, and filters).
                 Controls how data is compressed when stored. If None, defaults
-                to ``{'codec': blosc2.Codec.LZ4HC, 'clevel': 8}``.
+                to ``{'codec': blosc2.Codec.LZ4HC, 'clevel': 5, 'nthreads': 4}``,
+                with the filter (NOFILTER or SHUFFLE) chosen per array from its
+                data as nnU-Net does.
             dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
                 decompression parameters used when
                 accessing compressed chunks (for example number of
@@ -1482,7 +1486,9 @@ class MLArray:
                 creating/writing array data (for example codec, compression
                 level, and filters). Controls how data is compressed when
                 stored. If None, defaults to ``{'codec': blosc2.Codec.LZ4HC,
-                'clevel': 8}``.
+                'clevel': 5, 'nthreads': 4}`` with blosc2's default filter
+                (SHUFFLE); the data is not known yet, so no filter is chosen
+                from it.
             dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
                 decompression parameters used when
                 reading/accessing compressed chunks (for example number of
@@ -1597,7 +1603,9 @@ class MLArray:
                 compression parameters used when creating the in-memory Blosc2
                 container (for example codec, compression level, and filters).
                 Controls how data is compressed when stored. If None, defaults
-                to ``{'codec': blosc2.Codec.LZ4HC, 'clevel': 8}``.
+                to ``{'codec': blosc2.Codec.LZ4HC, 'clevel': 5, 'nthreads': 4}``,
+                with the filter (NOFILTER or SHUFFLE) chosen per array from its
+                data as nnU-Net does.
             dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
                 decompression parameters used when
                 accessing compressed chunks (for example number of
@@ -1662,7 +1670,7 @@ class MLArray:
                 Ignored when ``patch_size`` is provided.
             cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2 compression
                 parameters. If None, defaults to
-                ``{'codec': blosc2.Codec.LZ4HC, 'clevel': 8}``.
+                ``{'codec': blosc2.Codec.LZ4HC, 'clevel': 5, 'nthreads': 4}``.
             dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
                 decompression parameters. If None, defaults to
                 ``{'nthreads': 1}``.
@@ -1705,6 +1713,7 @@ class MLArray:
                 spatial_axis_mask,
                 cparams,
                 dparams,
+                array=source_array,
             )
             self.meta._has_array.has_array = True
 
@@ -1797,7 +1806,7 @@ class MLArray:
         arr = func(**call_kwargs)
         return np.reshape(arr, shape, order="C" if c_order else "F")
 
-    def _comp_and_validate_blosc2_meta(self, meta_blosc2, patch_size, chunk_size, block_size, shape, dtype_itemsize, spatial_axis_mask, cparams, dparams):
+    def _comp_and_validate_blosc2_meta(self, meta_blosc2, patch_size, chunk_size, block_size, shape, dtype_itemsize, spatial_axis_mask, cparams, dparams, array=None):
         """Compute and validate Blosc2 chunk/block metadata.
 
         Args:
@@ -1810,6 +1819,12 @@ class MLArray:
             shape (Union[List, Tuple, np.ndarray]): Full array shape including non-spatial axes.
             dtype_itemsize (int): Number of bytes per array element.
             spatial_axis_mask (Optional[list[bool]]): Mask indicating for every axis whether it is spatial or not.
+            cparams: Compression parameters, or None for the defaults.
+            dparams: Decompression parameters, or None for the defaults.
+            array (Optional[np.ndarray]): The data to be compressed, if known.
+                With the default compression parameters, the filter
+                (NOFILTER or SHUFFLE) is then chosen per array as nnU-Net
+                does; without data, blosc2's default (SHUFFLE) applies.
 
         Returns:
             MetaBlosc2: Validated Blosc2 metadata instance.
@@ -1843,8 +1858,14 @@ class MLArray:
         if patch_size is not None:
             chunk_size, block_size = MLArray.comp_blosc2_params(shape, patch_size, spatial_axis_mask, bytes_per_pixel=dtype_itemsize)
 
+        choose_filter = array is not None and chunk_size is not None and MLArray._is_default_cparams(cparams)
         cparams = MLArray._resolve_cparams(cparams)
         dparams = MLArray._resolve_dparams(dparams)
+        if choose_filter:
+            cparams = dict(cparams)
+            cparams["filters"] = [_layout.select_blosc2_filter(
+                array, chunk_size, block_size, codec=cparams["codec"], clevel=cparams["clevel"],
+            )]
 
         meta_blosc2 = MetaBlosc2(
             chunk_size=chunk_size,
@@ -2014,6 +2035,7 @@ class MLArray:
                 spatial_axis_mask=spatial_axis_mask,
                 cparams=self.meta.blosc2.cparams,
                 dparams=self.meta.blosc2.dparams,
+                array=array,
             )
         self._store = blosc2.asarray(
             np.ascontiguousarray(array),
@@ -2062,10 +2084,37 @@ class MLArray:
         return shape, np.dtype(dtype), meta
 
     @staticmethod
+    def _default_cparams() -> Dict:
+        """MLArray's default compression parameters (nnU-Net's: LZ4HC level 5, 4 threads)."""
+        return {
+            "codec": _layout.DEFAULT_CODEC,
+            "clevel": _layout.DEFAULT_CLEVEL,
+            "nthreads": _layout.DEFAULT_COMPRESS_NTHREADS,
+        }
+
+    @staticmethod
+    def _is_default_cparams(cparams) -> bool:
+        """True for the default compression parameters without a chosen filter."""
+        if cparams is None:
+            return True
+        if isinstance(cparams, blosc2.CParams) or not hasattr(cparams, "keys"):
+            return False
+        cparams = dict(cparams)
+        default = MLArray._default_cparams()
+        if set(cparams) != set(default):
+            return False
+        try:
+            return (blosc2.Codec(cparams["codec"]) == default["codec"]
+                    and cparams["clevel"] == default["clevel"]
+                    and cparams["nthreads"] == default["nthreads"])
+        except (ValueError, TypeError):
+            return False
+
+    @staticmethod
     def _resolve_cparams(cparams: Optional[Union[Dict, blosc2.CParams]]) -> Union[Dict, blosc2.CParams]:
         """Resolve compression params with MLArray defaults."""
         if cparams is None:
-            return {"codec": blosc2.Codec.LZ4HC, "clevel": 8}
+            return MLArray._default_cparams()
         if isinstance(cparams, dict):
             cparams = dict(cparams)
             if "codec" in cparams and not isinstance(cparams["codec"], blosc2.Codec):
