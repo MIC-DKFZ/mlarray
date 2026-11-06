@@ -28,8 +28,8 @@ Last update: 2026-11-06 (stages 1-4 done and released; follow-up work in `follow
   `gh workflow run workflow.yml -R MIC-DKFZ/mlarray --ref main`.
   MedVol's docs (https://mic-dkfz.github.io/MedVol/, sources in `medvol/docs/*.md` + `mkdocs.yml`) deploy the same
   way (`gh workflow run test_and_deploy.yml -R MIC-DKFZ/MedVol --ref main`).
-- **MedVol 1.0.1** (the `medvol` command line; 1.0.0 declared it without `medvol/cli.py`) is committed on `main`
-  (`9300a7a`) but not tagged: the user pushes `v1.0.1`.
+- **MedVol 1.0.1** (2026-11-06) adds the `medvol` command line (1.0.0 declared it without `medvol/cli.py`);
+  released to PyPI and docs deployed.
 
 ---
 
