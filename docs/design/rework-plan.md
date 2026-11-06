@@ -3,7 +3,27 @@
 This document lets any agent or developer continue the rework without prior context. Read it fully before
 touching code. Keep it current: when a stage step is done, tick it and add the commit hash.
 
-Last update: 2026-11-06 (stages 1-4 done, follow-up gaps implemented; remaining items in §6).
+Last update: 2026-11-06 (stages 1-4 done and released; follow-up work in `followups.md`).
+
+## Start here (current state)
+
+- **Released:** mlarray 1.0.0 and MedVol 1.0.0 are on PyPI (2026-11-06). `pip install "mlarray[all]"` installs
+  both; `mlarray_convert` delegates to MedVol.
+- **Branches:** mlarray `main` == `rework/v1`; MedVol `main` == `rework/v2` (both pushed). Work on `main` or a new
+  feature branch from now on.
+- **Next work:** `docs/design/followups.md`. The most urgent item is nnunetv3, which still uses the v0 API.
+  Open gaps and decisions are in §6 below.
+- **Envs:** `mlarray` (mlarray dev; its `mlarray` editable install points at the old review worktree, so run tests
+  with `python -m pytest` from the repo root) and `medvol-v2` (both repos installed editable; use it for MedVol and
+  for mlarray's CLI tests).
+- **Tests:** `cd ~/projects/mlarray && ~/miniforge3/envs/medvol-v2/bin/python -m pytest -q -p no:cacheprovider`
+  (163 passed) and `cd ~/projects/medvol && ~/miniforge3/envs/medvol-v2/bin/python -m pytest -q -p no:cacheprovider tests/`
+  (170 passed).
+- **Releasing (CD):** local push → GitLab (`codebase.helmholtz.cloud`) → automatic sync to GitHub → GitHub Actions
+  publishes `v*` tags to PyPI by trusted publishing (mlarray: `.github/workflows/workflow.yml`; MedVol:
+  `test_and_deploy.yml`, tests on Python 3.10-3.13 first). Version: mlarray from the git tag (setuptools_scm),
+  MedVol from `medvol/__init__.py`. Pushing a tag is a public action: ask the user to run `git push origin vX.Y.Z`
+  themselves. Check on Python 3.10 too: pip resolves blosc2 4.3.3 there, which behaves differently.
 
 ---
 

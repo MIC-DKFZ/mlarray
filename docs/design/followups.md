@@ -23,6 +23,21 @@ remote → a GitHub Actions workflow on a `v*` tag publishes to PyPI.
 - [x] Trusted publishing, `mlarray>=1.0.0`, version 1.0.0, `rework/v2` merged into `main`, tagged `v1.0.0` (on PyPI 2026-11-06).
 - [ ] Remaining gaps (mlarray `rework-plan.md` §6): Siemens mosaic (needs dcm2niix), RTSTRUCT writing, vector frame in MetaImage/MGH writers.
 
+### nnunetv2 and nnunetv3: check that they load data correctly
+- [ ] **nnunetv3 (urgent):** it uses the v0 API (`Meta(is_seg=...)`, `MLArray(..., meta=...)` in
+  `nnunetv3/training/dataloading/nnunet_dataset.py`, about 6 call sites; also `planning/layouts.py`,
+  `preprocessing/`, `inference/export_prediction.py`, `training/nnUNetTrainer/pretrained/totalseg.py`) and pins
+  only `mlarray>=0.0.43`, so a fresh install gets mlarray 1.0.0 and breaks. Either pin `mlarray<1` right away or
+  port it to v1 (`values={"kind": "label"}` instead of `is_seg`, `meta.storage` instead of `meta.blosc2`,
+  `MLArray.comp_blosc2_params` is unchanged). Preprocessed datasets written as v0 `.mla` cannot be read by
+  mlarray 1.0 and must be preprocessed again.
+- [ ] **nnunetv3:** check that loading keeps the layout and geometry: patch reads, segmentation labels, spacing
+  used for resampling (now derived from the space matrix, per array axis in array order), and that the storage
+  defaults (nnU-Net layout, LZ4HC-5, read-ahead) still apply (`docs/optimization.md`).
+- [ ] **nnunetv2:** it reads blosc2 `.b2nd` files directly and uses neither mlarray nor MedVol. Check its image
+  IO (SimpleITK/nibabel readers) against the orientation KB phantom (`~/projects/image-orientation-kb`,
+  KB ch05) and decide whether it should move to MedVol/mlarray.
+
 ### napari-mlarray
 - [ ] Read the v1 core: `axes`, `spaces` (from-array matrix), `values` (labels → napari Labels layer with names/colours), profiles.
 - [ ] Correct on-screen orientation with the axis-order recipe from the orientation KB (ch06 §6.3).
