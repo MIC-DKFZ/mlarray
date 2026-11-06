@@ -137,6 +137,22 @@ class TestInMemoryConstructors(unittest.TestCase):
         with self.assertRaises(TypeError):
             MLArray.zeros_like(123)
 
+    def test_dtype_is_optional_for_all_filled_constructors(self):
+        for name in ("empty", "zeros", "ones"):
+            with self.subTest(constructor=name):
+                image = getattr(MLArray, name)((4, 6, 8))
+                self.assertEqual(image.dtype, np.dtype(blosc2.DEFAULT_FLOAT))
+        self.assertTrue(np.all(MLArray.zeros((4, 6, 8)).to_numpy() == 0))
+
+    def test_asarray_uncompressed_shares_memory(self):
+        array = np.zeros((4, 6, 8), dtype=np.float32)
+        image = MLArray.asarray(array, compressed=False)
+        array[0, 0, 0] = 7
+        self.assertEqual(image[0, 0, 0], 7)
+        compressed = MLArray.asarray(array)
+        array[0, 0, 0] = 8
+        self.assertEqual(compressed[0, 0, 0], 7)
+
 
 if __name__ == "__main__":
     unittest.main()

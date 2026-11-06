@@ -323,7 +323,7 @@ class MLArray:
     def empty(
             cls,
             shape: Union[int, List, Tuple, np.ndarray],
-            dtype: np.dtype,
+            dtype: np.dtype = None,
             meta: Optional[Union[Dict, Meta]] = None,
             patch_size: Optional[Union[int, List, Tuple]] = "default",
             chunk_size: Optional[Union[int, List, Tuple]] = None,
@@ -337,7 +337,8 @@ class MLArray:
         Args:
             shape (Union[int, List, Tuple, np.ndarray]): Shape of the output
                 array.
-            dtype (np.dtype): Numpy dtype for the output array.
+            dtype (np.dtype): Numpy dtype for the output array. If None, uses
+                ``blosc2.DEFAULT_FLOAT``.
             meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
                 the created ``MLArray``. Dict values are stored as
                 ``meta.source``.
@@ -356,6 +357,7 @@ class MLArray:
         Returns:
             MLArray: A newly created in-memory MLArray instance.
         """
+        dtype = blosc2.DEFAULT_FLOAT if dtype is None else dtype
         class_instance = cls()
         class_instance._construct_in_memory(
             constructor="empty",
@@ -375,7 +377,7 @@ class MLArray:
     def zeros(
             cls,
             shape: Union[int, List, Tuple, np.ndarray],
-            dtype: np.dtype,
+            dtype: np.dtype = None,
             meta: Optional[Union[Dict, Meta]] = None,
             patch_size: Optional[Union[int, List, Tuple]] = "default",
             chunk_size: Optional[Union[int, List, Tuple]] = None,
@@ -389,7 +391,8 @@ class MLArray:
         Args:
             shape (Union[int, List, Tuple, np.ndarray]): Shape of the output
                 array.
-            dtype (np.dtype): Numpy dtype for the output array.
+            dtype (np.dtype): Numpy dtype for the output array. If None, uses
+                ``blosc2.DEFAULT_FLOAT``.
             meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
                 the created ``MLArray``.
             patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
@@ -406,6 +409,7 @@ class MLArray:
         Returns:
             MLArray: A newly created in-memory MLArray instance.
         """
+        dtype = blosc2.DEFAULT_FLOAT if dtype is None else dtype
         class_instance = cls()
         class_instance._construct_in_memory(
             constructor="zeros",
