@@ -61,6 +61,9 @@ radiologist read them the same way.
 | `mlarray.user` | `user` (§7), arbitrary, may be very large | on first access |
 
 - Metadata **MUST NOT** use pickle or any other executable serialisation.
+- Readers **MUST** read each key as raw bytes and decode them with plain msgpack, never through blosc2's
+  own vlmeta decoder. That decoder can rebuild Python objects and only defaults to a safe mode in recent
+  blosc2 versions (review finding C2, branch `review/findings`).
 - Values **MUST** be msgpack-native types: map, array, string, integer, float, boolean, nil, binary.
   Map key order is preserved.
 
@@ -392,10 +395,18 @@ storage:
   chunk_size: [1, 256, 256]
   block_size: [1, 64, 64]
   patch_size: [128, 128, 128]
+  compression: {codec: LZ4HC, level: 5, filters: [SHUFFLE]}
 ```
 
 `history` is an append-only list of conversions and operations with tool, version, settings and warnings.
-`storage` describes the blosc2 layout; it is an implementation detail with no scientific meaning.
+
+`storage` describes the blosc2 layout. It is an implementation detail with no scientific meaning.
+- It **MUST** contain only portable properties of the file: chunk, block and patch size, codec, level and
+  filters.
+- It **MUST NOT** contain runtime or machine-specific settings: thread counts, typesize, internal
+  blocksize, read-ahead (review finding M12). Those are chosen at runtime by the library defaults
+  (`docs/optimization.md`: nnU-Net layout heuristic, LZ4HC-5 with 4 compression threads, read-ahead with 4
+  threads) or by the user per call.
 
 ## 9. Accuracy standard
 
