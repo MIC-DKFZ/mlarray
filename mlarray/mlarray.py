@@ -1,20 +1,26 @@
-from copy import deepcopy
+from collections.abc import Mapping
+from dataclasses import replace as _replace
 import numpy as np
 import blosc2
-from typing import Any, Dict, Optional, Union, List, Tuple
+from typing import Any, Dict, Optional, Sequence, Union, List, Tuple
 from pathlib import Path
 import os
-from mlarray.meta import (
+from mlarray.metadata import (
+    Axis,
     Meta,
-    AxisLabel,
-    _spatial_axis_mask,
-    _meta_internal_write,
+    MetadataError,
+    SPEC_VERSION,
+    Space,
+    SourceEntry,
+    Values,
+    space_from_geometry,
 )
 from mlarray import blosc2_layout_strategies as _layout
+from mlarray import fingerprint as _fingerprint
 from mlarray import metadata_io
 from mlarray import storage as _storage
 from mlarray.constructors import MLArrayConstructors
-from mlarray.storage import MLARRAY_SUFFIX, MLARRAY_VERSION, MLARRAY_DEFAULT_PATCH_SIZE  # re-exported
+from mlarray.storage import MLARRAY_SUFFIX, MLARRAY_DEFAULT_PATCH_SIZE  # re-exported
 
 MLARRAY_DEFAULT_READ_AHEAD = 4
 
@@ -65,17 +71,56 @@ def _apply_default_read_ahead() -> None:
     blosc2.set_prefetch(MLARRAY_DEFAULT_READ_AHEAD)
 
 
+def _writer() -> str:
+    from mlarray import __version__
+    return f"mlarray {__version__}"
+
+
+def _metadata_parts(axes=None, spaces=None, values=None, profiles=None, user=None, source=None) -> Dict[str, Any]:
+    """The metadata keyword arguments that were given."""
+    parts = dict(axes=axes, spaces=spaces, values=values, profiles=profiles, user=user, source=source)
+    return {key: value for key, value in parts.items() if value is not None}
+
+
+def _compose_space(spaces: Sequence[Space], axes: Sequence[Axis], space, spacing, origin, direction) -> List[Space]:
+    """Spaces with ``space`` (re)built from spacing, origin and direction, placed first.
+
+    When a space of that name exists and maps the same array axes, the values
+    not given are taken from it, so e.g. only the spacing can be changed.
+    """
+    array_axes = [axis.name for axis in axes if axis.type == "space"]
+    if not array_axes:
+        raise MetadataError("Convenience geometry needs array axes of type space; declare axes=[...].")
+    name = space if isinstance(space, str) else (space.name if isinstance(space, Space) else dict(space).get("name"))
+    existing = next((s for s in spaces if s.name == name), None)
+    if existing is not None and list(existing.from_array.array_axes) == array_axes:
+        if isinstance(space, str):
+            space = existing
+        spacing = existing.spacing if spacing is None else spacing
+        origin = existing.origin if origin is None else origin
+        direction = existing.direction if direction is None else direction
+    new = space_from_geometry(space, array_axes, spacing=spacing, origin=origin, direction=direction)
+    return [new] + [s for s in spaces if s.name != new.name]
+
+
 class MLArray(MLArrayConstructors):
     def __init__(
             self,
             array: Optional[Union[np.ndarray, str, Path]] = None,
-            spacing: Optional[Union[List, Tuple, np.ndarray]] = None,
-            origin: Optional[Union[List, Tuple, np.ndarray]] = None,
-            direction: Optional[Union[List, Tuple, np.ndarray]] = None,
-            affine: Optional[Union[List, Tuple, np.ndarray]] = None,
-            meta: Optional[Union[Dict, Meta]] = None,
-            axis_labels: Optional[List[Union[str, AxisLabel]]] = None,
+            *,
+            axes: Optional[Sequence[Union[Axis, str, Mapping]]] = None,
+            spaces: Optional[Sequence[Union[Space, Mapping]]] = None,
+            values: Optional[Union[Values, Mapping]] = None,
+            profiles: Optional[Mapping] = None,
+            user: Optional[Mapping] = None,
+            source: Optional[Sequence[Union[SourceEntry, Mapping]]] = None,
+            spacing: Optional[Sequence[float]] = None,
+            origin: Optional[Sequence[float]] = None,
+            direction: Optional[Any] = None,
+            space: Optional[Union[str, Mapping, Space]] = None,
+            meta: Optional[Union[Meta, Mapping]] = None,
             copy: Optional['MLArray'] = None,
+            copy_source: bool = False,
             patch_size: Optional[Union[int, List, Tuple]] = "default",
             chunk_size: Optional[Union[int, List, Tuple]] = None,
             block_size: Optional[Union[int, List, Tuple]] = None,
@@ -83,37 +128,44 @@ class MLArray(MLArrayConstructors):
             dparams: Optional[Union[Dict, blosc2.DParams]] = None,
             compressed: bool = True,
         ) -> None:
-        """Initializes a MLArray instance.
+        """Create an MLArray from an array, or load a ".mla" file.
 
-        The MLArray file format (".mla") is a Blosc2-compressed container
-        with standardized metadata support for N-dimensional medical images.
+        The MLArray file format (".mla") is a Blosc2-compressed array with
+        explicit, domain-neutral metadata (spec ``docs/design/spec.md``).
 
         Args:
-            array (Optional[Union[np.ndarray, str, Path]]): Input data or file
-                path. Use a numpy ndarray for in-memory arrays, or a string/Path
-                to load a ".mla" file. If None, an empty MLArray
-                instance is created.
-            spacing (Optional[Union[List, Tuple, np.ndarray]]): Spacing per
-                spatial axis. Provide a list/tuple/ndarray with length equal to
-                the number of spatial dimensions (e.g., [sx, sy, sz]).
-            origin (Optional[Union[List, Tuple, np.ndarray]]): Origin per axis.
-                Provide a list/tuple/ndarray with length equal to the number of
-                spatial dimensions.
-            direction (Optional[Union[List, Tuple, np.ndarray]]): Direction
-                cosine matrix. Provide a 2D list/tuple/ndarray with shape
-                (ndims, ndims) for spatial dimensions.
-            affine (Optional[Union[List, Tuple, np.ndarray]]): Homogeneous
-                affine matrix. Provide a 2D list/tuple/ndarray with shape
-                (spatial_ndims + 1, spatial_ndims + 1).
-            meta (Optional[Dict | Meta]): Free-form metadata dictionary or Meta
-                instance. Must be JSON-serializable when saving. 
-                If meta is passed as a Dict, it is internally converted into a
-                ``Meta`` object with the dict stored as ``meta.source``.
-            axis_labels (Optional[List[Union[str, AxisLabel]]]): Per-axis labels or roles. Length must match ndims. If None, the array
-                is treated as purely spatial.
-            copy (Optional[MLArray]): Another MLArray instance to copy metadata
-                fields from. If provided, its metadata overrides any metadata
-                set via arguments.
+            array (Optional[Union[np.ndarray, str, Path]]): A NumPy array, or the
+                path of a ".mla" file to load. None creates an instance without
+                array data.
+            axes: One entry per array axis, in array order: names (``"z"``),
+                :class:`~mlarray.metadata.Axis` objects or dicts with ``name``,
+                ``type`` (space, time, channel, component, other) and optional
+                labels or sampling. Defaults to ``axis_0``, ``axis_1``, ... of
+                type space.
+            spaces: Coordinate systems with their from-array transform
+                (:class:`~mlarray.metadata.Space` or dicts). The first space
+                is the default one.
+            values: What the numbers mean (:class:`~mlarray.metadata.Values`
+                or a dict with ``kind``, ``unit``, ``labels`` ...).
+            profiles: Domain metadata by profile name, e.g. ``{"ml": {...}}``.
+            user: Arbitrary user metadata; never interpreted.
+            source: Original metadata of converted files (read-only afterwards).
+            spacing, origin, direction: Convenience geometry, composed into the
+                from-array matrix of ``space`` (see
+                :func:`mlarray.metadata.space_from_geometry`). They follow the
+                array's space axes in array order: ``spacing[c]`` and
+                ``direction[:, c]`` belong to array axis ``c``; ``origin`` is the
+                centre of index (0, ..., 0) in space coordinates.
+            space: The space the convenience geometry lives in: a preset
+                (``"patient"``: DICOM patient frame, LPS, millimeter) or a
+                space description without ``from_array``. Required with
+                ``spacing``, ``origin`` or ``direction``.
+            meta: Complete metadata (:class:`~mlarray.metadata.Meta` or its
+                dict form) to start from; it is copied.
+            copy: Another MLArray to take metadata from: axes, spaces, values,
+                profiles and user, but not its history, its ``ml`` statistics
+                and boxes, nor its ``source`` (unless ``copy_source=True``).
+            copy_source: Also copy the ``source`` of ``copy``.
             patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
                 chunk/block optimization. Use ``"default"`` to use the default
                 patch size of 192.
@@ -125,6 +177,8 @@ class MLArray(MLArrayConstructors):
                 parameters used when creating in-memory compressed array data.
             dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
                 decompression parameters used for chunk access.
+            compressed (bool): Keep the data Blosc2-compressed in memory
+                (default) or as a NumPy array.
         """
         self.filepath = None
         self.support_metadata = None
@@ -133,62 +187,40 @@ class MLArray(MLArrayConstructors):
         self._meta = None
         self._store = None
         self._backend = None
-        if isinstance(array, (str, Path)) and (
-            spacing is not None
-            or origin is not None
-            or direction is not None
-            or affine is not None
-            or meta is not None
-            or axis_labels is not None
-            or copy is not None
-            or patch_size != "default"
-            or chunk_size is not None
-            or block_size is not None
-            or cparams is not None
-            or dparams is not None
-        ):
-            raise RuntimeError(
-                "Spacing, origin, direction, affine, meta, axis_labels, copy, patch_size, "
-                "chunk_size, block_size, cparams or dparams cannot be set when "
-                "array is a filepath."
-            )
+        self._has_array = False
+        parts = _metadata_parts(axes, spaces, values, profiles, user, source)
+        geometry = dict(spacing=spacing, origin=origin, direction=direction, space=space)
         if isinstance(array, (str, Path)):
+            given = sorted(parts) + sorted(k for k, v in geometry.items() if v is not None)
+            if meta is not None or copy is not None or patch_size != "default" or chunk_size is not None \
+                    or block_size is not None or cparams is not None or dparams is not None:
+                given.append("meta/copy/layout/cparams/dparams")
+            if given:
+                raise RuntimeError(f"{', '.join(given)} cannot be set when array is a filepath.")
             self._load(array, compressed=compressed)
-        else:
-            self._validate_and_add_meta(
-                meta,
-                spacing=spacing,
-                origin=origin,
-                direction=direction,
-                affine=affine,
-                axis_labels=axis_labels,
-                has_array=False,
-                validate=False,
+            return
+        meta = self._build_meta(meta, copy, copy_source, like=False, parts=parts, geometry=geometry,
+                                shape=None if array is None else np.shape(array))
+        if array is not None:
+            self._asarray(
+                array,
+                meta=meta,
+                patch_size=patch_size,
+                chunk_size=chunk_size,
+                block_size=block_size,
+                cparams=cparams,
+                dparams=dparams,
+                compressed=compressed,
             )
-            if array is not None:
-                self._asarray(
-                    array,
-                    meta=self.meta,
-                    patch_size=patch_size,
-                    chunk_size=chunk_size,
-                    block_size=block_size,
-                    cparams=cparams,
-                    dparams=dparams,
-                    compressed=compressed,
-                )
-                has_array = True
+        else:
+            self._meta = meta
+            self.support_metadata = True
+            if compressed:
+                self._store = blosc2.empty((0,))
+                self._backend = "blosc2"
             else:
-                if compressed:
-                    self._store = blosc2.empty((0,))
-                    self._backend = "blosc2"
-                else:
-                    self._store = np.empty((0,))
-                    self._backend = "numpy"
-                has_array = False
-            if copy is not None:
-                with _meta_internal_write():
-                    self.meta.copy_from(copy.meta)
-            self._validate_and_add_meta(self.meta, has_array=has_array, validate=True)
+                self._store = np.empty((0,))
+                self._backend = "numpy"
 
     @classmethod
     def open(
@@ -233,7 +265,7 @@ class MLArray(MLArrayConstructors):
             filepath: Union[str, Path],
             shape: Union[List, Tuple, np.ndarray],
             dtype: np.dtype,
-            meta: Optional[Union[Dict, Meta]] = None,
+            meta: Optional[Union[Meta, Mapping]] = None,
             mode: str = 'w',
             mmap_mode: str = 'w+',
             patch_size: Optional[Union[int, List, Tuple]] = 'default',  # 'default' means that the default of 192 is used. However, if set to 'default', the patch_size will be skipped if self.patch_size is set from a previously loaded MLArray image. In that case the self.patch_size is used.
@@ -251,9 +283,8 @@ class MLArray(MLArrayConstructors):
                 to create. If provided, a new file is created. Length must match
                 the full array dimensionality (including non-spatial axes if present).
             dtype (np.dtype): Numpy dtype for a newly created array.
-            meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
-                the created ``MLArray``. Dict values are stored as
-                ``meta.source``.
+            meta (Optional[Union[Meta, Mapping]]): Metadata of the created
+                ``MLArray`` (copied), e.g. ``{"axes": [...], "spaces": [...]}``.
             mode (str): Controls storage open/creation permissions when using standard Blosc2 I/O (read-only, read/write, overwrite). 
                 Does not affect lazy loading or decompression; data is accessed and decompressed on demand by Blosc2.
                 Must be 'w' (default). Leave at default if unsure.
@@ -345,10 +376,9 @@ class MLArray(MLArrayConstructors):
         """
         self._require_array()
 
-        source_meta = deepcopy(self.meta)
         converted = MLArray.asarray(
             self.to_numpy(),
-            meta=None,
+            meta=self.meta,
             patch_size=patch_size,
             chunk_size=chunk_size,
             block_size=block_size,
@@ -356,7 +386,6 @@ class MLArray(MLArrayConstructors):
             dparams=dparams,
             compressed=True,
         )
-        converted.meta.copy_from(source_meta, overwrite=True)
         self._replace_with_converted(converted)
 
     def decompress(self) -> None:
@@ -364,30 +393,18 @@ class MLArray(MLArrayConstructors):
 
         The instance is detached from any previously opened file state and
         becomes an in-memory object. Persist changes by calling ``save()``.
-        ``meta.blosc2`` keeps the layout record (patch, chunk and block size,
-        cparams), as ``load(compressed=False)`` does, so a later ``save()``
-        or ``compress()`` reuses it.
+        ``meta.storage`` keeps the layout record (patch, chunk and block
+        size, compression), as ``load(compressed=False)`` does, so a later
+        ``save()`` or ``compress()`` reuses it.
 
         Raises:
             TypeError: If no array data is loaded.
         """
         self._require_array()
 
-        source_meta = deepcopy(self.meta)
-        converted = MLArray.asarray(
-            self.to_numpy(),
-            meta=None,
-            patch_size=None,
-            chunk_size=None,
-            block_size=None,
-            cparams=None,
-            dparams=None,
-            compressed=False,
-        )
-        converted.meta.copy_from(source_meta, overwrite=True)
-        with _meta_internal_write():
-            converted.meta.blosc2 = deepcopy(source_meta.blosc2)
-        self._replace_with_converted(converted)
+        meta = self.meta.copy()
+        self._replace_with_converted(MLArray.asarray(self.to_numpy(), meta=meta, patch_size=None, compressed=False))
+        self._meta._storage = meta.storage
 
     def save(
             self,
@@ -423,7 +440,7 @@ class MLArray(MLArrayConstructors):
         store, meta = self._blosc2_store_for_save()
 
         _storage.save_atomically(
-            store, filepath, lambda vlmeta: metadata_io.write(vlmeta, self._serialize_metadata(meta))
+            store, filepath, lambda saved: metadata_io.write(saved, self._serialize_metadata(meta), unchanged_in=store)
         )
 
         if saves_onto_source:
@@ -439,6 +456,7 @@ class MLArray(MLArrayConstructors):
         self._write_metadata()
         self._store = None
         self._backend = None
+        self._has_array = False
         self.filepath = None
         self.support_metadata = None
         self.mode = None  
@@ -478,10 +496,20 @@ class MLArray(MLArrayConstructors):
             state["_store_state"] = ("value", store)
         elif self.mode is not None or self.mmap_mode is not None:
             mode, mmap_mode = _storage.reopen_modes(self.mode, self.mmap_mode)
+            meta = self._meta
+            reread = {name: not getattr(meta, name).loaded and getattr(meta, name).origin is store
+                      for name in ("_source", "_user")}
+            if any(reread.values()):  # read undecoded parts from the file again instead of pickling them
+                meta = meta.copy()
+                for name, again in reread.items():
+                    if again:
+                        setattr(meta, name, None)
+                state["_meta"] = meta
             state["_store_state"] = ("file", {
                 "mode": mode,
                 "mmap_mode": mmap_mode,
                 "dparams": store.schunk.dparams,
+                "reread": reread,
             })
         else:
             state["_store_state"] = ("cframe", _storage.in_memory_state(store))
@@ -498,11 +526,15 @@ class MLArray(MLArrayConstructors):
             meta = self._meta
             self._store = None
             self._open(self.filepath, payload["mode"], payload["mmap_mode"], payload["dparams"])
+            for name, again in payload["reread"].items():
+                if again:
+                    setattr(meta, name, getattr(self._meta, name))
+            meta._set_shape(self._store.shape)
             self._meta = meta
 
     def _has_array_data(self) -> bool:
         """True when array data is loaded (not a metadata-only instance)."""
-        return self._store is not None and bool(self.meta._has_array.has_array)
+        return self._store is not None and self._has_array
 
     def _require_array(self) -> None:
         """Raise ``TypeError`` unless array data is loaded."""
@@ -597,125 +629,140 @@ class MLArray(MLArrayConstructors):
 
     @property
     def meta(self) -> Optional[Meta]:
+        """All metadata (:class:`~mlarray.metadata.Meta`)."""
         return self._meta
 
-    @property
-    def spacing(self):
-        """Returns the image spacing.
-
-        Returns:
-            list: Spacing per spatial axis with length equal to the number of
-            spatial dimensions.
-        """
-        return self.meta.spatial.spacing
-
-    @spacing.setter
-    def spacing(self, value):
-        self.meta.spatial.spacing = value
+    # -- core metadata ---------------------------------------------------------
 
     @property
-    def origin(self):
-        """Returns the image origin.
+    def axes(self) -> Tuple[Axis, ...]:
+        """The array axes, in array order. Assign a new list to replace them (validated)."""
+        return self._meta.axes
 
-        Returns:
-            list: Origin per spatial axis with length equal to the number of
-            spatial dimensions.
-        """
-        return self.meta.spatial.origin
-
-    @origin.setter
-    def origin(self, value):
-        self.meta.spatial.origin = value
+    @axes.setter
+    def axes(self, value):
+        self._meta.axes = value
 
     @property
-    def direction(self):
-        """Returns the image direction.
+    def spaces(self) -> Tuple[Space, ...]:
+        """Coordinate systems the array is placed in; the first is the default."""
+        return self._meta.spaces
 
-        Returns:
-            list: Direction cosine matrix with shape (ndims, ndims).
-        """
-        return self.meta.spatial.direction
-
-    @direction.setter
-    def direction(self, value):
-        self.meta.spatial.direction = value
+    @spaces.setter
+    def spaces(self, value):
+        self._meta.spaces = value
 
     @property
-    def affine(self) -> np.ndarray:
-        """Computes the affine transformation matrix for the image.
+    def values(self) -> Values:
+        """What the stored numbers mean."""
+        return self._meta.values
 
-        Returns:
-            list: Affine matrix with shape (ndims + 1, ndims + 1), or None if
-                no array is loaded.
-        """
-        if not self._has_array_data():
-            return None
-        if self.meta.spatial.affine is not None:
-            return self.meta.spatial.affine
-        spacing  = np.array(self.spacing) if self.spacing is not None else np.ones(self.spatial_ndim)
-        origin  = np.array(self.origin) if self.origin is not None else np.zeros(self.spatial_ndim)
-        direction = np.array(self.direction) if self.direction is not None else np.eye(self.spatial_ndim)
-        affine = np.eye(self.spatial_ndim + 1)
-        affine[:self.spatial_ndim, :self.spatial_ndim] = direction @ np.diag(spacing)
-        affine[:self.spatial_ndim, self.spatial_ndim] = origin
-        return affine.tolist()
-
-    @affine.setter
-    def affine(self, value):
-        self.meta.spatial.affine = value
+    @values.setter
+    def values(self, value):
+        self._meta.values = value
 
     @property
-    def translation(self):
-        """Extracts the translation vector from the affine matrix.
+    def profiles(self) -> Dict[str, Dict[str, Any]]:
+        """Domain metadata by profile name (plain dicts, validated when written)."""
+        return self._meta.profiles
 
-        Returns:
-            list: Translation vector with length equal to the number of spatial
-                dimensions, or None if no array is loaded.
-        """
-        if not self._has_array_data():
-            return None
-        return np.array(self.affine)[:-1, -1].tolist()
+    @profiles.setter
+    def profiles(self, value):
+        self._meta.update(profiles=value)
 
     @property
-    def scale(self):
-        """Extracts the scaling factors from the affine matrix.
+    def user(self) -> Dict[str, Any]:
+        """Arbitrary user metadata; loaded from the file on first access."""
+        return self._meta.user
 
-        Returns:
-            list: Scaling factors per axis with length equal to the number of
-                spatial dimensions, or None if no array is loaded.
-        """
-        if not self._has_array_data():
-            return None
-        scales = np.linalg.norm(np.array(self.affine)[:-1, :-1], axis=0)
-        return scales.tolist()
+    @user.setter
+    def user(self, value):
+        self._meta.user = value
 
     @property
-    def rotation(self):
-        """Extracts the rotation matrix from the affine matrix.
-
-        Returns:
-            list: Rotation matrix with shape (ndims, ndims), or None if no array
-                is loaded.
-        """
-        if not self._has_array_data():
-            return None
-        rotation_matrix = np.array(self.affine)[:-1, :-1] / np.array(self.scale)
-        return rotation_matrix.tolist()
+    def source(self) -> Tuple[SourceEntry, ...]:
+        """Original metadata of the converted file(s); read-only, loaded on first access."""
+        return self._meta.source
 
     @property
-    def shear(self):
-        """Computes the shear matrix from the affine matrix.
+    def history(self) -> Tuple[Mapping, ...]:
+        """Conversions and operations applied to this image (append with ``meta.add_history``)."""
+        return self._meta.history
 
-        Returns:
-            list: Shear matrix with shape (ndims, ndims), or None if no array is
-                loaded.
+    # -- geometry (derived from the spaces, never stored) ----------------------
+
+    def space(self, name: Optional[str] = None) -> Optional[Space]:
+        """A space by name; without a name the default (first) space, or None if there is none."""
+        spaces = self._meta.spaces
+        if name is None:
+            return spaces[0] if spaces else None
+        for candidate in spaces:
+            if candidate.name == name:
+                return candidate
+        raise KeyError(f"No space named {name!r}; spaces: {[s.name for s in spaces]}.")
+
+    def _space_or_raise(self, name: Optional[str]) -> Space:
+        space = self.space(name)
+        if space is None:
+            raise MetadataError("The array has no spaces: it lives in index space only.")
+        return space
+
+    def matrix(self, space: Optional[str] = None) -> np.ndarray:
+        """Homogeneous from-array matrix of a space (default: the first one).
+
+        Rows are the space axes (+1), columns the space's ``from_array.array_axes``
+        (+ translation). An integer index is the centre of its voxel.
         """
-        if not self._has_array_data():
-            return None
-        scales = np.array(self.scale)
-        rotation_matrix = np.array(self.rotation)
-        shearing_matrix = np.dot(rotation_matrix.T, np.array(self.affine)[:-1, :-1]) / scales[:, None]
-        return shearing_matrix.tolist()
+        return self._space_or_raise(space).matrix()
+
+    @property
+    def spacing(self) -> Optional[Tuple[float, ...]]:
+        """Voxel spacing along each mapped array axis of the default space (array order), or None."""
+        space = self.space()
+        return None if space is None else space.spacing
+
+    @property
+    def origin(self) -> Optional[Tuple[float, ...]]:
+        """Default-space coordinates of the centre of index (0, ..., 0), or None."""
+        space = self.space()
+        return None if space is None else space.origin
+
+    @property
+    def direction(self) -> Optional[np.ndarray]:
+        """Unit vector of each mapped array axis in the default space (rows: space axes), or None."""
+        space = self.space()
+        return None if space is None else space.direction
+
+    def letter_codes(self, space: Optional[str] = None) -> Tuple[str, ...]:
+        """Display letters: the direction each mapped array axis increases toward, e.g. ("S", "P", "L")."""
+        return self._space_or_raise(space).letter_codes()
+
+    def set_geometry(
+            self,
+            spacing: Optional[Sequence[float]] = None,
+            origin: Optional[Sequence[float]] = None,
+            direction: Optional[Any] = None,
+            space: Optional[Union[str, Mapping, Space]] = None,
+        ) -> None:
+        """Set a space from spacing, origin and direction (see the constructor).
+
+        ``space`` defaults to the current default space. If the space exists,
+        values not given are kept, e.g. ``set_geometry(spacing=[1, 1, 2])``
+        changes only the spacing. The space becomes the first (default) one.
+        """
+        if space is None:
+            space = self.space()
+            if space is None:
+                raise MetadataError("Give space= (e.g. 'patient'): the array has no space yet.")
+            space = space.name
+        self._meta.spaces = _compose_space(self._meta.spaces, self._meta.axes, space, spacing, origin, direction)
+
+    def fingerprint(self) -> Dict[str, Any]:
+        """Fingerprint of the array and its geometry (spec 6.3), as written into ``source`` entries."""
+        self._require_array()
+        return _fingerprint.compute(self, self._meta)
+
+    # -- array properties ------------------------------------------------------
 
     @property
     def shape(self):
@@ -724,10 +771,9 @@ class MLArray(MLArrayConstructors):
         Returns:
             tuple: Shape of the underlying array, or None if no array is loaded.
         """
-        if self.meta is None or self.meta._has_array.has_array == False:
+        if not self._has_array_data():
             return None
-        shape = self.meta.spatial.shape
-        return tuple(shape) if shape is not None else None
+        return tuple(self._store.shape)
 
     @property
     def dtype(self):
@@ -742,39 +788,10 @@ class MLArray(MLArrayConstructors):
         return self._store.dtype
 
     @property
-    def ndim(self) -> int:
-        """Returns the number of spatial and non-spatial dimensions of the array.
-
-        Returns:
-            int: Number of dimensions, or None if not determinable.
-        """
-        if self.meta is None:
-            return None
-        spatial = self.meta.spatial
-        if spatial.shape is not None:
-            return len(spatial.shape)
-        if spatial._num_spatial_axes is not None:
-            return spatial._num_spatial_axes + spatial._num_non_spatial_axes
-        for attr in (spatial.spacing, spatial.origin, spatial.direction):
-            if attr is not None:
-                return len(attr)
-        if spatial.affine is not None:
-            return len(spatial.affine) - 1
-        return None
-
-    @property
-    def spatial_ndim(self) -> int:
-        """Returns the number of spatial dimensions.
-
-        Returns:
-            int: Number of spatial dimensions, or None if not determinable.
-        """
-        if self.meta is None:
-            return None
-        spatial = self.meta.spatial
-        if spatial._num_spatial_axes is not None:
-            return spatial._num_spatial_axes
-        return self.ndim
+    def ndim(self) -> Optional[int]:
+        """Number of array dimensions, or None if no array is loaded."""
+        shape = self.shape
+        return None if shape is None else len(shape)
 
     @classmethod
     def comp_blosc2_params(
@@ -873,7 +890,6 @@ class MLArray(MLArrayConstructors):
         self._store = blosc2.open(urlpath=str(filepath), dparams=dparams, mode=mode, mmap_mode=mmap_mode)
         self._backend = "blosc2"
         self._read_meta()
-        self._update_blosc2_meta()
         self.mode = mode
         self.mmap_mode = mmap_mode
 
@@ -882,7 +898,7 @@ class MLArray(MLArrayConstructors):
             filepath: Union[str, Path],
             shape: Union[List, Tuple, np.ndarray],
             dtype: np.dtype,
-            meta: Optional[Union[Dict, Meta]] = None,
+            meta: Optional[Union[Meta, Mapping]] = None,
             mode: str = 'w',
             mmap_mode: str = 'w+',
             patch_size: Optional[Union[int, List, Tuple]] = 'default',  # 'default' means that the default of 192 is used. However, if set to 'default', the patch_size will be skipped if self.patch_size is set from a previously loaded MLArray image. In that case the self.patch_size is used.
@@ -900,9 +916,8 @@ class MLArray(MLArrayConstructors):
                 to create. If provided, a new file is created. Length must match
                 the full array dimensionality (including non-spatial axes if present).
             dtype (np.dtype): Numpy dtype for a newly created array.
-            meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
-                the created ``MLArray``. Dict values are stored as
-                ``meta.source``.
+            meta (Optional[Union[Meta, Mapping]]): Metadata of the created
+                ``MLArray`` (copied), e.g. ``{"axes": [...], "spaces": [...]}``.
             mode (str): Controls storage open/creation permissions when using standard Blosc2 I/O (read-only, read/write, overwrite). 
                 Does not affect lazy loading or decompression; data is accessed and decompressed on demand by Blosc2.
                 Must be 'w' (default). Leave at default if unsure.
@@ -945,20 +960,19 @@ class MLArray(MLArrayConstructors):
             raise RuntimeError("mmap_mode must be one of the following: 'w+', None")
     
         shape = _storage.normalize_shape(shape)
-        self._validate_and_add_meta(meta, has_array=True)
-        spatial_axis_mask = [True] * len(shape) if self.meta.spatial.axis_labels is None else _spatial_axis_mask(self.meta.spatial.axis_labels)
-        with _meta_internal_write():
-            self.meta.blosc2, cparams = _storage.comp_blosc2_meta(self.meta.blosc2, patch_size, chunk_size, block_size, shape, np.dtype(dtype).itemsize, spatial_axis_mask, cparams, dparams)
-            self.meta._has_array.has_array = True
-        
+        meta = self._coerce_meta(meta, shape)
+        storage, cparams = _storage.comp_layout(
+            meta.storage, patch_size, chunk_size, block_size, shape, np.dtype(dtype).itemsize,
+            MLArray._space_axis_mask(meta), cparams,
+        )
         self.support_metadata = True
-        
-        self._store = blosc2.empty(shape=shape, dtype=np.dtype(dtype), urlpath=str(filepath), chunks=self.meta.blosc2.chunk_size, blocks=self.meta.blosc2.block_size, cparams=cparams, dparams=_storage.resolve_dparams(self.meta.blosc2.dparams), mode=mode, mmap_mode=mmap_mode)
+        self._store = blosc2.empty(shape=shape, dtype=np.dtype(dtype), urlpath=str(filepath), chunks=storage.chunk_size, blocks=storage.block_size, cparams=cparams, dparams=_storage.resolve_dparams(dparams), mode=mode, mmap_mode=mmap_mode)
         self._backend = "blosc2"
+        self._has_array = True
         self.mode = mode
         self.mmap_mode = mmap_mode
-        self._validate_and_add_meta(self.meta)
-        self._update_blosc2_meta()
+        self._meta = meta
+        self._record_storage(storage)
         self._write_metadata()
 
     def _load(
@@ -986,106 +1000,105 @@ class MLArray(MLArrayConstructors):
         self._backend = "blosc2"
         self.mode = None
         self.mmap_mode = None
-        self._read_meta()        
-        self._update_blosc2_meta()
+        self._read_meta()
         if not compressed:
             self._store = np.asarray(self._store[...])
             self._backend = "numpy"
 
-    def _validate_and_add_meta(
-            self,
-            meta,
-            spacing=None,
-            origin=None,
-            direction=None,
-            affine=None,
-            axis_labels=None,
-            has_array=None,
-            validate=True,
-        ):
-        """Validate and attach metadata to the MLArray instance.
+    # -- metadata internals ----------------------------------------------------
 
-        Args:
-            meta (Optional[Union[dict, Meta]]): Metadata to attach. Dicts are
-                interpreted as ``meta.source`` fields.
-            spacing (Optional[Union[List, Tuple, np.ndarray]]): Spacing per
-                spatial axis.
-            origin (Optional[Union[List, Tuple, np.ndarray]]): Origin per
-                spatial axis.
-            direction (Optional[Union[List, Tuple, np.ndarray]]): Direction
-                cosine matrix with shape (ndims, ndims).
-            affine (Optional[Union[List, Tuple, np.ndarray]]): Homogeneous
-                affine matrix with shape (spatial_ndims + 1, spatial_ndims + 1).
-            axis_labels (Optional[List[Union[str, AxisLabel]]]): Per-axis labels or roles. Length must match ndims.
-            has_array (Optional[bool]): Explicitly set whether array data is
-                present. When True, metadata is validated with array-dependent
-                shape information.
+    @staticmethod
+    def _space_axis_mask(meta: Meta) -> List[bool]:
+        """For every array axis whether it is a space axis (drives the layout heuristic)."""
+        return [axis.type == "space" for axis in meta.axes]
 
-        Raises:
-            ValueError: If ``meta`` is not None, dict, or Meta.
-        """
-        if meta is not None:
-            if not isinstance(meta, (dict, Meta)):
-                raise ValueError("Meta must be None, a dict or a Meta object.")
-            if isinstance(meta, dict):
-                meta = Meta(source=meta)
-        else:
+    @staticmethod
+    def _coerce_meta(meta: Optional[Union[Meta, Mapping]], shape: Optional[Sequence[int]] = None) -> Meta:
+        """A private copy of ``meta`` (Meta or its dict form), bound to ``shape``."""
+        if meta is None:
             meta = Meta()
-        self._meta = meta
-        with _meta_internal_write():
-            self.meta._mlarray_version = MLARRAY_VERSION
+        elif isinstance(meta, Meta):
+            meta = meta.copy()
+        elif isinstance(meta, Mapping):
+            meta = Meta.from_dict({"version": SPEC_VERSION, **meta})
+        else:
+            raise TypeError(f"meta must be a Meta or a mapping, got {type(meta).__name__}.")
+        if shape is not None:
+            meta._set_shape(shape)
+        return meta
 
-        if affine is not None and (
-            spacing is not None or origin is not None or direction is not None
-        ):
-            raise ValueError(
-                "affine cannot be provided together with spacing, origin, or direction."
-            )
+    @staticmethod
+    def _derived_meta(other: Meta, like: bool, copy_source: bool) -> Meta:
+        """Metadata for an image derived from another one (spec 6.1 rule 4).
 
-        if spacing is not None:
-            self.meta.spatial.spacing = spacing
-        if origin is not None:
-            self.meta.spatial.origin = origin
-        if direction is not None:
-            self.meta.spatial.direction = direction
-        if affine is not None:
-            self.meta.spatial.affine = affine
-        if axis_labels is not None:
-            self.meta.spatial.axis_labels = axis_labels
-        if has_array == True:
-            with _meta_internal_write():
-                self.meta._has_array.has_array = True
-        if self.meta._has_array.has_array:
-            with _meta_internal_write():
-                if self._store is not None:
-                    self.meta.spatial.shape = list(self._store.shape)
-        if validate:
-            with _meta_internal_write():
-                self.meta.spatial._validate_and_cast(ndims=self.ndim, spatial_ndims=self.spatial_ndim)
-
-    def _update_blosc2_meta(self):
-        """Sync Blosc2 chunk and block sizes into metadata.
-
-        Updates ``self.meta.blosc2`` from the underlying store when the array
-        is present.
+        Geometry, values, profiles and user metadata are copied; the history
+        and the data-dependent ``ml`` statistics and boxes are not, and
+        ``source`` only with ``copy_source``. ``*_like`` constructors also drop
+        the label semantics.
         """
-        if self._backend != "blosc2":
-            return
-        if self.support_metadata and self.meta._has_array.has_array == True:
-            with _meta_internal_write():
-                self.meta.blosc2.chunk_size = list(self._store.chunks)
-                self.meta.blosc2.block_size = list(self._store.blocks)
-                self.meta.blosc2._validate_and_cast(
-                    ndims=self.ndim,
-                    spatial_ndims=self.spatial_ndim,
+        meta = other.copy(source=copy_source)
+        meta._history = []
+        meta.writer = None
+        ml = meta.profiles.get("ml")
+        if ml is not None:
+            for key in ("statistics", "boxes"):
+                ml.pop(key, None)
+        if like:
+            meta._values = meta.values.without_label_semantics()
+        meta._shape = None
+        return meta
+
+    @classmethod
+    def _build_meta(cls, meta, copy, copy_source, like, parts, geometry, shape) -> Meta:
+        """Metadata of a new array from ``meta``/``copy`` plus the given parts and convenience geometry."""
+        if meta is not None and copy is not None:
+            raise ValueError("Give either meta or copy, not both.")
+        if copy is not None:
+            if not isinstance(copy, MLArray) or copy.meta is None:
+                raise TypeError("copy must be an MLArray with metadata.")
+            result = cls._derived_meta(copy.meta, like=like, copy_source=copy_source)
+        else:
+            if copy_source:
+                raise ValueError("copy_source needs copy.")
+            result = cls._coerce_meta(meta)
+        source = parts.pop("source", None)
+        if source is not None:
+            result._source = Meta(source=source)._source
+        user = parts.pop("user", None)
+        if user is not None:
+            result.user = user
+        has_geometry = any(geometry[key] is not None for key in ("spacing", "origin", "direction"))
+        if geometry["space"] is not None and not has_geometry:
+            raise ValueError("space= needs spacing, origin or direction.")
+        if has_geometry:
+            if geometry["space"] is None:
+                raise MetadataError(
+                    "spacing, origin and direction place the array in a space; say which with space= "
+                    "(e.g. space='patient' for the DICOM patient frame) or pass spaces=[...]."
                 )
+            if "spaces" in parts:
+                raise ValueError("Give either spaces or spacing/origin/direction, not both.")
+        if shape is not None:
+            result._set_shape(tuple(int(v) for v in shape), axes=parts.pop("axes", None))
+        if parts:
+            result.update(**parts)
+        if has_geometry:
+            result.spaces = _compose_space(result.spaces, result.axes, geometry["space"],
+                                           geometry["spacing"], geometry["origin"], geometry["direction"])
+        return result
+
+    def _record_storage(self, storage) -> None:
+        """Record the store's layout: the computed storage with chunk/block size as blosc2 chose them."""
+        if self._backend == "blosc2" and self._has_array:
+            storage = _replace(storage, chunk_size=tuple(self._store.chunks), block_size=tuple(self._store.blocks))
+        self._meta._storage = storage
 
     def _read_meta(self):
-        """Read MLArray metadata from the underlying store, if available."""
-        meta = Meta()
-        if self.support_metadata and self._backend == "blosc2":
-            meta = metadata_io.read(self._store.vlmeta)
-        self._validate_and_add_meta(meta)
+        """Read the metadata of the opened or loaded store."""
+        meta = metadata_io.read(self._store, shape=None)
+        meta._set_shape(tuple(self._store.shape))
+        self._meta = meta
+        self._has_array = True
 
     def _write_metadata(self):
         """Write MLArray metadata to the underlying store if it is writable."""
@@ -1102,59 +1115,55 @@ class MLArray(MLArrayConstructors):
         if self._backend != "blosc2":
             return
 
-        metadata_io.write(self._store.vlmeta, self._serialize_metadata())
+        metadata_io.write(self._store, self._serialize_metadata())
 
-    def _serialize_metadata(self, meta: Optional[Meta] = None) -> bytes:
-        """Serialize MLArray metadata (default: ``self.meta``) into the bytes stored in vlmeta."""
-        return metadata_io.encode(self.meta if meta is None else meta)
+    def _serialize_metadata(self, meta: Optional[Meta] = None) -> Meta:
+        """Validate the metadata (default: ``self.meta``) and stamp the writer before it is written."""
+        meta = self.meta if meta is None else meta
+        meta.validate()
+        meta.writer = _writer()
+        return meta
 
     def _blosc2_store_for_save(self) -> Tuple[Any, Meta]:
         """Return the Blosc2 store and metadata to write, without changing this instance.
 
         Blosc2-backed arrays are saved as they are. NumPy-backed arrays are
         compressed into a temporary store whose layout follows the recorded
-        ``meta.blosc2`` (patch size first, then chunk/block size, then the
+        ``meta.storage`` (patch size first, then chunk/block size, then the
         default patch size); the instance stays NumPy-backed.
         """
-        if self._store is None or not self.meta._has_array.has_array:
-            return blosc2.empty((0,)), self.meta
+        if not self._has_array_data():
+            # The file format always holds an array: save an empty one with one axis per declared axis.
+            meta = self.meta.copy()
+            shape = (0,) * max(1, len(meta.axes))
+            meta._set_shape(shape)
+            return blosc2.empty(shape), meta
 
         if self._backend == "blosc2":
-            self._update_blosc2_meta()
             return self._store, self.meta
 
         array = np.ascontiguousarray(self._store)
-        meta = deepcopy(self.meta)
-        shape = _storage.normalize_shape(array.shape)
-        spatial_axis_mask = (
-            [True] * len(shape)
-            if meta.spatial.axis_labels is None
-            else _spatial_axis_mask(meta.spatial.axis_labels)
+        meta = self.meta.copy()
+        recorded = meta.storage
+        cparams = None if recorded is None or not recorded.compression else recorded.to_cparams()
+        storage, cparams = _storage.comp_layout(
+            recorded,
+            patch_size="default",
+            chunk_size=None,
+            block_size=None,
+            shape=array.shape,
+            dtype_itemsize=np.dtype(array.dtype).itemsize,
+            spatial_axis_mask=MLArray._space_axis_mask(meta),
+            cparams=cparams,
+            array=array,
         )
-        with _meta_internal_write():
-            meta.blosc2, cparams = _storage.comp_blosc2_meta(
-                meta.blosc2,
-                patch_size="default",
-                chunk_size=None,
-                block_size=None,
-                shape=shape,
-                dtype_itemsize=np.dtype(array.dtype).itemsize,
-                spatial_axis_mask=spatial_axis_mask,
-                cparams=meta.blosc2.cparams,
-                dparams=meta.blosc2.dparams,
-                array=array,
-            )
         store = blosc2.asarray(
             array,
-            chunks=meta.blosc2.chunk_size,
-            blocks=meta.blosc2.block_size,
+            chunks=storage.chunk_size,
+            blocks=storage.block_size,
             cparams=cparams,
-            dparams=_storage.resolve_dparams(meta.blosc2.dparams),
         )
-        with _meta_internal_write():
-            meta.blosc2.chunk_size = list(store.chunks)
-            meta.blosc2.block_size = list(store.blocks)
-            meta.blosc2._validate_and_cast(ndims=len(shape), spatial_ndims=sum(spatial_axis_mask))
+        meta._storage = _replace(storage, chunk_size=tuple(store.chunks), block_size=tuple(store.blocks))
         return store, meta
 
     def _replace_with_converted(self, other: "MLArray") -> None:
@@ -1162,6 +1171,7 @@ class MLArray(MLArrayConstructors):
         old_store = self._store
         self._store = other._store
         self._backend = other._backend
+        self._has_array = other._has_array
         self._meta = other._meta
         self.support_metadata = other.support_metadata
         self.filepath = None

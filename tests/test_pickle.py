@@ -25,11 +25,11 @@ class TestPickle(unittest.TestCase):
     def _assert_same(self, restored, original, array):
         self.assertTrue(np.array_equal(restored[...], array))
         self.assertEqual(restored.spacing, original.spacing)
-        self.assertEqual(restored.meta.to_mapping(), original.meta.to_mapping())
+        self.assertEqual(restored.meta.to_dict(include_lazy=True), original.meta.to_dict(include_lazy=True))
 
     def test_in_memory_blosc2_round_trip_keeps_layout_and_cparams(self):
         array = _make_array()
-        image = MLArray(array, spacing=(1, 2, 3), patch_size=(4, 8, 8))
+        image = MLArray(array, spacing=(1, 2, 3), space="patient", patch_size=(4, 8, 8))
         restored = pickle.loads(pickle.dumps(image))
 
         self._assert_same(restored, image, array)
@@ -42,7 +42,7 @@ class TestPickle(unittest.TestCase):
 
     def test_numpy_backed_round_trip(self):
         array = _make_array(seed=1)
-        image = MLArray(array, spacing=(1, 2, 3), compressed=False)
+        image = MLArray(array, spacing=(1, 2, 3), space="patient", compressed=False)
         restored = pickle.loads(pickle.dumps(image))
 
         self._assert_same(restored, image, array)
@@ -57,7 +57,7 @@ class TestPickle(unittest.TestCase):
             with self.subTest(mode=mode, mmap_mode=mmap_mode), tempfile.TemporaryDirectory() as tmpdir:
                 array = _make_array(seed=2)
                 path = Path(tmpdir) / "sample.mla"
-                MLArray(array, spacing=(1, 2, 3)).save(path)
+                MLArray(array, spacing=(1, 2, 3), space="patient").save(path)
 
                 opened = MLArray.open(path, mode=mode, mmap_mode=mmap_mode, dparams={"nthreads": 2})
                 restored = pickle.loads(pickle.dumps(opened))
@@ -87,21 +87,21 @@ class TestPickle(unittest.TestCase):
             path = Path(tmpdir) / "sample.mla"
             MLArray(_make_array(seed=4)).save(path)
             opened = MLArray.open(path, mmap_mode="r+")
-            opened.spacing = [3, 3, 3]
+            opened.set_geometry(spacing=[3, 3, 3], space="patient")
 
             restored = pickle.loads(pickle.dumps(opened))
 
-            self.assertEqual(restored.spacing, [3.0, 3.0, 3.0])
+            self.assertEqual(restored.spacing, (3.0, 3.0, 3.0))
 
     def test_spawn_workers_read_patches(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             array = _make_array(seed=5)
             path = Path(tmpdir) / "sample.mla"
-            MLArray(array, spacing=(1, 2, 3)).save(path)
+            MLArray(array, spacing=(1, 2, 3), space="patient").save(path)
             images = {
                 "opened": MLArray.open(path),
-                "in_memory": MLArray(array, spacing=(1, 2, 3)),
-                "numpy": MLArray(array, spacing=(1, 2, 3), compressed=False),
+                "in_memory": MLArray(array, spacing=(1, 2, 3), space="patient"),
+                "numpy": MLArray(array, spacing=(1, 2, 3), space="patient", compressed=False),
             }
             context = multiprocessing.get_context("spawn")
             with context.Pool(2) as pool:
@@ -110,7 +110,7 @@ class TestPickle(unittest.TestCase):
                         results = pool.map(_read_patch, [(image, i) for i in range(4)])
                         for index, patch, spacing in results:
                             self.assertTrue(np.array_equal(patch, array[index : index + 2, 2:10, 3:11]))
-                            self.assertEqual(spacing, [1.0, 2.0, 3.0])
+                            self.assertEqual(spacing, (1.0, 2.0, 3.0))
 
 
 if __name__ == "__main__":

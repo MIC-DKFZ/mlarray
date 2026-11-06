@@ -1,26 +1,22 @@
-"""A standardized blosc2 image reader and writer for medical images."""
+"""A standardized blosc2 array format with explicit metadata for scientific and medical images."""
 
 from importlib import metadata as _metadata
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from mlarray.mlarray import MLArray, MLARRAY_DEFAULT_PATCH_SIZE, MLARRAY_DEFAULT_READ_AHEAD, set_read_ahead
-    from mlarray.meta import (
+    from mlarray.metadata import (
+        Axis,
+        FromArray,
         Meta,
-        MetaBbox,
-        MetaBlosc2,
-        MetaExtra,
-        MetaHasArray,
-        MetaSource,
-        MetaImageFormat,
-        MetaIsSeg,
-        MetaSpatial,
-        MetaStatistics,
-        MetaVersion,
-        AxisLabel,
-        CoordSystem,
+        MetadataError,
+        SourceEntry,
+        Space,
+        SpaceAxis,
+        Storage,
+        Values,
+        space_from_geometry,
     )
-    from mlarray.utils import is_serializable
     from mlarray.cli import cli_print_header, cli_convert_to_mlarray
 
 __all__ = [
@@ -29,20 +25,16 @@ __all__ = [
     "MLARRAY_DEFAULT_PATCH_SIZE",
     "MLARRAY_DEFAULT_READ_AHEAD",
     "set_read_ahead",
+    "Axis",
+    "FromArray",
     "Meta",
-    "MetaBbox",
-    "MetaBlosc2",
-    "MetaExtra",
-    "MetaHasArray",
-    "MetaSource",
-    "MetaImageFormat",
-    "MetaIsSeg",
-    "MetaSpatial",
-    "MetaStatistics",
-    "MetaVersion",
-    "AxisLabel",
-    "CoordSystem",
-    "is_serializable",
+    "MetadataError",
+    "SourceEntry",
+    "Space",
+    "SpaceAxis",
+    "Storage",
+    "Values",
+    "space_from_geometry",
     "cli_print_header",
     "cli_convert_to_mlarray",
 ]
@@ -58,20 +50,16 @@ _LAZY_ATTRS = {
     "MLARRAY_DEFAULT_PATCH_SIZE": ("mlarray.mlarray", "MLARRAY_DEFAULT_PATCH_SIZE"),
     "MLARRAY_DEFAULT_READ_AHEAD": ("mlarray.mlarray", "MLARRAY_DEFAULT_READ_AHEAD"),
     "set_read_ahead": ("mlarray.mlarray", "set_read_ahead"),
-    "Meta": ("mlarray.meta", "Meta"),
-    "MetaBbox": ("mlarray.meta", "MetaBbox"),
-    "MetaBlosc2": ("mlarray.meta", "MetaBlosc2"),
-    "MetaExtra": ("mlarray.meta", "MetaExtra"),
-    "MetaHasArray": ("mlarray.meta", "MetaHasArray"),
-    "MetaSource": ("mlarray.meta", "MetaSource"),
-    "MetaImageFormat": ("mlarray.meta", "MetaImageFormat"),
-    "MetaIsSeg": ("mlarray.meta", "MetaIsSeg"),
-    "MetaSpatial": ("mlarray.meta", "MetaSpatial"),
-    "MetaStatistics": ("mlarray.meta", "MetaStatistics"),
-    "MetaVersion": ("mlarray.meta", "MetaVersion"),
-    "AxisLabel": ("mlarray.meta", "AxisLabel"),
-    "CoordSystem": ("mlarray.meta", "CoordSystem"),
-    "is_serializable": ("mlarray.utils", "is_serializable"),
+    "Axis": ("mlarray.metadata", "Axis"),
+    "FromArray": ("mlarray.metadata", "FromArray"),
+    "Meta": ("mlarray.metadata", "Meta"),
+    "MetadataError": ("mlarray.metadata", "MetadataError"),
+    "SourceEntry": ("mlarray.metadata", "SourceEntry"),
+    "Space": ("mlarray.metadata", "Space"),
+    "SpaceAxis": ("mlarray.metadata", "SpaceAxis"),
+    "Storage": ("mlarray.metadata", "Storage"),
+    "Values": ("mlarray.metadata", "Values"),
+    "space_from_geometry": ("mlarray.metadata", "space_from_geometry"),
     "cli_print_header": ("mlarray.cli", "cli_print_header"),
     "cli_convert_to_mlarray": ("mlarray.cli", "cli_convert_to_mlarray"),
 }

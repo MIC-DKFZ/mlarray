@@ -161,7 +161,7 @@ class TestMLArrayLayout(unittest.TestCase):
         data = np.zeros((300, 64, 64), dtype=np.uint8)
         arr = MLArray(data, patch_size=(64, 32, 32))
         self.assertEqual(
-            (list(arr.meta.blosc2.chunk_size), list(arr.meta.blosc2.block_size)),
+            (list(arr.meta.storage.chunk_size), list(arr.meta.storage.block_size)),
             comp_blosc2_params(data.shape, (64, 32, 32), bytes_per_pixel=1),
         )
 
@@ -189,19 +189,20 @@ class TestWriteDefaults(unittest.TestCase):
     def test_lz4hc_5_with_4_threads(self):
         arr, cparams = self._saved(_interpolated(), patch_size=(32, 48, 48))
         self.assertEqual((cparams.codec, cparams.clevel), (blosc2.Codec.LZ4HC, 5))
-        meta = dict(arr.meta.blosc2.cparams)
-        self.assertEqual((blosc2.Codec(meta["codec"]), meta["clevel"], meta["nthreads"]), (blosc2.Codec.LZ4HC, 5, 4))
+        meta = arr.meta.storage.compression
+        self.assertEqual((blosc2.Codec[meta["codec"]], meta["level"]), (blosc2.Codec.LZ4HC, 5))
+        self.assertEqual(MLArray(_interpolated(), patch_size=(32, 48, 48))._store.schunk.cparams.nthreads, 4)
 
     def test_filter_chosen_from_data(self):
         for make, expected in ((_quantized, blosc2.Filter.NOFILTER), (_interpolated, blosc2.Filter.SHUFFLE)):
             with self.subTest(data=make.__name__):
                 arr, cparams = self._saved(make(), patch_size=(32, 48, 48))
                 self.assertEqual(blosc2.Filter.SHUFFLE in cparams.filters, expected == blosc2.Filter.SHUFFLE)
-                self.assertEqual(blosc2.Filter(arr.meta.blosc2.cparams["filters"][0]), expected)
+                self.assertEqual(blosc2.Filter[arr.meta.storage.compression["filters"][0]], expected)
                 self.assertTrue(np.array_equal(arr[...], make()))
 
     def test_explicit_cparams_are_kept(self):
         cp = {"codec": blosc2.Codec.ZSTD, "clevel": 3}
         arr, cparams = self._saved(_quantized(), patch_size=(32, 48, 48), cparams=cp)
         self.assertEqual((cparams.codec, cparams.clevel), (blosc2.Codec.ZSTD, 3))
-        self.assertNotIn("filters", dict(arr.meta.blosc2.cparams))
+        self.assertNotIn("filters", arr.meta.storage.compression)

@@ -89,7 +89,7 @@ class TestInMemoryConstructors(unittest.TestCase):
             shape=(2, 3, 4),
             fill_value=5,
             dtype=np.int16,
-            meta={"case": "meta-copy"},
+            meta={"user": {"case": "meta-copy"}},
             patch_size=None,
             chunk_size=(1, 3, 4),
             block_size=(1, 2, 2),
@@ -131,7 +131,7 @@ class TestInMemoryConstructors(unittest.TestCase):
             np.array_equal(full_like[...], np.full(base.shape, 9, dtype=base.dtype))
         )
 
-        self.assertEqual(zeros_like.meta.source.to_plain(), {"case": "meta-copy"})
+        self.assertEqual(zeros_like.user, {"case": "meta-copy"})
 
     def test_like_raises_for_invalid_input(self):
         with self.assertRaises(TypeError):

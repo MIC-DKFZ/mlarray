@@ -15,7 +15,7 @@ def _make_array(shape=(8, 16, 16), seed=0):
 class TestCompressDecompress(unittest.TestCase):
     def test_compress_in_place_switches_backend_and_applies_layout(self):
         array = _make_array(seed=1)
-        image = MLArray(array, compressed=False, meta={"case": "compress"})
+        image = MLArray(array, compressed=False, user={"case": "compress"})
         self.assertTrue(isinstance(image._store, np.ndarray))
 
         image.compress(
@@ -26,9 +26,9 @@ class TestCompressDecompress(unittest.TestCase):
 
         self.assertFalse(isinstance(image._store, np.ndarray))
         self.assertTrue(np.allclose(image.to_numpy(), array))
-        self.assertEqual(image.meta.source.to_plain(), {"case": "compress"})
-        self.assertEqual(image.meta.blosc2.chunk_size, [1, 8, 8])
-        self.assertEqual(image.meta.blosc2.block_size, [1, 4, 4])
+        self.assertEqual(image.user, {"case": "compress"})
+        self.assertEqual(image.meta.storage.chunk_size, (1, 8, 8))
+        self.assertEqual(image.meta.storage.block_size, (1, 4, 4))
         self.assertIsNone(image.filepath)
         self.assertIsNone(image.mode)
         self.assertIsNone(image.mmap_mode)
@@ -37,50 +37,50 @@ class TestCompressDecompress(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             array = _make_array(seed=2)
             path = Path(tmpdir) / "switch-source.mla"
-            MLArray(array, meta={"case": "decompress"}).save(path)
+            MLArray(array, user={"case": "decompress"}).save(path)
 
             image = MLArray.open(path, mode="a", mmap_mode="r+")
             self.assertEqual(image.mode, "a")
             self.assertEqual(image.mmap_mode, "r+")
             self.assertEqual(image.filepath, str(path))
-            self.assertIsNotNone(image.meta.blosc2.chunk_size)
-            blosc2_before = image.meta.blosc2.to_mapping()
+            self.assertIsNotNone(image.meta.storage.chunk_size)
+            blosc2_before = image.meta.storage.to_dict()
 
             image.decompress()
 
             self.assertTrue(isinstance(image._store, np.ndarray))
             self.assertTrue(np.allclose(image.to_numpy(), array))
-            self.assertEqual(image.meta.source.to_plain(), {"case": "decompress"})
-            self.assertEqual(image.meta.blosc2.to_mapping(), blosc2_before)
+            self.assertEqual(image.user, {"case": "decompress"})
+            self.assertEqual(image.meta.storage.to_dict(), blosc2_before)
             self.assertIsNone(image.filepath)
             self.assertIsNone(image.mode)
             self.assertIsNone(image.mmap_mode)
 
             # Decompression is detached until explicitly saved.
             reloaded = MLArray(path)
-            self.assertIsNotNone(reloaded.meta.blosc2.chunk_size)
+            self.assertIsNotNone(reloaded.meta.storage.chunk_size)
 
     def test_roundtrip_preserves_data_and_metadata(self):
         array = _make_array(seed=3)
         image = MLArray(
             array,
-            spacing=(0.8, 0.9, 1.2),
+            spacing=(0.8, 0.9, 1.2), space="patient",
             origin=(1.0, 2.0, 3.0),
-            meta={"patient_id": "p-123"},
+            user={"patient_id": "p-123"},
         )
 
         image.decompress()
         self.assertTrue(np.allclose(image.to_numpy(), array))
-        self.assertEqual(image.spacing, [0.8, 0.9, 1.2])
-        self.assertEqual(image.origin, [1.0, 2.0, 3.0])
-        self.assertEqual(image.meta.source["patient_id"], "p-123")
+        self.assertEqual(image.spacing, (0.8, 0.9, 1.2))
+        self.assertEqual(image.origin, (1.0, 2.0, 3.0))
+        self.assertEqual(image.user["patient_id"], "p-123")
 
         image.compress(patch_size=64)
         self.assertTrue(np.allclose(image.to_numpy(), array))
-        self.assertEqual(image.spacing, [0.8, 0.9, 1.2])
-        self.assertEqual(image.origin, [1.0, 2.0, 3.0])
-        self.assertEqual(image.meta.source["patient_id"], "p-123")
-        self.assertEqual(image.meta.blosc2.patch_size, [64, 64, 64])
+        self.assertEqual(image.spacing, (0.8, 0.9, 1.2))
+        self.assertEqual(image.origin, (1.0, 2.0, 3.0))
+        self.assertEqual(image.user["patient_id"], "p-123")
+        self.assertEqual(image.meta.storage.patch_size, (64, 64, 64))
 
     def test_compress_and_decompress_raise_without_array(self):
         image = MLArray(_make_array(seed=4))
@@ -101,12 +101,12 @@ class TestCompressDecompress(unittest.TestCase):
             decompressed.decompress()
             loaded = MLArray.load(path, compressed=False)
 
-            self.assertEqual(decompressed.meta.blosc2.to_mapping(), loaded.meta.blosc2.to_mapping())
-            self.assertEqual(decompressed.meta.blosc2.patch_size, [4, 8, 8])
+            self.assertEqual(decompressed.meta.storage.to_dict(), loaded.meta.storage.to_dict())
+            self.assertEqual(decompressed.meta.storage.patch_size, (4, 8, 8))
 
             resaved = Path(tmpdir) / "resaved.mla"
             decompressed.save(resaved)
-            self.assertEqual(MLArray(resaved).meta.blosc2.patch_size, [4, 8, 8])
+            self.assertEqual(MLArray(resaved).meta.storage.patch_size, (4, 8, 8))
 
 
 if __name__ == "__main__":

@@ -1,26 +1,21 @@
-import numpy as np
+import json
 import tempfile
 from pathlib import Path
-from mlarray import MLArray, Meta, MetaBbox
-import json
+
+from mlarray import MLArray
 
 
 if __name__ == '__main__':
-    print("Creating array...")
-    array = np.random.random((32, 64, 64))
-    spacing = np.array((2, 2.5, 4))
-    origin = (1, 1, 1)
-    direction = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
-    source_meta = {"tmp1": "This is an image", "tmp2": 5, "tmp3": {"test1": 16.4587, "test2": [1, 2, 3, 4, 5, 6]}}
-    bboxes = [[[0, 1], [0, 1], [0, 1]]]
     with tempfile.TemporaryDirectory() as tmp_dir:
         filepath = Path(tmp_dir) / "tmp.mla"
 
-        print("Initializing image...")
-        image = MLArray(spacing=spacing, origin=origin, direction=direction, meta=Meta(source=source_meta, bbox=MetaBbox(bboxes)))
-        print("Saving image...")
+        print("Initializing metadata without array data...")
+        image = MLArray(axes=["z", "y", "x"], spacing=(2, 2.5, 4), origin=(1, 1, 1), space="patient",
+                        user={"note": "metadata only"})
+        print("Saving image (stored as an empty array)...")
         image.save(filepath)
 
         print("Loading image...")
         image = MLArray(filepath)
-        print(json.dumps(image.meta.to_mapping(), indent=2, sort_keys=True))
+        print("Shape:", image.shape)
+        print(json.dumps(image.meta.to_dict(include_lazy=True), indent=2))

@@ -2,33 +2,35 @@ import json
 import tempfile
 from pathlib import Path
 
-from mlarray import MLArray, Meta, MetaBbox
+import numpy as np
+
+from mlarray import MLArray
 
 
 if __name__ == "__main__":
     with tempfile.TemporaryDirectory() as tmp_dir:
-        filepath = Path(tmp_dir) / "tmp_metadata_bboxes_only.mla"
+        filepath = Path(tmp_dir) / "tmp_bboxes.mla"
 
-        # Five example 3D bounding boxes in [z, y, x] order.
-        bboxes = [
-            [[12, 28], [40, 75], [55, 90]],
-            [[48, 70], [18, 36], [10, 24]],
-            [[20, 33], [80, 108], [44, 73]],
-            [[72, 95], [52, 81], [88, 118]],
-            [[5, 16], [12, 30], [100, 126]],
+        # Five example 3D boxes in index coordinates along the array axes z, y, x.
+        boxes = [
+            ([12, 40, 55], [28, 75, 90], "tumor", 0.97),
+            ([48, 18, 10], [70, 36, 24], "lymph_node", 0.84),
+            ([20, 80, 44], [33, 108, 73], "lesion", 0.76),
+            ([72, 52, 88], [95, 81, 118], "organ_part", 0.91),
+            ([5, 12, 100], [16, 30, 126], "cyst", 0.68),
         ]
-        scores = [0.97, 0.84, 0.76, 0.91, 0.68]
-        labels = ["tumor", "lymph_node", "lesion", "organ_part", "cyst"]
-
-        meta = Meta(
-            source={"case_id": "case-001", "modality": "CT"},
-            bbox=MetaBbox(bboxes=bboxes, scores=scores, labels=labels)
+        image = MLArray(
+            np.zeros((100, 128, 128), dtype=np.uint8),
+            axes=["z", "y", "x"],
+            profiles={"ml": {"profile_version": "1.0", "boxes": {
+                "frame": "index",
+                "axes": ["z", "y", "x"],
+                "items": [{"min": lo, "max": hi, "label": label, "score": score} for lo, hi, label, score in boxes],
+            }}},
+            user={"case_id": "case-001", "modality": "CT"},
         )
-
-        # No array data: this MLArray stores metadata only.
-        image = MLArray(meta=meta)
         image.save(filepath)
 
         loaded = MLArray(filepath)
-        print("Saved metadata-only MLArray with 3D bboxes:")
-        print(json.dumps(loaded.meta.to_mapping(), indent=2, sort_keys=True))
+        print("Saved MLArray with 3D boxes in the ml profile:")
+        print(json.dumps(loaded.profiles["ml"], indent=2))

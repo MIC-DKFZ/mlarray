@@ -1,212 +1,63 @@
 import argparse
 import json
+import math
 from collections.abc import Mapping
-from typing import Optional, Union
 from pathlib import Path
-import numpy as np
+from typing import Any, Union
+
 from mlarray import MLArray
-from mlarray.meta import _meta_internal_write
-
-try:
-    from medvol import MedVol
-except ImportError:
-    MedVol = None
 
 
-def _require_medvol() -> None:
-    if MedVol is None:
-        raise RuntimeError(
-            "medvol is required for mlarray_convert; install with 'pip install mlarray[all]'."
-        )
+def _json_safe(value: Any) -> Any:
+    """Make metadata printable as strict JSON.
 
-
-def _is_mlarray_path(filepath: Union[str, Path]) -> bool:
-    return str(filepath).endswith(".mla")
-
-
-def _is_nifti_path(filepath: Union[str, Path]) -> bool:
-    filepath_str = str(filepath)
-    return filepath_str.endswith(".nii.gz") or filepath_str.endswith(".nii")
-
-
-def _is_nrrd_path(filepath: Union[str, Path]) -> bool:
-    return str(filepath).endswith(".nrrd")
-
-
-def _is_medvol_path(filepath: Union[str, Path]) -> bool:
-    return _is_nifti_path(filepath) or _is_nrrd_path(filepath)
-
-
-def _source_format_for_path(filepath: Union[str, Path]) -> Optional[str]:
-    if _is_nifti_path(filepath):
-        return "nifti"
-    if _is_nrrd_path(filepath):
-        return "nrrd"
-    return None
-
-
-def _medvol_backend_for_path(filepath: Union[str, Path]) -> Optional[str]:
-    """Return the explicit backend to use when creating a MedVol for saving.
-
-    NIfTI: None → MedVol auto-selects nibabel (canonical RAS+ geometry,
-    fresh header from affine — dict source-metadata is intentionally not
-    passed through since nibabel expects a Nifti1Header object).
-    NRRD:  "pynrrd" → MedVol backend flag must match so pynrrd.save() picks
-    up the source-metadata dict as the base header.
+    Non-finite floats become the strings "NaN", "Infinity" and "-Infinity"
+    (bare NaN is not JSON); binary values are shown as ``<binary, N bytes>``.
     """
-    if _is_nrrd_path(filepath):
-        return "pynrrd"
-    return None
-
-
-
-def _jsonable_header_value(value):
-    if isinstance(value, np.ndarray):
-        if value.ndim == 0:
-            return _jsonable_header_value(value.item())
-        return [_jsonable_header_value(v) for v in value.tolist()]
-    if isinstance(value, bytes):
-        # Must precede np.generic: np.bytes_ is a subclass of both bytes and
-        # np.generic, and .item() on it returns Python bytes (not str).
-        return value.decode("utf-8", errors="replace")
-    if isinstance(value, np.generic):
-        return value.item()
+    if isinstance(value, float) and not math.isfinite(value):
+        return "NaN" if math.isnan(value) else ("Infinity" if value > 0 else "-Infinity")
+    if isinstance(value, (bytes, bytearray, memoryview)):
+        return f"<binary, {len(bytes(value))} bytes>"
     if isinstance(value, Mapping):
-        return {str(k): _jsonable_header_value(v) for k, v in value.items()}
+        return {str(key): _json_safe(item) for key, item in value.items()}
     if isinstance(value, (list, tuple)):
-        return [_jsonable_header_value(v) for v in value]
-    if hasattr(value, "tolist") and not isinstance(value, (str, bytes)):
-        converted = value.tolist()
-        return _jsonable_header_value(converted)
+        return [_json_safe(item) for item in value]
     return value
 
 
-def _header_to_source_meta(header) -> dict:
-    if header is None:
-        return {}
-
-    raw = None
-    if isinstance(header, Mapping):
-        raw = dict(header)
-    elif hasattr(header, "items"):
-        raw = {str(k): v for k, v in header.items()}
-    elif hasattr(header, "keys"):
-        raw = {str(k): header[k] for k in header.keys()}
-    else:
-        raise TypeError(
-            f"Unsupported MedVol header type for MLArray conversion: {type(header).__name__}"
-        )
-
-    converted = _jsonable_header_value(raw)
-    if not isinstance(converted, dict):
-        raise TypeError("Converted MedVol header must be a mapping.")
-    return converted
+def header(filepath: Union[str, Path], source: bool = False, user: bool = False) -> dict:
+    """The metadata of an ``.mla`` file as plain data; ``source`` and ``user`` only on request."""
+    image = MLArray.open(filepath)
+    out = image.meta.to_dict()
+    if source:
+        out["source"] = [entry.to_dict() for entry in image.source]
+    if user:
+        out["user"] = image.user
+    return _json_safe(out)
 
 
-def _coord_system_alias(coord_system: Optional[str]) -> Optional[str]:
-    if coord_system in {"RAS", "RAS+"}:
-        return "RAS+"
-    if coord_system in {"LPS", "LPS+"}:
-        return "LPS+"
-    return coord_system
+def print_header(filepath: Union[str, Path], source: bool = False, user: bool = False) -> None:
+    """Print the metadata of an ``.mla`` file as JSON."""
+    print(json.dumps(header(filepath, source=source, user=user), indent=2, allow_nan=False))
 
 
-def print_header(filepath: Union[str, Path]) -> None:
-    """Print the MLArray metadata header for a file.
-
-    Args:
-        filepath: Path to a ".mla" file.
-    """
-    meta = MLArray(filepath).meta
-    if meta is None:
-        print("null")
-        return
-    print(json.dumps(meta.to_plain(include_none=True), indent=2, sort_keys=True))
-
-
-def convert_to_mlarray(load_filepath: Union[str, Path], save_filepath: Union[str, Path]):
-    _require_medvol()
-    image_meta_format = _source_format_for_path(load_filepath)
-    # Let MedVol auto-detect the backend (nibabel for NIfTI, pynrrd for NRRD).
-    # The default canonicalize=True reorients the array+affine to RAS+.
-    image_medvol = MedVol(load_filepath)
-    # MedVol canonical output uses nibabel's XYZ axis convention: axis 0 ≈ X, axis 1 ≈ Y,
-    # axis 2 ≈ Z, with affine column i = direction of array axis i.
-    # SlicerMLArray assumes ZYX order when axis_labels is None. Supply explicit XYZ labels so
-    # Slicer uses an identity permutation and the stored affine is used as-is.
-    ndim = image_medvol.array.ndim
-    if ndim == 3:
-        axis_labels = ["spatial_x", "spatial_y", "spatial_z"]
-    elif ndim == 2:
-        axis_labels = ["spatial_x", "spatial_y"]
-    else:
-        axis_labels = None  # 4D: non-spatial axis ambiguous; leave unlabeled
-    image_mlarray = MLArray(
-        image_medvol.array,
-        affine=image_medvol.affine,
-        meta=_header_to_source_meta(image_medvol.header),
-        axis_labels=axis_labels,
-    )
-    coord_system = _coord_system_alias(image_medvol.coordinate_system)
-    if coord_system is not None:
-        image_mlarray.meta.spatial.coord_system = coord_system
-    with _meta_internal_write():
-        image_mlarray.meta._image_meta_format = image_meta_format
-    image_mlarray.save(save_filepath)
-
-
-def convert_from_mlarray(load_filepath: Union[str, Path], save_filepath: Union[str, Path]):
-    _require_medvol()
-    image_mlarray = MLArray(load_filepath)
-    backend = _medvol_backend_for_path(save_filepath)
-
-    # MedVol always canonicalises to RAS+ on load, so data stored in an
-    # MLArray is in RAS+ orientation.  The only exception is legacy LPS+
-    # files created before that default existed.  Anything else (None,
-    # "unknown", custom strings) is therefore safely treated as RAS+.
-    stored_cs = image_mlarray.meta.spatial.coord_system
-    coordinate_system = "LPS+" if stored_cs in {"LPS", "LPS+"} else "RAS+"
-
-    header = dict(image_mlarray.meta.source.to_plain())
-    if _is_nrrd_path(save_filepath):
-        # Strip NRRD coordinate-system keys; pynrrd will re-set "space" from
-        # the coordinate_system we pass.  "NRRD_space" is a SimpleITK
-        # metadata artifact that must not appear in clean NRRD output.
-        header.pop("space", None)
-        header.pop("NRRD_space", None)
-
-    MedVol(
-        image_mlarray.to_numpy(),
-        affine=image_mlarray.affine,
-        header=header,
-        backend=backend,
-        coordinate_system=coordinate_system,
-        canonicalize=False,
-    ).save(save_filepath, backend=backend)
-
-
-def convert_image(load_filepath: Union[str, Path], save_filepath: Union[str, Path]):
-    if _is_medvol_path(load_filepath) and _is_mlarray_path(save_filepath):
-        convert_to_mlarray(load_filepath, save_filepath)
-        return
-
-    if _is_mlarray_path(load_filepath) and _is_medvol_path(save_filepath):
-        convert_from_mlarray(load_filepath, save_filepath)
-        return
-
+def convert_image(load_filepath: Union[str, Path], save_filepath: Union[str, Path]) -> None:
     raise RuntimeError(
-        "Supported conversions are NIfTI/NRRD -> MLArray and MLArray -> NIfTI/NRRD."
+        "mlarray_convert is not available on this development branch: conversion is being rebuilt "
+        "on MedVol 2, which writes MLArray v1 metadata."
     )
 
 
 def cli_print_header() -> None:
     parser = argparse.ArgumentParser(
         prog="mlarray_header",
-        description="Print the MLArray metadata header for a file.",
+        description="Print the metadata of an MLArray file as JSON.",
     )
     parser.add_argument("filepath", help="Path to a .mla file.")
+    parser.add_argument("--source", action="store_true", help="Also print the original metadata of converted files.")
+    parser.add_argument("--user", action="store_true", help="Also print the user metadata.")
     args = parser.parse_args()
-    print_header(args.filepath)
+    print_header(args.filepath, source=args.source, user=args.user)
 
 
 def cli_convert_to_mlarray() -> None:
@@ -214,13 +65,7 @@ def cli_convert_to_mlarray() -> None:
         prog="mlarray_convert",
         description="Convert between MLArray and NIfTI/NRRD files.",
     )
-    parser.add_argument(
-        "load_filepath",
-        help="Input path: MLArray (.mla), NIfTI (.nii.gz, .nii), or NRRD (.nrrd).",
-    )
-    parser.add_argument(
-        "save_filepath",
-        help="Output path: MLArray (.mla), NIfTI (.nii.gz, .nii), or NRRD (.nrrd).",
-    )
+    parser.add_argument("load_filepath", help="Input path.")
+    parser.add_argument("save_filepath", help="Output path.")
     args = parser.parse_args()
     convert_image(args.load_filepath, args.save_filepath)

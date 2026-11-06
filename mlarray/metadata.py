@@ -777,6 +777,16 @@ class Storage:
             compression = frozen(compression)
         return cls(compression=compression, unknown=unknown, **sizes)
 
+    def to_cparams(self, nthreads: Optional[int] = None):
+        """The recorded compression as ``blosc2.CParams``.
+
+        ``nthreads`` is a runtime choice and never stored; it defaults to
+        MLArray's 4 compression threads.
+        """
+        from mlarray.storage import cparams_from_compression
+
+        return cparams_from_compression(self.compression, nthreads=nthreads)
+
     def to_dict(self) -> Dict[str, Any]:
         out: Dict[str, Any] = {}
         for name in ("chunk_size", "block_size", "patch_size"):
@@ -1132,7 +1142,8 @@ class Meta:
         """Check the whole metadata against the spec and the array shape."""
         _validate_core(self._axes, self._spaces, self._values, self._shape)
         self.profiles = validate_profiles(self.profiles, self._axes, self._spaces, self._shape)
-        plain(self.user, "user", str_keys=False)
+        if self._user.loaded:  # undecoded user metadata is written back as it was read
+            plain(self.user, "user", str_keys=False)
 
     def _set_shape(self, shape: Optional[Sequence[int]], axes: Optional[Sequence] = None) -> None:
         """Bind the metadata to an array shape (internal), validating it."""
@@ -1219,10 +1230,18 @@ class Meta:
     @classmethod
     def from_dict(cls, data: Mapping, shape: Optional[Sequence[int]] = None,
                   source: Optional[_Lazy] = None, user: Optional[_Lazy] = None) -> "Meta":
-        """Build metadata from the plain content of the ``mlarray`` key."""
+        """Build metadata from the plain content of the ``mlarray`` key.
+
+        ``source`` and ``user`` entries in ``data`` (the format of
+        ``to_dict(include_lazy=True)``) are accepted too.
+        """
         data = _mapping(data, "mlarray")
         if "version" not in data:
             raise MetadataError("mlarray.version is required.")
+        if source is None and "source" in data:
+            source = _Lazy(_source_entries(data["source"]))
+        if user is None and "user" in data:
+            user = _Lazy(plain(_mapping(data["user"], "user"), "user", str_keys=False))
         meta = cls(
             axes=data.get("axes", []),
             spaces=data.get("spaces", []),
@@ -1232,7 +1251,7 @@ class Meta:
             storage=data.get("storage"),
             version=data["version"],
             writer=data.get("writer"),
-            unknown={k: v for k, v in data.items() if k not in cls._CORE_KEYS},
+            unknown={k: v for k, v in data.items() if k not in cls._CORE_KEYS + ("source", "user")},
             shape=shape,
         )
         if source is not None:

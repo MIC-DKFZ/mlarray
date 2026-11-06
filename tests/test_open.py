@@ -18,7 +18,7 @@ class TestOpen(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             array = _make_array()
             path = Path(tmpdir) / "sample.mla"
-            MLArray(array, meta={"case": "open-basic"}).save(path)
+            MLArray(array, user={"case": "open-basic"}).save(path)
 
             opened = MLArray.open(path, mmap_mode="r")
 
@@ -49,14 +49,14 @@ class TestOpen(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             array = _make_array(seed=3)
             path = Path(tmpdir) / "append-mode.mla"
-            MLArray(array, meta={"edited": False}).save(path)
+            MLArray(array, user={"edited": False}).save(path)
 
             opened = MLArray.open(path, mode="a", mmap_mode=None)
-            opened.meta.source["edited"] = True
+            opened.user["edited"] = True
             opened.close()
 
             reloaded = MLArray(path)
-            self.assertEqual(reloaded.meta.source["edited"], True)
+            self.assertEqual(reloaded.user["edited"], True)
 
     def test_open_raises_for_missing_file(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -93,7 +93,7 @@ class TestOpen(unittest.TestCase):
         for mode, mmap_mode in (("a", None), ("r", "r+")):
             with self.subTest(mode=mode, mmap_mode=mmap_mode), tempfile.TemporaryDirectory() as tmpdir:
                 path = Path(tmpdir) / "unchanged.mla"
-                MLArray(_make_array(seed=6), meta={"case": "unchanged"}).save(path)
+                MLArray(_make_array(seed=6), user={"case": "unchanged"}).save(path)
                 original_bytes = path.read_bytes()
 
                 MLArray.open(path, mode=mode, mmap_mode=mmap_mode)
@@ -113,10 +113,10 @@ class TestOpen(unittest.TestCase):
             MLArray(_make_array(seed=8)).save(path)
 
             opened = MLArray.open(path, mmap_mode="r+")
-            opened.spacing = [3, 3, 3]
+            opened.set_geometry(spacing=[3, 3, 3], space="patient")
             opened.flush()
 
-            self.assertEqual(MLArray(path).spacing, [3.0, 3.0, 3.0])
+            self.assertEqual(MLArray(path).spacing, (3.0, 3.0, 3.0))
 
     def test_context_manager_closes_and_persists_metadata(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -124,12 +124,12 @@ class TestOpen(unittest.TestCase):
             array = _make_array(seed=9)
             with MLArray.create(path, shape=array.shape, dtype=array.dtype) as created:
                 created[...] = array
-                created.spacing = [2, 2, 2]
+                created.set_geometry(spacing=[2, 2, 2], space="patient")
             self.assertIsNone(created.meta)
 
             with MLArray.open(path) as opened:
                 self.assertTrue(np.allclose(opened[...], array))
-                self.assertEqual(opened.spacing, [2.0, 2.0, 2.0])
+                self.assertEqual(opened.spacing, (2.0, 2.0, 2.0))
 
 
 if __name__ == "__main__":

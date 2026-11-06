@@ -12,10 +12,9 @@ import blosc2
 import numpy as np
 
 from mlarray import blosc2_layout_strategies as _layout
-from mlarray.meta import MetaBlosc2
+from mlarray.metadata import Storage
 
 MLARRAY_SUFFIX = "mla"
-MLARRAY_VERSION = "v0"
 MLARRAY_DEFAULT_PATCH_SIZE = 192
 
 
@@ -94,6 +93,45 @@ def portable_cparams(cparams: Union[Dict, blosc2.CParams]) -> Dict:
     return portable
 
 
+def compression_record(cparams: Union[Dict, blosc2.CParams]) -> Dict[str, Any]:
+    """Portable compression settings as recorded in ``storage.compression`` (spec 8).
+
+    Codec and filters are stored by name; only fields given in ``cparams``
+    are recorded (filters left to blosc2's default stay unrecorded), and
+    ``NOFILTER`` slots are dropped; ``["NOFILTER"]`` records "no filter".
+    """
+    portable = portable_cparams(cparams)
+    record: Dict[str, Any] = {}
+    if "codec" in portable:
+        record["codec"] = blosc2.Codec(portable["codec"]).name
+    if "clevel" in portable:
+        record["level"] = int(portable["clevel"])
+    if "filters" in portable:
+        filters = [blosc2.Filter(f).name for f in portable["filters"] if blosc2.Filter(f) != blosc2.Filter.NOFILTER]
+        record["filters"] = filters or ["NOFILTER"]  # explicitly no filter, unlike an absent entry
+    return record
+
+
+def cparams_from_compression(compression, nthreads: Optional[int] = None) -> blosc2.CParams:
+    """Compression parameters for a recorded ``storage.compression``.
+
+    Missing codec or level fall back to MLArray's defaults (LZ4HC, 5); missing
+    filters to blosc2's default. ``nthreads`` defaults to MLArray's 4.
+    """
+    compression = compression or {}
+    default = default_cparams()
+    kwargs: Dict[str, Any] = {
+        "codec": blosc2.Codec[compression["codec"]] if "codec" in compression else default["codec"],
+        "clevel": compression.get("level", default["clevel"]),
+        "nthreads": default["nthreads"] if nthreads is None else nthreads,
+    }
+    if "filters" in compression:
+        filters = [blosc2.Filter[name] for name in compression["filters"]]
+        kwargs["filters"] = filters
+        kwargs["filters_meta"] = [0] * len(filters)
+    return blosc2.CParams(**kwargs)
+
+
 def resolve_dparams(dparams: Optional[Union[Dict, blosc2.DParams]]) -> Union[Dict, blosc2.DParams]:
     """Resolve decompression params with MLArray defaults."""
     if dparams is None:
@@ -127,31 +165,31 @@ def normalize_patch_size(patch_size, num_spatial_axes: int) -> Optional[List[int
     return [int(value) for value in patch_size]
 
 
-def comp_blosc2_meta(meta_blosc2, patch_size, chunk_size, block_size, shape, dtype_itemsize, spatial_axis_mask, cparams, dparams, array=None) -> Tuple[MetaBlosc2, Union[Dict, blosc2.CParams]]:
-    """Compute and validate Blosc2 chunk/block metadata.
+def comp_layout(previous: Optional[Storage], patch_size, chunk_size, block_size, shape, dtype_itemsize, spatial_axis_mask, cparams, array=None) -> Tuple[Storage, Union[Dict, blosc2.CParams]]:
+    """Compute the blosc2 layout and compression of a new store.
 
     Args:
-        meta_blosc2 (Optional[MetaBlosc2]): Existing Blosc2 metadata to use
-            as defaults.
+        previous (Optional[Storage]): Layout recorded before (e.g. of a loaded
+            file); used when ``patch_size`` is ``"default"``: its patch size
+            first, then its chunk/block size, then the default patch size.
         patch_size (Optional[Union[int, List, Tuple, str]]): Patch size hint
-            or "default". See ``open``/``save`` for expected shapes.
+            over the spatial axes, ``"default"`` or None.
         chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
         block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
         shape (Union[List, Tuple, np.ndarray]): Full array shape including non-spatial axes.
         dtype_itemsize (int): Number of bytes per array element.
-        spatial_axis_mask (Optional[list[bool]]): Mask indicating for every axis whether it is spatial or not.
+        spatial_axis_mask (list[bool]): For every array axis whether it is spatial.
         cparams: Compression parameters, or None for the defaults.
-        dparams: Decompression parameters, or None for the defaults.
         array (Optional[np.ndarray]): The data to be compressed, if known.
             With the default compression parameters, the filter
             (NOFILTER or SHUFFLE) is then chosen per array as nnU-Net
             does; without data, blosc2's default (SHUFFLE) applies.
 
     Returns:
-        Tuple[MetaBlosc2, Union[Dict, blosc2.CParams]]: The validated Blosc2
-        metadata, which records the portable compression parameters (see
-        :func:`portable_cparams`), and the full compression parameters to
-        create the store with.
+        Tuple[Storage, Union[Dict, blosc2.CParams]]: The layout to record
+        (chunk and block size may be None when blosc2 chooses them; the
+        caller fills them in from the store) and the full compression
+        parameters to create the store with.
     """
     num_spatial_axes = sum(spatial_axis_mask)
     is_default_patch_size = isinstance(patch_size, str) and patch_size == "default"
@@ -161,12 +199,12 @@ def comp_blosc2_meta(meta_blosc2, patch_size, chunk_size, block_size, shape, dty
         raise RuntimeError("If either chunk/block size is used then both must be set.")
 
     if is_default_patch_size:
-        if meta_blosc2 is not None and meta_blosc2.patch_size is not None:  # Use previously loaded patch size, when patch size is not explicitly set and a patch size from a previously loaded image exists
-            patch_size = meta_blosc2.patch_size
-        elif meta_blosc2 is not None and (meta_blosc2.chunk_size is not None):
-            chunk_size = meta_blosc2.chunk_size
-            block_size = meta_blosc2.block_size
-        elif num_spatial_axes > 0:  # Use default patch size, when patch size is not explicitly set and no patch size from a previously loaded image exists
+        if previous is not None and previous.patch_size is not None:  # Reuse the patch size recorded before
+            patch_size = list(previous.patch_size)
+        elif previous is not None and previous.chunk_size is not None and previous.block_size is not None:
+            chunk_size = list(previous.chunk_size)
+            block_size = list(previous.block_size)
+        elif num_spatial_axes > 0:  # Default patch size
             patch_size = [MLARRAY_DEFAULT_PATCH_SIZE] * num_spatial_axes
         else:  # No spatial axis to optimize for: let Blosc2 choose the layout
             patch_size = None
@@ -181,6 +219,8 @@ def comp_blosc2_meta(meta_blosc2, patch_size, chunk_size, block_size, shape, dty
             "Set patch_size=None and provide chunk_size/block_size manually, "
             "or let Blosc2 determine the layout."
         )
+    if patch_size is not None and len(patch_size) != num_spatial_axes:
+        raise ValueError(f"patch_size needs one entry per spatial axis ({num_spatial_axes}), got {patch_size}.")
 
     if patch_size is not None and 0 in shape:
         # An array without elements has no layout to optimize; Blosc2 chooses one.
@@ -195,22 +235,29 @@ def comp_blosc2_meta(meta_blosc2, patch_size, chunk_size, block_size, shape, dty
 
     choose_filter = array is not None and chunk_size is not None and is_default_cparams(cparams)
     cparams = resolve_cparams(cparams)
-    dparams = resolve_dparams(dparams)
     if choose_filter:
         cparams = dict(cparams)
         cparams["filters"] = [_layout.select_blosc2_filter(
             array, chunk_size, block_size, codec=cparams["codec"], clevel=cparams["clevel"],
         )]
 
-    meta_blosc2 = MetaBlosc2(
-        chunk_size=chunk_size,
-        block_size=block_size,
-        patch_size=patch_size,
-        cparams=portable_cparams(cparams),
-        dparams=dparams,
-    )
-    meta_blosc2._validate_and_cast(ndims=len(shape), spatial_ndims=num_spatial_axes)
-    return meta_blosc2, cparams
+    for name, value in (("chunk_size", chunk_size), ("block_size", block_size)):
+        if value is not None:
+            value = [value] * len(shape) if isinstance(value, (int, np.integer)) else list(value)
+            if len(value) != len(shape):
+                raise ValueError(f"{name} needs one entry per array axis ({len(shape)}), got {value}.")
+        if name == "chunk_size":
+            chunk_size = value
+        else:
+            block_size = value
+
+    storage = Storage.from_dict({
+        "chunk_size": chunk_size,
+        "block_size": block_size,
+        "patch_size": patch_size,
+        "compression": compression_record(cparams),
+    })
+    return storage, cparams
 
 
 # ----------------------------------------------------------------------------
@@ -230,15 +277,16 @@ def load_into_memory(filepath, dparams) -> blosc2.NDArray:
     )
     for i in range(ondisk.schunk.nchunks):
         in_memory.schunk.update_chunk(i, ondisk.schunk.get_chunk(i))
-    for key, value in ondisk.schunk.vlmeta.getall().items():
-        in_memory.schunk.vlmeta[key] = value
+    # Raw copy: decoding vlmeta through blosc2 is unsafe for untrusted files.
+    for key in ondisk.schunk.vlmeta.keys():
+        in_memory.schunk.vlmeta.set_vlmeta(key, ondisk.schunk.vlmeta.get_vlmeta(key), typesize=1)
     return in_memory
 
 
 def save_atomically(store, filepath, write_metadata: Callable[[Any], None]) -> None:
     """Save ``store`` to ``filepath`` through a temporary file next to it.
 
-    ``write_metadata`` receives the vlmeta of the temporary file. The target
+    ``write_metadata`` receives the opened temporary file. The target
     is replaced with ``os.replace`` only once the file is complete; on any
     error the temporary file is removed and the target is left untouched.
     """
@@ -249,7 +297,7 @@ def save_atomically(store, filepath, write_metadata: Callable[[Any], None]) -> N
     try:
         store.save(tmp_filepath)
         saved = blosc2.open(urlpath=tmp_filepath, mode="a")
-        write_metadata(saved.schunk.vlmeta)
+        write_metadata(saved)
         del saved
         os.replace(tmp_filepath, str(filepath))
     except BaseException:

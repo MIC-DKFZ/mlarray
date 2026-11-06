@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 
 from mlarray import MLArray, MLARRAY_DEFAULT_PATCH_SIZE
-from mlarray.meta import Meta
+from mlarray.metadata import MetadataError
 
 
 def _make_array(shape=(16, 32, 32), seed=0):
@@ -72,83 +72,74 @@ class TestUsage(unittest.TestCase):
             array = _make_array()
             image = MLArray(
                 array,
-                spacing=(1.0, 1.0, 1.5),
+                axes=["z", "y", "x"],
+                spacing=(1.5, 1.0, 1.0),
                 origin=(10.0, 10.0, 30.0),
-                direction=[[1, 0, 0], [0, 1, 0], [0, 0, 1]],
-                meta=Meta(source={"patient_id": "123", "modality": "CT"}, is_seg=False),
+                direction=[[0, 0, 1], [0, 1, 0], [1, 0, 0]],
+                space="patient",
+                values={"kind": "measurement", "unit": "hounsfield_unit"},
+                user={"patient_id": "123", "modality": "CT"},
             )
-            image.spacing[1] = 5.3
-            image.meta.source["study_id"] = "study-001"
+            image.set_geometry(spacing=(1.5, 5.3, 1.0))
+            image.user["study_id"] = "study-001"
 
             path = Path(tmpdir) / "with-metadata.mla"
             image.save(path)
 
             loaded = MLArray(path)
-            self.assertEqual(loaded.spacing, [1.0, 5.3, 1.5])
-            self.assertEqual(loaded.origin, [10.0, 10.0, 30.0])
-            self.assertEqual(loaded.meta.source["study_id"], "study-001")
+            self.assertEqual(loaded.spacing, (1.5, 5.3, 1.0))
+            self.assertEqual(loaded.origin, (10.0, 10.0, 30.0))
+            self.assertEqual(loaded.letter_codes(), ("S", "P", "L"))
+            self.assertEqual(loaded.values.unit_code, "[hnsf'U]")
+            self.assertEqual(loaded.user["study_id"], "study-001")
 
-    def test_mlarray_spatial_property_setters(self):
-        array = _make_array(shape=(8, 8, 8))
-        image = MLArray(array)
+    def test_geometry_is_derived_and_changed_through_set_geometry(self):
+        image = MLArray(_make_array(shape=(8, 8, 8)))
+        self.assertIsNone(image.spacing)
+        with self.assertRaises(AttributeError):
+            image.spacing = [0.1, 0.2, 0.3]
 
-        image.spacing = [0.1, 0.2, 0.3]
-        image.origin = [1.0, 2.0, 3.0]
-        image.direction = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+        image.set_geometry(spacing=[0.1, 0.2, 0.3], origin=[1.0, 2.0, 3.0], space="patient")
+        self.assertEqual(image.spacing, (0.1, 0.2, 0.3))
+        self.assertEqual(image.origin, (1.0, 2.0, 3.0))
+        np.testing.assert_array_equal(image.direction, np.eye(3))
+        image.set_geometry(origin=[0.0, 0.0, 0.0])
+        self.assertEqual(image.spacing, (0.1, 0.2, 0.3))
+        np.testing.assert_allclose(image.matrix(), np.diag([0.1, 0.2, 0.3, 1.0]))
 
-        self.assertEqual(image.spacing, [0.1, 0.2, 0.3])
-        self.assertEqual(image.origin, [1.0, 2.0, 3.0])
-        self.assertEqual(image.direction, [[1, 0, 0], [0, 1, 0], [0, 0, 1]])
-
-        with self.assertRaises(ValueError):
-            image.affine = [
-                [1.0, 0.0, 0.0, 10.0],
-                [0.0, 1.0, 0.0, 20.0],
-                [0.0, 0.0, 1.0, 30.0],
-                [0.0, 0.0, 0.0, 1.0],
-            ]
-
-        image.spacing = None
-        image.origin = None
-        image.direction = None
-        image.affine = [
-            [1.0, 0.0, 0.0, 10.0],
-            [0.0, 1.0, 0.0, 20.0],
-            [0.0, 0.0, 1.0, 30.0],
-            [0.0, 0.0, 0.0, 1.0],
-        ]
-        self.assertEqual(image.affine, [
-            [1.0, 0.0, 0.0, 10.0],
-            [0.0, 1.0, 0.0, 20.0],
-            [0.0, 0.0, 1.0, 30.0],
-            [0.0, 0.0, 0.0, 1.0],
-        ])
-
-    def test_affine_stored_in_meta_spatial(self):
-        array = _make_array(shape=(8, 8, 8))
-        affine = [
-            [1.0, 0.0, 0.0, 10.0],
+    def test_explicit_space_with_matrix(self):
+        matrix = [
+            [0.0, 0.0, 1.0, 10.0],
             [0.0, 2.0, 0.0, 20.0],
-            [0.0, 0.0, 3.0, 30.0],
+            [-3.0, 0.0, 0.0, 30.0],
             [0.0, 0.0, 0.0, 1.0],
         ]
-        image = MLArray(array, affine=affine)
+        image = MLArray(
+            _make_array(shape=(8, 8, 8)),
+            axes=["z", "y", "x"],
+            spaces=[{
+                "name": "patient",
+                "axes": [
+                    {"name": "x", "unit": "millimeter", "increases_toward": "left"},
+                    {"name": "y", "unit": "millimeter", "increases_toward": "posterior"},
+                    {"name": "z", "unit": "millimeter", "increases_toward": "superior"},
+                ],
+                "from_array": {"array_axes": ["z", "y", "x"], "matrix": matrix},
+            }],
+        )
+        np.testing.assert_array_equal(image.matrix(), matrix)
+        self.assertEqual(image.spacing, (3.0, 2.0, 1.0))
+        self.assertEqual(image.origin, (10.0, 20.0, 30.0))
+        self.assertEqual(image.letter_codes(), ("I", "P", "L"))
 
-        self.assertEqual(image.meta.spatial.affine, affine)
-        self.assertIsNone(image.meta.spatial.spacing)
-        self.assertIsNone(image.meta.spatial.origin)
-        self.assertIsNone(image.meta.spatial.direction)
-
-    def test_affine_and_spacing_origin_direction_mix_raises(self):
+    def test_geometry_needs_a_declared_space(self):
         array = _make_array(shape=(8, 8, 8))
-        affine = [
-            [1.0, 0.0, 0.0, 10.0],
-            [0.0, 1.0, 0.0, 20.0],
-            [0.0, 0.0, 1.0, 30.0],
-            [0.0, 0.0, 0.0, 1.0],
-        ]
+        with self.assertRaises(MetadataError):
+            MLArray(array, spacing=(1.0, 1.0, 1.0))
         with self.assertRaises(ValueError):
-            MLArray(array, spacing=(1.0, 1.0, 1.0), affine=affine)
+            MLArray(array, spacing=(1.0, 1.0, 1.0), space="patient", spaces=[])
+        with self.assertRaises(MetadataError):
+            MLArray(array).matrix()
 
     def test_copy_metadata_with_override(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -157,21 +148,28 @@ class TestUsage(unittest.TestCase):
                 array,
                 spacing=(1.0, 1.0, 1.0),
                 origin=(1.0, 2.0, 3.0),
-                direction=[[1, 0, 0], [0, 1, 0], [0, 0, 1]],
-                meta=Meta(source={"source": "base"}, is_seg=True),
+                space="patient",
+                values={"kind": "label", "labels": {"1": {"name": "liver"}}},
+                user={"case": "base"},
+                source=[{"format": "nifti", "header": {"descrip": "base"}}],
+                profiles={"ml": {"statistics": {"min": 0, "max": 1}, "split": "train"}},
             )
             base_path = Path(tmpdir) / "base.mla"
             base.save(base_path)
 
             base_loaded = MLArray(base_path)
             array2 = _make_array(seed=1)
-            image = MLArray(array2, spacing=(0.8, 0.8, 1.0), copy=base_loaded)
+            image = MLArray(array2, spacing=(0.8, 0.8, 1.0), space="patient", copy=base_loaded)
 
-            self.assertEqual(image.spacing, [0.8, 0.8, 1.0])
+            self.assertEqual(image.spacing, (0.8, 0.8, 1.0))
             self.assertEqual(image.origin, base_loaded.origin)
-            self.assertEqual(image.direction, base_loaded.direction)
-            self.assertEqual(image.meta.is_seg, base_loaded.meta.is_seg)
-            self.assertEqual(image.meta.source, base_loaded.meta.source)
+            np.testing.assert_array_equal(image.direction, base_loaded.direction)
+            self.assertEqual(image.values, base_loaded.values)
+            self.assertEqual(image.user, {"case": "base"})
+            self.assertEqual(image.profiles["ml"], {"split": "train"})
+            self.assertEqual(image.source, ())
+            with_source = MLArray(array2, copy=base_loaded, copy_source=True)
+            self.assertEqual(with_source.source[0].header["descrip"], "base")
 
     def test_patch_size_default(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -181,8 +179,8 @@ class TestUsage(unittest.TestCase):
 
             loaded = MLArray(path)
             self.assertEqual(
-                loaded.meta.blosc2.patch_size,
-                [MLARRAY_DEFAULT_PATCH_SIZE,] * 3,
+                loaded.meta.storage.patch_size,
+                (MLARRAY_DEFAULT_PATCH_SIZE,) * 3,
             )
 
     def test_patch_size_isotropic(self):
@@ -192,7 +190,7 @@ class TestUsage(unittest.TestCase):
             MLArray(array, patch_size=64).save(path)
 
             loaded = MLArray(path)
-            self.assertEqual(loaded.meta.blosc2.patch_size, [64, 64, 64])
+            self.assertEqual(loaded.meta.storage.patch_size, (64, 64, 64))
 
     def test_patch_size_non_isotropic(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -201,7 +199,7 @@ class TestUsage(unittest.TestCase):
             MLArray(array, patch_size=[16, 24, 32]).save(path)
 
             loaded = MLArray(path)
-            self.assertEqual(loaded.meta.blosc2.patch_size, [16, 24, 32])
+            self.assertEqual(loaded.meta.storage.patch_size, (16, 24, 32))
 
     def test_manual_chunk_and_block(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -215,8 +213,8 @@ class TestUsage(unittest.TestCase):
             ).save(path)
 
             loaded = MLArray(path)
-            self.assertEqual(loaded.meta.blosc2.chunk_size, [1, 16, 16])
-            self.assertEqual(loaded.meta.blosc2.block_size, [1, 8, 8])
+            self.assertEqual(loaded.meta.storage.chunk_size, (1, 16, 16))
+            self.assertEqual(loaded.meta.storage.block_size, (1, 8, 8))
 
     def test_b2nd_extension_not_supported(self):
         with tempfile.TemporaryDirectory() as tmpdir:

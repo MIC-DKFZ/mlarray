@@ -8,7 +8,7 @@ import blosc2
 import numpy as np
 
 from mlarray import MLArray
-from mlarray.meta import Meta
+from mlarray.metadata import Meta
 
 
 def _make_array(shape=(8, 16, 16), seed=0):
@@ -19,12 +19,12 @@ def _make_array(shape=(8, 16, 16), seed=0):
 class TestAsArray(unittest.TestCase):
     def test_asarray_creates_blosc2_store_and_meta(self):
         array = _make_array()
-        image = MLArray.asarray(array, meta={"case_id": "plain"})
+        image = MLArray.asarray(array, meta={"user": {"case_id": "plain"}})
 
         self.assertFalse(isinstance(image._store, np.ndarray))
         self.assertEqual(image.shape, array.shape)
         self.assertTrue(np.allclose(image.to_numpy(), array))
-        self.assertEqual(image.meta.source.to_plain(), {"case_id": "plain"})
+        self.assertEqual(image.user, {"case_id": "plain"})
 
     def test_asarray_calls_blosc2_asarray(self):
         array = _make_array()
@@ -50,8 +50,8 @@ class TestAsArray(unittest.TestCase):
 
             self.assertFalse(isinstance(image._store, np.ndarray))
             self.assertTrue(np.allclose(image.to_numpy(), array))
-            self.assertEqual(image.meta.blosc2.chunk_size, [1, 8, 8])
-            self.assertEqual(image.meta.blosc2.block_size, [1, 4, 4])
+            self.assertEqual(image.meta.storage.chunk_size, (1, 8, 8))
+            self.assertEqual(image.meta.storage.block_size, (1, 4, 4))
 
             path = Path(tmpdir) / "asarray-compressed.mla"
             image.save(path)
@@ -60,27 +60,27 @@ class TestAsArray(unittest.TestCase):
 
     def test_asarray_accepts_meta_object(self):
         array = _make_array(seed=2)
-        meta = Meta(source={"patient_id": "p-001"}, is_seg=True)
+        meta = Meta(user={"patient_id": "p-001"}, values={"kind": "label"})
         image = MLArray.asarray(array, meta=meta)
 
-        self.assertEqual(image.meta.source.to_plain(), {"patient_id": "p-001"})
-        self.assertTrue(image.meta.is_seg)
+        self.assertEqual(image.user, {"patient_id": "p-001"})
+        self.assertEqual(image.values.kind, "label")
 
     def test_asarray_uncompressed_numpy_store_and_save(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             array = _make_array(seed=3)
-            image = MLArray.asarray(array, meta={"case_id": "np"}, compressed=False)
+            image = MLArray.asarray(array, meta={"user": {"case_id": "np"}}, compressed=False)
 
             self.assertTrue(isinstance(image._store, np.ndarray))
             self.assertTrue(np.allclose(image.to_numpy(), array))
-            self.assertEqual(image.meta.source.to_plain(), {"case_id": "np"})
+            self.assertEqual(image.user, {"case_id": "np"})
 
             path = Path(tmpdir) / "asarray-numpy-save.mla"
             image.save(path)
             loaded = MLArray(path)
             self.assertFalse(isinstance(loaded._store, np.ndarray))
             self.assertTrue(np.allclose(loaded.to_numpy(), array))
-            self.assertEqual(loaded.meta.source.to_plain(), {"case_id": "np"})
+            self.assertEqual(loaded.user, {"case_id": "np"})
 
 
     def test_asarray_keeps_zero_dimensional_shape(self):
@@ -119,19 +119,19 @@ class TestAsArray(unittest.TestCase):
 
     def test_zero_length_axes_save_and_load(self):
         cases = {
-            "compressed": lambda: MLArray(np.zeros((0, 10, 10), dtype=np.float32), spacing=(1, 2, 3)),
-            "uncompressed": lambda: MLArray(np.zeros((0, 10, 10), dtype=np.float32), spacing=(1, 2, 3), compressed=False),
+            "compressed": lambda: MLArray(np.zeros((0, 10, 10), dtype=np.float32), spacing=(1, 2, 3), space="patient"),
+            "uncompressed": lambda: MLArray(np.zeros((0, 10, 10), dtype=np.float32), spacing=(1, 2, 3), space="patient", compressed=False),
         }
         for name, make in cases.items():
             with self.subTest(case=name), tempfile.TemporaryDirectory() as tmpdir:
                 path = Path(tmpdir) / "empty.mla"
                 image = make()
-                self.assertIsNone(image.meta.blosc2.patch_size)
+                self.assertIsNone(image.meta.storage.patch_size)
                 image.save(path)
                 loaded = MLArray(path)
                 self.assertEqual(loaded.shape, (0, 10, 10))
                 self.assertEqual(loaded.to_numpy().shape, (0, 10, 10))
-                self.assertEqual(loaded.spacing, [1.0, 2.0, 3.0])
+                self.assertEqual(loaded.spacing, (1.0, 2.0, 3.0))
 
     def test_create_with_zero_length_axis(self):
         with tempfile.TemporaryDirectory() as tmpdir:

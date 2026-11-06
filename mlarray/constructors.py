@@ -3,15 +3,15 @@
 ``MLArray`` inherits them from :class:`MLArrayConstructors`.
 """
 
-from copy import deepcopy
 import math
+from collections.abc import Mapping
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import blosc2
 import numpy as np
 
 from mlarray import storage as _storage
-from mlarray.meta import Meta, _meta_internal_write, _spatial_axis_mask
+from mlarray.metadata import Meta
 
 
 class MLArrayConstructors:
@@ -22,7 +22,7 @@ class MLArrayConstructors:
             cls,
             shape: Union[int, List, Tuple, np.ndarray],
             dtype: np.dtype = None,
-            meta: Optional[Union[Dict, Meta]] = None,
+            meta: Optional[Union[Meta, Mapping]] = None,
             patch_size: Optional[Union[int, List, Tuple]] = "default",
             chunk_size: Optional[Union[int, List, Tuple]] = None,
             block_size: Optional[Union[int, List, Tuple]] = None,
@@ -37,9 +37,8 @@ class MLArrayConstructors:
                 array.
             dtype (np.dtype): Numpy dtype for the output array. If None, uses
                 ``blosc2.DEFAULT_FLOAT``.
-            meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
-                the created ``MLArray``. Dict values are stored as
-                ``meta.source``.
+            meta (Optional[Union[Meta, Mapping]]): Metadata of the created
+                ``MLArray`` (copied), e.g. ``{"axes": [...], "spaces": [...]}``.
             patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
                 chunk/block optimization. Use ``"default"`` to use the default
                 patch size of 192.
@@ -76,7 +75,7 @@ class MLArrayConstructors:
             cls,
             shape: Union[int, List, Tuple, np.ndarray],
             dtype: np.dtype = None,
-            meta: Optional[Union[Dict, Meta]] = None,
+            meta: Optional[Union[Meta, Mapping]] = None,
             patch_size: Optional[Union[int, List, Tuple]] = "default",
             chunk_size: Optional[Union[int, List, Tuple]] = None,
             block_size: Optional[Union[int, List, Tuple]] = None,
@@ -91,8 +90,8 @@ class MLArrayConstructors:
                 array.
             dtype (np.dtype): Numpy dtype for the output array. If None, uses
                 ``blosc2.DEFAULT_FLOAT``.
-            meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
-                the created ``MLArray``.
+            meta (Optional[Union[Meta, Mapping]]): Metadata of the created
+                ``MLArray`` (copied).
             patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
                 chunk/block optimization.
             chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
@@ -128,7 +127,7 @@ class MLArrayConstructors:
             cls,
             shape: Union[int, List, Tuple, np.ndarray],
             dtype: np.dtype = None,
-            meta: Optional[Union[Dict, Meta]] = None,
+            meta: Optional[Union[Meta, Mapping]] = None,
             patch_size: Optional[Union[int, List, Tuple]] = "default",
             chunk_size: Optional[Union[int, List, Tuple]] = None,
             block_size: Optional[Union[int, List, Tuple]] = None,
@@ -143,8 +142,8 @@ class MLArrayConstructors:
                 array.
             dtype (np.dtype): Numpy dtype for the output array. If None, uses
                 ``blosc2.DEFAULT_FLOAT``.
-            meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
-                the created ``MLArray``.
+            meta (Optional[Union[Meta, Mapping]]): Metadata of the created
+                ``MLArray`` (copied).
             patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
                 chunk/block optimization.
             chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
@@ -181,7 +180,7 @@ class MLArrayConstructors:
             shape: Union[int, List, Tuple, np.ndarray],
             fill_value: Union[bytes, int, float, bool],
             dtype: np.dtype = None,
-            meta: Optional[Union[Dict, Meta]] = None,
+            meta: Optional[Union[Meta, Mapping]] = None,
             patch_size: Optional[Union[int, List, Tuple]] = "default",
             chunk_size: Optional[Union[int, List, Tuple]] = None,
             block_size: Optional[Union[int, List, Tuple]] = None,
@@ -198,8 +197,8 @@ class MLArrayConstructors:
                 elements in the output.
             dtype (np.dtype): Numpy dtype for the output array. If None, inferred
                 from ``fill_value``.
-            meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
-                the created ``MLArray``.
+            meta (Optional[Union[Meta, Mapping]]): Metadata of the created
+                ``MLArray`` (copied).
             patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
                 chunk/block optimization.
             chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
@@ -244,7 +243,7 @@ class MLArrayConstructors:
             dtype: np.dtype = None,
             shape: Optional[Union[int, List, Tuple, np.ndarray]] = None,
             c_order: bool = True,
-            meta: Optional[Union[Dict, Meta]] = None,
+            meta: Optional[Union[Meta, Mapping]] = None,
             patch_size: Optional[Union[int, List, Tuple]] = None,
             chunk_size: Optional[Union[int, List, Tuple]] = None,
             block_size: Optional[Union[int, List, Tuple]] = None,
@@ -267,8 +266,8 @@ class MLArrayConstructors:
             shape (Optional[Union[int, List, Tuple, np.ndarray]]): Target output
                 shape. If None, shape is inferred from start/stop/step.
             c_order (bool): Store in C order (row-major) if True.
-            meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
-                the created ``MLArray``.
+            meta (Optional[Union[Meta, Mapping]]): Metadata of the created
+                ``MLArray`` (copied).
             patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
                 chunk/block optimization. Defaults to None for this method.
             chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
@@ -339,7 +338,7 @@ class MLArrayConstructors:
             endpoint: bool = True,
             shape: Optional[Union[int, List, Tuple, np.ndarray]] = None,
             c_order: bool = True,
-            meta: Optional[Union[Dict, Meta]] = None,
+            meta: Optional[Union[Meta, Mapping]] = None,
             patch_size: Optional[Union[int, List, Tuple]] = None,
             chunk_size: Optional[Union[int, List, Tuple]] = None,
             block_size: Optional[Union[int, List, Tuple]] = None,
@@ -363,8 +362,8 @@ class MLArrayConstructors:
             shape (Optional[Union[int, List, Tuple, np.ndarray]]): Target output
                 shape. If None, inferred from ``num``.
             c_order (bool): Store in C order (row-major) if True.
-            meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
-                the created ``MLArray``.
+            meta (Optional[Union[Meta, Mapping]]): Metadata of the created
+                ``MLArray`` (copied).
             patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
                 chunk/block optimization. Defaults to None for this method.
             chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
@@ -428,7 +427,7 @@ class MLArrayConstructors:
     def asarray(
             cls,
             array: Union[np.ndarray],
-            meta: Optional[Union[Dict, Meta]] = None,
+            meta: Optional[Union[Meta, Mapping]] = None,
             patch_size: Optional[Union[int, List, Tuple]] = 'default',  # 'default' means that the default of 192 is used. However, if set to 'default', the patch_size will be skipped if self.patch_size is set from a previously loaded MLArray image. In that case the self.patch_size is used.
             chunk_size: Optional[Union[int, List, Tuple]]= None,
             block_size: Optional[Union[int, List, Tuple]] = None,
@@ -440,9 +439,8 @@ class MLArrayConstructors:
 
         Args:
             array (Union[np.ndarray]): Input array to convert to MLArray.
-            meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
-                the created ``MLArray``. Dict values are stored as
-                ``meta.source``.
+            meta (Optional[Union[Meta, Mapping]]): Metadata of the created
+                ``MLArray`` (copied), e.g. ``{"axes": [...], "spaces": [...]}``.
             patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
                 chunk/block optimization. Provide an int for isotropic sizes or
                 a list/tuple with length equal to the number of dimensions.
@@ -501,7 +499,7 @@ class MLArrayConstructors:
             cls,
             x,
             dtype: np.dtype = None,
-            meta: Optional[Union[Dict, Meta]] = None,
+            meta: Optional[Union[Meta, Mapping]] = None,
             patch_size: Optional[Union[int, List, Tuple]] = "default",
             chunk_size: Optional[Union[int, List, Tuple]] = None,
             block_size: Optional[Union[int, List, Tuple]] = None,
@@ -515,9 +513,11 @@ class MLArrayConstructors:
             x: Source object. Can be an ``MLArray`` or any array-like object
                 exposing ``shape`` and ``dtype``.
             dtype (np.dtype): Output dtype. If None, inferred from ``x``.
-            meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
-                the created ``MLArray``. If ``x`` is an ``MLArray`` and ``meta``
-                is None, metadata is copied from ``x``.
+            meta (Optional[Union[Meta, Mapping]]): Metadata of the created
+                ``MLArray`` (copied). If ``x`` is an ``MLArray`` and ``meta``
+                is None, its geometry, values (without labels), profiles and
+                user metadata are copied, but not its history, ``ml``
+                statistics and boxes, or ``source``.
             patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
                 chunk/block optimization.
             chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
@@ -554,7 +554,7 @@ class MLArrayConstructors:
             cls,
             x,
             dtype: np.dtype = None,
-            meta: Optional[Union[Dict, Meta]] = None,
+            meta: Optional[Union[Meta, Mapping]] = None,
             patch_size: Optional[Union[int, List, Tuple]] = "default",
             chunk_size: Optional[Union[int, List, Tuple]] = None,
             block_size: Optional[Union[int, List, Tuple]] = None,
@@ -568,9 +568,11 @@ class MLArrayConstructors:
             x: Source object. Can be an ``MLArray`` or any array-like object
                 exposing ``shape`` and ``dtype``.
             dtype (np.dtype): Output dtype. If None, inferred from ``x``.
-            meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
-                the created ``MLArray``. If ``x`` is an ``MLArray`` and ``meta``
-                is None, metadata is copied from ``x``.
+            meta (Optional[Union[Meta, Mapping]]): Metadata of the created
+                ``MLArray`` (copied). If ``x`` is an ``MLArray`` and ``meta``
+                is None, its geometry, values (without labels), profiles and
+                user metadata are copied, but not its history, ``ml``
+                statistics and boxes, or ``source``.
             patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
                 chunk/block optimization.
             chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
@@ -607,7 +609,7 @@ class MLArrayConstructors:
             cls,
             x,
             dtype: np.dtype = None,
-            meta: Optional[Union[Dict, Meta]] = None,
+            meta: Optional[Union[Meta, Mapping]] = None,
             patch_size: Optional[Union[int, List, Tuple]] = "default",
             chunk_size: Optional[Union[int, List, Tuple]] = None,
             block_size: Optional[Union[int, List, Tuple]] = None,
@@ -621,9 +623,11 @@ class MLArrayConstructors:
             x: Source object. Can be an ``MLArray`` or any array-like object
                 exposing ``shape`` and ``dtype``.
             dtype (np.dtype): Output dtype. If None, inferred from ``x``.
-            meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
-                the created ``MLArray``. If ``x`` is an ``MLArray`` and ``meta``
-                is None, metadata is copied from ``x``.
+            meta (Optional[Union[Meta, Mapping]]): Metadata of the created
+                ``MLArray`` (copied). If ``x`` is an ``MLArray`` and ``meta``
+                is None, its geometry, values (without labels), profiles and
+                user metadata are copied, but not its history, ``ml``
+                statistics and boxes, or ``source``.
             patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
                 chunk/block optimization.
             chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
@@ -661,7 +665,7 @@ class MLArrayConstructors:
             x,
             fill_value: Union[bool, int, float, complex],
             dtype: np.dtype = None,
-            meta: Optional[Union[Dict, Meta]] = None,
+            meta: Optional[Union[Meta, Mapping]] = None,
             patch_size: Optional[Union[int, List, Tuple]] = "default",
             chunk_size: Optional[Union[int, List, Tuple]] = None,
             block_size: Optional[Union[int, List, Tuple]] = None,
@@ -677,9 +681,11 @@ class MLArrayConstructors:
             fill_value (Union[bool, int, float, complex]): Fill value used for
                 all elements in the output.
             dtype (np.dtype): Output dtype. If None, inferred from ``x``.
-            meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
-                the created ``MLArray``. If ``x`` is an ``MLArray`` and ``meta``
-                is None, metadata is copied from ``x``.
+            meta (Optional[Union[Meta, Mapping]]): Metadata of the created
+                ``MLArray`` (copied). If ``x`` is an ``MLArray`` and ``meta``
+                is None, its geometry, values (without labels), profiles and
+                user metadata are copied, but not its history, ``ml``
+                statistics and boxes, or ``source``.
             patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
                 chunk/block optimization.
             chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
@@ -715,7 +721,7 @@ class MLArrayConstructors:
     def _asarray(
             self,
             array: Union[np.ndarray],
-            meta: Optional[Union[Dict, Meta]] = None,
+            meta: Optional[Union[Meta, Mapping]] = None,
             patch_size: Optional[Union[int, List, Tuple]] = 'default',  # 'default' means that the default of 192 is used. However, if set to 'default', the patch_size will be skipped if self.patch_size is set from a previously loaded MLArray image. In that case the self.patch_size is used.
             chunk_size: Optional[Union[int, List, Tuple]]= None,
             block_size: Optional[Union[int, List, Tuple]] = None,
@@ -727,9 +733,8 @@ class MLArrayConstructors:
 
         Args:
             array (Union[np.ndarray]): Input array to convert to MLArray.
-            meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
-                the created ``MLArray``. Dict values are stored as
-                ``meta.source``.
+            meta (Optional[Union[Meta, Mapping]]): Metadata of the created
+                ``MLArray`` (copied), e.g. ``{"axes": [...], "spaces": [...]}``.
             patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
                 chunk/block optimization. Provide an int for isotropic sizes or
                 a list/tuple with length equal to the number of dimensions.
@@ -782,7 +787,7 @@ class MLArrayConstructors:
             shape: Optional[Union[int, List, Tuple, np.ndarray]] = None,
             dtype: Optional[np.dtype] = None,
             source_array: Optional[np.ndarray] = None,
-            meta: Optional[Union[Dict, Meta]] = None,
+            meta: Optional[Union[Meta, Mapping]] = None,
             patch_size: Optional[Union[int, List, Tuple]] = "default",
             chunk_size: Optional[Union[int, List, Tuple]] = None,
             block_size: Optional[Union[int, List, Tuple]] = None,
@@ -801,9 +806,8 @@ class MLArrayConstructors:
             constructor (str): Constructor operation name.
             source_array (Optional[np.ndarray]): Source array that should be
                 converted into an in-memory Blosc2-backed store.
-            meta (Optional[Union[Dict, Meta]]): Optional metadata attached to
-                the created ``MLArray``. Dict values are stored as
-                ``meta.source``.
+            meta (Optional[Union[Meta, Mapping]]): Metadata of the created
+                ``MLArray`` (copied), e.g. ``{"axes": [...], "spaces": [...]}``.
             patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
                 chunk/block optimization. Use ``"default"`` to use the default
                 patch size of 192.
@@ -838,36 +842,27 @@ class MLArrayConstructors:
             shape = _storage.normalize_shape(shape)
             dtype = np.dtype(dtype)
 
-        self._validate_and_add_meta(meta, has_array=True)
-        spatial_axis_mask = (
-            [True] * len(shape)
-            if self.meta.spatial.axis_labels is None
-            else _spatial_axis_mask(self.meta.spatial.axis_labels)
+        meta = self._coerce_meta(meta, shape)
+        storage, cparams = _storage.comp_layout(
+            meta.storage,
+            patch_size,
+            chunk_size,
+            block_size,
+            shape,
+            dtype.itemsize,
+            self._space_axis_mask(meta),
+            cparams,
+            array=source_array,
         )
-
-        with _meta_internal_write():
-            self.meta.blosc2, cparams = _storage.comp_blosc2_meta(
-                self.meta.blosc2,
-                patch_size,
-                chunk_size,
-                block_size,
-                shape,
-                dtype.itemsize,
-                spatial_axis_mask,
-                cparams,
-                dparams,
-                array=source_array,
-            )
-            self.meta._has_array.has_array = True
 
         backend_lib = blosc2 if compressed else np
         blosc2_storage_kwargs = {}
         if compressed:
             blosc2_storage_kwargs = {
-                "chunks": self.meta.blosc2.chunk_size,
-                "blocks": self.meta.blosc2.block_size,
+                "chunks": storage.chunk_size,
+                "blocks": storage.block_size,
                 "cparams": cparams,
-                "dparams": _storage.resolve_dparams(self.meta.blosc2.dparams),
+                "dparams": _storage.resolve_dparams(dparams),
             }
 
         if constructor == "asarray":
@@ -896,9 +891,9 @@ class MLArrayConstructors:
         self._backend = "blosc2" if compressed else "numpy"
 
         self.support_metadata = True
-
-        self._validate_and_add_meta(self.meta)
-        self._update_blosc2_meta()
+        self._has_array = True
+        self._meta = meta
+        self._record_storage(storage)
 
     @staticmethod
     def _build_constructor_call_kwargs(
@@ -951,12 +946,12 @@ class MLArrayConstructors:
 
     def _resolve_like_input(self, x, dtype, meta):
         if isinstance(x, MLArrayConstructors):
-            if x._store is None or x.meta is None or x.meta._has_array.has_array is False:
+            if not x._has_array_data():
                 raise TypeError("Input MLArray has no array data loaded.")
             shape = _storage.normalize_shape(x.shape)
             src_dtype = x.dtype
             if meta is None:
-                meta = deepcopy(x.meta)
+                meta = self._derived_meta(x.meta, like=True, copy_source=False)
         elif hasattr(x, "shape") and hasattr(x, "dtype"):
             shape = _storage.normalize_shape(x.shape)
             src_dtype = x.dtype

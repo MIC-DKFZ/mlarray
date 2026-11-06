@@ -44,7 +44,7 @@ class TestCreate(unittest.TestCase):
                 path,
                 shape=(4, 8, 8),
                 dtype=np.float32,
-                meta={"created_by": "test_create"},
+                meta={"user": {"created_by": "test_create"}},
                 patch_size=None,
                 chunk_size=(1, 4, 4),
                 block_size=(1, 2, 2),
@@ -52,7 +52,7 @@ class TestCreate(unittest.TestCase):
             image.close()
 
             loaded = MLArray(path)
-            self.assertEqual(loaded.meta.source["created_by"], "test_create")
+            self.assertEqual(loaded.user["created_by"], "test_create")
 
     def test_create_accepts_cparams_dparams_dict(self):
         with tempfile.TemporaryDirectory() as tmpdir:
