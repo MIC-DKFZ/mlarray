@@ -71,7 +71,11 @@ image[...] = array  # Modify image in memory and disk
 
 `MLArray.open` reads lazily: `image[...]` decompresses only the chunks a patch touches. The first open in a process also turns on blosc2's read-ahead (4 threads), which fetches those chunks in parallel and makes reads of data not in the page cache several times faster, especially on network storage. Change it with `mlarray.set_read_ahead(n)` (`0` turns it off) or the `BLOSC_PREFETCH` environment variable. Files are written with nnU-Net's layout and compression settings; see [ML Optimization](docs/optimization.md) for details.
 
-### Metadata inspection and manipulation
+### Metadata
+
+Metadata is explicit and domain-neutral: what each axis is, where the array sits in physical space, what
+its values mean, optional domain profiles, and your own metadata. Geometry is never implied: spacing,
+origin and direction always refer to a declared space.
 
 ```python
 import numpy as np
@@ -80,63 +84,44 @@ from mlarray import MLArray
 array = np.random.random((64, 128, 128))
 image = MLArray(
     array,
-    spacing=(1.0, 1.0, 1.5),
-    origin=(10.0, 10.0, 30.0),
-    direction=[[1, 0, 0], [0, 1, 0], [0, 0, 1]],
-    meta={"patient_id": "123", "modality": "CT"},  # Any metadata from the original image source (for example raw DICOM metadata)
+    axes=["z", "y", "x"],
+    spacing=(1.5, 1.0, 1.0),          # per array axis, in array order
+    origin=(10.0, 10.0, 30.0),        # centre of index (0, 0, 0)
+    direction=[[0, 0, 1], [0, 1, 0], [1, 0, 0]],  # column c: unit vector of array axis c
+    space="patient",                  # DICOM patient frame (LPS)
+    values={"kind": "measurement", "unit": "hounsfield_unit"},
+    user={"patient_id": "123"},       # any metadata of your own
 )
 
-print(image.spacing)  # [1.0, 1.0, 1.5]
-print(image.origin)  # [10.0, 10.0, 30.0]
-print(image.meta.source)  # {"patient_id": "123", "modality": "CT"}
-
-image.spacing[1] = 5.3
-image.meta.source["study_id"] = "study-001"
+print(image.spacing)         # (1.5, 1.0, 1.0)
+print(image.letter_codes())  # ('S', 'P', 'L')
+image.set_geometry(spacing=(1.5, 5.3, 1.0))
+image.user["study_id"] = "study-001"
 image.save("with-metadata.mla")
 
 # Open memory-mapped
-image = MLArray.open("with-metadata.mla", mmap_mode='r+')  
-image.meta.source["study_id"] = "new-study"  # Modify metadata
+image = MLArray.open("with-metadata.mla", mmap_mode='r+')
+image.user["study_id"] = "new-study"  # Modify metadata
 image.close()  # Close and save metadata, only necessary to save modified metadata
 ```
 
-### Copy metadata with overrides
+Segmentations, ML profiles and derived images:
 
 ```python
 import numpy as np
 from mlarray import MLArray
 
-base = MLArray("sample.mla")
-array = np.random.random(base.shape)
-
-image = MLArray(
-    array,
-    spacing=(0.8, 0.8, 1.0),
-    copy=base,  # Copies all non-explicitly set arguments from base
+base = MLArray("with-metadata.mla")
+seg = MLArray(
+    np.zeros(base.shape, dtype=np.uint8),
+    copy=base,  # geometry, values, profiles and user metadata of base (never its source)
+    values={"kind": "label", "labels": {"0": {"name": "background"}, "1": {"name": "liver"}}},
+    profiles={"ml": {"split": "train"}},
 )
-
-image.save("copied-metadata.mla")
+seg.save("seg.mla")
 ```
 
-### Standardized metadata usage
-
-```python
-import numpy as np
-from mlarray import MLArray, Meta
-
-array = np.random.random((64, 128, 128))
-image = MLArray(
-    array,
-    meta=Meta(source={"patient_id": "123", "modality": "CT"}, is_seg=True),  # Add metadata in a pre-defined format
-)
-
-print(image.meta.source)  # {"patient_id": "123", "modality": "CT"}
-print(image.meta.is_seg)  # True
-
-image.meta.source["study_id"] = "study-001"
-image.meta.is_seg = False
-image.save("with-metadata.mla")
-```
+See [Usage](docs/usage.md) and [Schema](docs/schema.md) for the full metadata model.
 
 ### Patch size variants
 
@@ -198,7 +183,8 @@ image.save("blosc2-auto.mla")
 
 ### mlarray_header
 
-Print the metadata header from a `.mla` file.
+Print the metadata of a `.mla` file as JSON (`--source` and `--user` add the original metadata of
+converted files and the user metadata).
 
 ```bash
 mlarray_header sample.mla
@@ -206,33 +192,8 @@ mlarray_header sample.mla
 
 ### mlarray_convert
 
-Convert between MLArray and NIfTI/NRRD files.
-
-When converting from NIfTI/NRRD to MLArray, source metadata is copied into
-`meta.source`.
-
-When converting from MLArray to NIfTI/NRRD, only `meta.source` is copied into
-the output header. Spatial metadata (`spacing`, `origin`, `direction`) is set
-explicitly from `meta.spatial`.
-
-`meta.spatial.coord_system` is propagated conservatively. For NRRD input, the
-CLI reads explicit NRRD space metadata when available and maps
-`right-anterior-superior` to `RAS` and `left-posterior-superior` to `LPS`,
-while preserving other explicit NRRD space strings verbatim. For NIfTI input,
-the CLI sets `coord_system` to `LPS` based on the current
-`MedVol -> SimpleITK/ITK` import path, where the imported geometry is
-represented in the ITK physical-space convention. MedVol's reindexing to NumPy
-layout does not change that world-space convention. On NRRD output, `RAS` and
-`LPS` are written back as NRRD `space` metadata when possible; arbitrary custom
-`coord_system` strings are not emitted as NRRD `space` declarations unless they
-already match a supported explicit NRRD space string. NIfTI output preserves
-geometry, but does not export `coord_system` as an explicit NIfTI metadata
-field.
-
-```bash
-mlarray_convert sample.nii.gz output.mla
-mlarray_convert sample.mla output.nii.gz
-```
+Conversion between MLArray and NIfTI/NRRD/DICOM is being rebuilt on MedVol 2, which writes MLArray v1
+metadata; on this development branch the command raises an error.
 
 ## Contributing
 

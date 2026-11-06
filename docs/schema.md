@@ -1,219 +1,152 @@
 # MLArray Metadata Schema
 
-This section defines the **MLArray metadata schema**: the standardized structure used to store and retrieve metadata alongside array data.
-
-The schema is designed around a few core goals:
-
-* **Interoperability:** tools can reliably access common fields (e.g., spacing, orientation, statistics) without guessing conventions.
-* **Flexibility:** users can still store arbitrary metadata (including raw metadata from existing formats) without being forced into a rigid structure.
-* **Format preservation:** MLArray can act as a storage and ML-optimized alternative to existing image formats (e.g., DICOM, NIfTI, NRRD) while retaining their metadata in a consistent place.
-* **Practicality for ML workflows:** fields like `is_seg`, `bbox`, and `blosc2` directly support common training, preprocessing, and patch-based access patterns.
-
-All fields in the schema are **JSON-serializable** unless otherwise noted. Fields marked as `Optional[...]` may be omitted if unknown or not applicable.
-
-### Representation notes
-
-Many namespaces are implemented as **single-key dataclasses** (subclasses of `SingleKeyBaseMeta`). In Python, these behave like their wrapped value (e.g., `meta.is_seg` is a `bool`, `meta.source` is a `dict`). When serialized via `Meta.to_mapping()`, they appear as a one-field object keyed by their internal field name (e.g., `is_seg: {"is_seg": true}` or `source: {"data": {...}}`). `Meta.from_mapping()` accepts either the one-field object or the raw value and will coerce it to the correct class.
-
----
-
-## Meta
-
-Top-level metadata container.
-
-### Overview
-
-`Meta` is the root object that groups all metadata into well-defined namespaces. Some namespaces are **standardized** (e.g., `spatial`, `stats`), while others are intentionally **free-form** (`source`, `extra`) to support arbitrary metadata and long-term extensibility. Several entries are single-key dataclasses that wrap a primitive value while still allowing schema-aware validation.
-
----
-
-### source
-
-* **Description:** Arbitrary JSON-serializable dictionary for metadata from the original image source.
-  Stores information from image sources such as DICOM, NIfTI, NRRD,
-  or other imaging formats.
-* **Dataclass:** `MetaSource` (single-key wrapper).
-
-| field | type                  | description                                  |
-| ----- | --------------------- | -------------------------------------------- |
-| data  | Dict[str, Any]        | JSON-serializable metadata from the source. |
-
----
-
-### extra
-
-* **Description:** Flexible container for arbitrary, JSON-serializable metadata
-  when no schema exists. Intended for experimental or application-specific
-  fields that are not part of the standard.
-* **Dataclass:** `MetaExtra` (single-key wrapper).
-
-| field | type           | description                                  |
-| ----- | -------------- | -------------------------------------------- |
-| data  | Dict[str, Any]  | JSON-serializable metadata for extra fields. |
-
----
-
-### spatial
-
-* **Description:** Spatial metadata for the image.
-* **Dataclass:** `MetaSpatial`.
-
-This section stores the information needed to interpret the array in physical space (e.g., voxel spacing, coordinate origin, and orientation). It also optionally captures array shape and axes layout to make downstream consumers more robust.
-
-| field        | type                        | description                                                                              |
-| ------------ | --------------------------- | ---------------------------------------------------------------------------------------- |
-| spacing      | Optional[List[float]]       | Voxel spacing per spatial axis, length = `ndims`.                                        |
-| origin       | Optional[List[float]]       | Origin per spatial axis, length = `ndims`.                                               |
-| direction    | Optional[List[List[float]]] | Direction matrix, shape `[ndims][ndims]`.                                                |
-| shape        | Optional[List[int]]         | Full array shape, length = spatial + non-spatial axes.                                   |
-| axis_labels  | Optional[List[str,AxisLabel]]   | Per-axis labels or roles, length = full array `ndims`.                                   |
-| coord_system | Optional[Union[str,CoordSystem]] | World/anatomical coordinate convention that `spacing`, `origin`, `direction`, or `affine` map into. |
-| axis_units   | Optional[List[str]]         | Per-axis units, length = full array `ndims`.                                             |
-
----
-
-#### AxisLabel
-
-Axis labels describe the semantic role of each axis. They may be provided as strings or enum values.
-
-| value         | description                                              |
-| ------------- | -------------------------------------------------------- |
-| spatial       | Generic spatial axis (used when no axis-specific label). |
-| spatial_x     | Spatial axis representing X.                             |
-| spatial_y     | Spatial axis representing Y.                             |
-| spatial_z     | Spatial axis representing Z.                             |
-| non_spatial   | Generic non-spatial axis.                                |
-| channel       | Channel axis (e.g., color channels or feature maps).     |
-| temporal      | Time axis.                                               |
-| continuous    | Continuous-valued axis (non-spatial).                    |
-| components    | Component axis (e.g., vector components).                |
-
-`axis_labels` defines which array axes correspond to spatial axes such as
-`spatial_x`, `spatial_y`, and `spatial_z`. It does not define what world-space
-X/Y/Z mean.
-
----
-
-#### CoordSystem
-
-`coord_system` describes the world/anatomical coordinate convention that the
-spatial metadata maps into. It applies to both geometry styles:
-`spacing`/`origin`/`direction` and `affine`.
-
-Built-in standard values are:
-
-| value   | description |
-| ------- | ----------- |
-| RAS     | Right-Anterior-Superior world convention. |
-| LPS     | Left-Posterior-Superior world convention. |
-| unknown | Coordinate system is unknown. |
-| other   | Coordinate system exists but falls outside the built-in vocabulary. |
-
-Arbitrary strings are also allowed and are preserved exactly as provided. This
-makes `coord_system` an extensible standard vocabulary rather than a closed
-enum.
-
-`coord_system` does not determine array axis order. `axis_labels` tells you
-which array axes are spatial axes; `coord_system` tells you what world
-X/Y/Z mean in those spatial coordinates.
-
----
-
-### stats
-
-* **Description:** Summary statistics for the image.
-* **Dataclass:** `MetaStatistics`.
-
-This section stores precomputed global statistics for the array, which can be useful for normalization, QA, dataset inspection, and visualization defaults.
-
-| field             | type            | description                                            |
-| ----------------- | --------------- | ------------------------------------------------------ |
-| min               | Optional[float] | Minimum value.                                         |
-| max               | Optional[float] | Maximum value.                                         |
-| mean              | Optional[float] | Mean value.                                            |
-| median            | Optional[float] | Median value.                                          |
-| std               | Optional[float] | Standard deviation.                                    |
-| percentile_min    | Optional[float] | Minimum within a selected percentile range.            |
-| percentile_max    | Optional[float] | Maximum within a selected percentile range.            |
-| percentile_mean   | Optional[float] | Mean within a selected percentile range.               |
-| percentile_median | Optional[float] | Median within a selected percentile range.             |
-| percentile_std    | Optional[float] | Standard deviation within a selected percentile range. |
-| percentile_min_key    | Optional[float] | Minimum percentile key used to determine percentile_min (for example 0.05).            |
-| percentile_max_key    | Optional[float] | Maximum percentile key used to determine percentile_max (for example 0.95).            |
-
----
-
-### bbox
-
-* **Description:** Bounding boxes for objects/regions in the image.
-* **Dataclass:** `MetaBbox`.
-* **Structure:** List of bboxes, each bbox is a list with length equal to image `ndims`,
-  and each entry is `[min, max]`.
-
-Bounding boxes are stored in a normalized, axis-aligned representation that works across dimensionalities (2D, 3D, …). This is especially useful for detection-style workflows, ROI cropping, dataset summaries, and interactive visualization.
-
-| field  | type                                            | description                                                                 |
-| ------ | ----------------------------------------------- | --------------------------------------------------------------------------- |
-| bboxes | Optional[List[List[List[Union[int, float]]]]]   | Bounding boxes shaped `[num_bboxes][ndims][2]` (min/max), ints or floats.   |
-| scores | Optional[List[Union[int, float]]]               | Optional confidence scores aligned with `bboxes`.                           |
-| labels | Optional[List[Union[str, int, float]]]          | Optional labels aligned with `bboxes`.                                      |
-
----
-
-### is_seg
-
-* **Description:** Whether the image is a segmentation mask.
-* **Dataclass:** `MetaIsSeg` (single-key wrapper).
-
-| field  | type           | description                                     |
-| ------ | -------------- | ----------------------------------------------- |
-| is_seg | Optional[bool] | True/False when known, None when unknown.       |
-
----
-
-### blosc2
-
-* **Description:** Blosc2 layout parameters.
-* **Dataclass:** `MetaBlosc2`.
-
-This section records how the array was laid out on disk (chunking, blocking, patching). It is primarily intended for reproducibility, debugging, and performance introspection.
-
-| field      | type                  | description                                                            |
-| ---------- | --------------------- | ---------------------------------------------------------------------- |
-| chunk_size | Optional[List[float]] | Chunk size per axis, length = full array `ndims` (including non-spatial axes). |
-| block_size | Optional[List[float]] | Block size per axis, length = full array `ndims` (including non-spatial axes). |
-| patch_size | Optional[List[float]] | Patch size per spatial axis, length = `ndims` (non-spatial axes excluded).     |
-
----
-
-### _has_array
-
-* **Description:** Whether this metadata instance represents an on-disk array.
-* **Dataclass:** `MetaHasArray` (single-key wrapper).
-
-| field     | type | description                           |
-| --------- | ---- | ------------------------------------- |
-| has_array | bool | True when an array payload is stored. |
-
----
-
-### _image_meta_format
-
-* **Description:** Source format identifier for the `image` metadata (e.g., "dicom",
-  "nifti", "nrrd"). This is advisory and application-defined.
-* **Dataclass:** `MetaImageFormat` (single-key wrapper).
-
-| field             | type           | description                                   |
-| ----------------- | -------------- | --------------------------------------------- |
-| image_meta_format | Optional[str]  | Identifier for the source metadata format. |
-
----
-
-### _mlarray_version
-
-* **Description:** MLArray version string used to write the file.
-* **Dataclass:** `MetaVersion` (single-key wrapper).
-
-| field           | type           | description                          |
-| --------------- | -------------- | ------------------------------------ |
-| mlarray_version | Optional[str]  | Version string for the writer.       |
+This page describes the metadata stored in an `.mla` file (format version 1). The normative definition is
+the [v1 specification](design/spec.md) and the JSON Schemas shipped with the package
+(`mlarray/schemas/mlarray-1.0.json`, `profile-ml-1.0.json`, `profile-medical-1.0.json`).
+
+## Storage
+
+An `.mla` file is a blosc2 NDArray. Its metadata lives in three blosc2 `vlmeta` keys, each a msgpack map
+that blosc2 compresses separately:
+
+| key | content | read |
+|---|---|---|
+| `mlarray` | `version`, `writer`, `axes`, `spaces`, `values`, `profiles`, `history`, `storage` | on open |
+| `mlarray.source` | `{"source": [...]}`, original metadata of converted files | on first access |
+| `mlarray.user` | `{"user": {...}}`, arbitrary user metadata | on first access |
+
+- Only plain msgpack types are stored: maps, arrays, strings, integers, floats, booleans, nil, binary.
+  Nothing is pickled, and readers decode the raw bytes with plain msgpack, never through blosc2's own
+  vlmeta decoder.
+- Opening a file reads only the `mlarray` key, so it stays fast however large `source` is.
+- Unknown keys are kept and written back at every level.
+- Files written by MLArray before v1 are not readable; convert them again from their original files.
+
+Inspect a file with `mlarray_header file.mla` (add `--source` and `--user` for the lazy keys).
+
+## `version` and `writer`
+
+```yaml
+version: "1.0"            # metadata format version; readers accept any 1.x
+writer: "mlarray 1.0.0"   # software that wrote the file
+```
+
+## `axes`
+
+One entry per array axis, in array (C) order. Required.
+
+| field | meaning |
+|---|---|
+| `name` | unique name, e.g. `z`, `y`, `x`, `t`, `c`. A name only: it says nothing about direction. Defaults: `axis_0`, `axis_1`, ... |
+| `type` | `space` · `time` · `channel` · `component` · `other` |
+| `labels` | one label per index, for categorical axes: `["T1", "T2", "FLAIR"]` |
+| `start`, `step`, `unit`, `unit_code` | uniform sampling of a non-space axis: coordinate of index *i* = `start + i·step` |
+| `coordinates`, `unit`, `unit_code` | explicit coordinate per index (timestamps, b-values, wavelengths) |
+
+Space axes carry no sampling or unit here: their geometry lives in `spaces`.
+
+## `spaces`
+
+Optional. Without spaces the array lives in index space only (photos, ML tensors). Each space is a named
+coordinate system and the matrix that maps array indices into it:
+
+```yaml
+spaces:
+  - name: patient
+    reference: {scheme: dicom_frame_of_reference, id: "1.2.826.0.1.3680043.8.498.1"}
+    axes:
+      - {name: x, unit: millimeter, unit_code: mm, increases_toward: left}
+      - {name: y, unit: millimeter, unit_code: mm, increases_toward: posterior}
+      - {name: z, unit: millimeter, unit_code: mm, increases_toward: superior}
+    from_array:
+      array_axes: [z, y, x]
+      matrix:                              # rows: space axes x, y, z (+1)
+        - [ 0.0, 0.0, 0.7, -170.1]         # columns: array_axes z, y, x (+ translation)
+        - [ 0.0, 0.7, 0.0, -201.3]
+        - [-2.5, 0.0, 0.0,  -87.0]
+        - [ 0.0, 0.0, 0.0,    1.0]
+```
+
+- `reference` identifies the physical frame; two spaces are the same frame if `scheme` and `id` match.
+- `increases_toward` says in which direction a coordinate grows: `left`/`right`, `anterior`/`posterior`,
+  `superior`/`inferior`, `east`/`west`, `north`/`south`, `up`/`down`. It replaces letter codes such as
+  `RAS` or `LPS`, which mean different things in different tools. The example is the DICOM patient frame
+  (LPS), the recommended world frame for medical images (`space="patient"` in the Python API).
+- `from_array.matrix` has one row per space axis plus `[0, ..., 0, 1]`, and one column per entry of
+  `array_axes` plus the translation. Rotations, oblique and mirrored grids and shear are allowed.
+  Axis-aligned grids may use `scale` and `translation` (per array axis) instead.
+- **An integer index is the centre of its voxel:** `matrix · [index, 1]` is the coordinate of the voxel
+  centre.
+- Spacing, origin, direction and letter codes are derived (`MLArray.spacing`, `.origin`, `.direction`,
+  `.letter_codes()`), never stored.
+- Several spaces are allowed (e.g. `patient` and `atlas`); the first is the default.
+
+## `values`
+
+What the stored numbers mean. Defaults to `{kind: measurement}`.
+
+| field | meaning |
+|---|---|
+| `kind` | `measurement` · `label` · `instance` · `probability` · `vector` · `other` |
+| `unit`, `unit_code` | unit of the values, e.g. `hounsfield_unit` |
+| `scale`, `offset` | physical value = `scale · stored + offset`; stored values are never pre-scaled |
+| `fill` | value meaning "no data" |
+| `labels` | for label kinds: map from value (as a decimal string) to `{name, color, code}`; `code` is an ontology reference `{scheme, value, meaning}` |
+| `label_layout` | `index` (one label value per element) or `channel` (one channel per label) |
+
+## Units
+
+Units are a readable name plus an optional UCUM code. Use a name from the curated list
+(`mlarray/schemas/units-1.0.json`: nanometer ... kilometer, second, degree, hounsfield_unit, counts,
+percent, kelvin, arbitrary, ...); MLArray fills in `unit_code` for listed names. Free text is allowed
+when no listed unit fits.
+
+## `profiles`
+
+Optional, independent domain metadata. Profiles never repeat what the core states.
+
+```yaml
+profiles:
+  medical:
+    profile_version: "1.0"
+    dicom: {Modality: MR, BodyPartExamined: BRAIN, RepetitionTime: 2300}   # DICOM keywords
+  ml:
+    profile_version: "1.0"
+    statistics: {min: -1024, max: 3071, mean: 40.2, standard_deviation: 410.0, percentiles: {"99.5": 1500}}
+    boxes:
+      frame: index            # "index" (array axes) or a space name (space coordinates)
+      axes: [z, y, x]
+      items: [{min: [10, 50, 60], max: [40, 90, 120], label: 1, score: 0.97}]
+    patch_size: [128, 128, 128]
+    split: train
+```
+
+- `medical.dicom` holds curated medical metadata for files without a DICOM source, or deliberate
+  overrides of source values. Files converted from DICOM keep their full DICOM metadata in `source`.
+- Profiles from third parties use a reverse-domain name (`org_example_cryoem`) and are kept as they are.
+
+## `history` and `storage`
+
+```yaml
+history:
+  - {action: converted, tool: "medvol 2.0.0", time: "2026-11-06T10:12:00Z", from: nifti, warnings: [...]}
+storage:
+  chunk_size: [1, 256, 256]
+  block_size: [1, 64, 64]
+  patch_size: [128, 128, 128]
+  compression: {codec: LZ4HC, level: 5, filters: [SHUFFLE]}
+```
+
+`storage` records only portable layout settings. Thread counts, typesize and similar runtime settings
+are never stored; they come from the library defaults (see [ML Optimization](optimization.md)).
+`meta.storage.to_cparams()` returns the recorded compression as `blosc2.CParams`.
+
+## `source` and `user`
+
+`source` keeps the original metadata of converted files readable and complete, so a converter can write
+the original format back. Each entry has `format`, `files`, `reader`, an `index_map` (how the stored
+array relates to the source file's own index order), a `fingerprint` (shape, dtype and hashes of the
+geometry and data) and the `header` as nested native values. It is read-only, and images derived from
+another image do not inherit it unless asked to (`copy_source=True`).
+
+`user` holds any msgpack-compatible metadata of your own and is never interpreted.

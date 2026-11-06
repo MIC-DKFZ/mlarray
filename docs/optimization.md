@@ -15,7 +15,7 @@ MLArray's defaults come from a benchmark of nnU-Net-style patch loading on a com
 
 You tell MLArray the **patch size** you expect to sample during training (e.g., `192³`), and it derives `chunk_size` and `block_size` with nnU-Net's heuristic, generalized to any number of axes:
 
-1. **Non-spatial axes** (channels, time, ... from `axis_labels`) get chunk and block size 1, so reading one channel touches only its own data.
+1. **Non-spatial axes** (channels, time, ...: every axis whose type in `axes` is not `space`) get chunk and block size 1, so reading one channel touches only its own data.
 2. **Blocks** start at the next power of two of the patch size per spatial axis and are halved until they fit **128 KiB**.
 3. **Chunks** grow by whole blocks on the least covered axis until they reach **6 MiB**, the image extent, or **1.5x the patch size** per axis.
 4. A patch entry of 1 (e.g. `(1, 256, 256)` for 2D slices of a 3D image) keeps that axis at chunk size 1.

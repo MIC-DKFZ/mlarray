@@ -8,17 +8,24 @@ The CLI currently focuses on core workflows (header inspection and conversion). 
 
 ## `mlarray_header`
 
-Print the metadata header from a `.mla` file.
-
-This command is useful for quickly checking spatial metadata, stored schemas, and other file-level information without loading the full array into memory.
+Print the metadata of a `.mla` file as JSON, without loading the array.
 
 ```bash
-mlarray_header sample.mla
+mlarray_header sample.mla                    # core metadata: axes, spaces, values, profiles, history, storage
+mlarray_header sample.mla --source --user    # also the original metadata of converted files and user metadata
 ```
+
+The output is strict JSON (`jq` accepts it): non-finite numbers are printed as the strings `"NaN"`,
+`"Infinity"` and `"-Infinity"`, and binary values as `"<binary, N bytes>"`.
 
 ---
 
 ## `mlarray_convert`
+
+!!! warning
+    `mlarray_convert` is being rebuilt on MedVol 2, which writes MLArray v1 metadata. On this
+    development branch the command raises an error; the description below refers to the previous
+    version.
 
 Convert between MLArray and NIfTI/NRRD files.
 

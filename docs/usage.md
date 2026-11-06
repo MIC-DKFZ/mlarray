@@ -2,7 +2,7 @@
 
 This section shows common usage patterns for **creating**, **saving**, and **loading** MLArray files, as well as working with **memory mapping** and **metadata**.
 
-MLArray is designed to feel natural in Python workflows: you can construct an `MLArray` directly from a NumPy array, save it to disk, and later load it again with a single line. For large images, MLArray also supports **memory-mapped access**, allowing you to read and modify *only small regions* of an image without loading the full array into RAM. In addition, MLArray exposes a consistent metadata interface, so you can store and retrieve both **standardized metadata** (e.g., spacing, origin) and **arbitrary custom metadata** (e.g., raw DICOM tags, experiment info).
+MLArray is designed to feel natural in Python workflows: you can construct an `MLArray` directly from a NumPy array, save it to disk, and later load it again with a single line. For large images, MLArray also supports **memory-mapped access**, allowing you to read and modify *only small regions* of an image without loading the full array into RAM. In addition, MLArray stores explicit metadata: what each axis is, where the array sits in physical space, what its values mean, optional domain profiles, and your own metadata.
 
 Below are practical examples that cover the most common workflows.
 
@@ -49,152 +49,128 @@ image[...] = array  # Modify image in memory and disk
 
 ---
 
-## Metadata inspection and manipulation
+## Metadata
 
-MLArray provides first-class support for common image metadata (spacing, origin, direction), and also lets you attach arbitrary metadata from the source image source via `meta=...` (e.g., raw DICOM fields, acquisition parameters, dataset identifiers).
+MLArray metadata is explicit and domain-neutral (full definition: [Schema](schema.md) and the
+[v1 spec](design/spec.md)):
 
-```python
-import numpy as np
-from mlarray import MLArray
+| part | meaning |
+|---|---|
+| `axes` | one entry per array axis, in array order: a name and a type (`space`, `time`, `channel`, `component`, `other`) |
+| `spaces` | coordinate systems (e.g. the patient frame) and the matrix that maps array indices into each |
+| `values` | what the numbers mean: `kind` (measurement, label, ...), unit, labels |
+| `profiles` | optional domain metadata, e.g. `medical` (DICOM keywords) and `ml` (statistics, boxes, split) |
+| `user` | arbitrary metadata of your own, never interpreted |
+| `source` | the original metadata of converted files, read-only |
 
-array = np.random.random((64, 128, 128))
-image = MLArray(
-    array,
-    spacing=(1.0, 1.0, 1.5),
-    origin=(10.0, 10.0, 30.0),
-    direction=[[1, 0, 0], [0, 1, 0], [0, 0, 1]],
-    meta={"patient_id": "123", "modality": "CT"},  # Any metadata from the original image source (for example raw DICOM metadata)
-)
+### Geometry
 
-print(image.spacing)  # [1.0, 1.0, 1.5]
-print(image.origin)  # [10.0, 10.0, 30.0]
-print(image.meta.source)  # {"patient_id": "123", "modality": "CT"}
-
-image.spacing[1] = 5.3
-image.meta.source["study_id"] = "study-001"
-image.save("with-metadata.mla")
-
-# Open memory-mapped
-image = MLArray.open("with-metadata.mla", mmap_mode='r+')  
-image.meta.source["study_id"] = "new-study"  # Modify metadata
-image.close()  # Close and save metadata, only necessary to save modified metadata
-```
-
----
-
-## Copy metadata with overrides
-
-This pattern is useful when you want to generate derived data (e.g., predictions, augmentations, resampled images) while keeping most metadata consistent with a reference image, but selectively overriding specific fields like spacing.
+Geometry is never implied. An array without `spaces` lives in index space only. To place it in a
+physical frame, give `spacing`, `origin` and `direction` **together with the space they refer to**:
 
 ```python
 import numpy as np
 from mlarray import MLArray
 
-base = MLArray("sample.mla")
-array = np.random.random(base.shape)
-
-image = MLArray(
-    array,
-    spacing=(0.8, 0.8, 1.0),
-    copy=base,  # Copies all non-explicitly set arguments from base
-)
-
-image.save("copied-metadata.mla")
-```
-
----
-
-## Standardized metadata usage
-
-For structured workflows, MLArray supports a standardized metadata container via `Meta`. This makes metadata access explicit and predictable, while still allowing flexible extensions when needed.
-
-```python
-import numpy as np
-from mlarray import MLArray, Meta
-
 array = np.random.random((64, 128, 128))
 image = MLArray(
     array,
-    meta=Meta(source={"patient_id": "123", "modality": "CT"}, is_seg=True),  # Add metadata in a pre-defined format
+    axes=["z", "y", "x"],             # names only; they say nothing about direction
+    spacing=(2.5, 0.7, 0.7),          # per array axis, in array order (z, y, x)
+    origin=(-170.1, -201.3, -87.0),   # centre of index (0, 0, 0) in space coordinates
+    direction=[[0, 0, 1],             # column c = unit vector of array axis c in the space;
+               [0, 1, 0],             # rows = space axes x, y, z
+               [1, 0, 0]],
+    space="patient",                  # DICOM patient frame: x to the left, y posterior, z superior (LPS)
 )
+image.save("sample.mla")
 
-print(image.meta.source)  # {"patient_id": "123", "modality": "CT"}
-print(image.meta.is_seg)  # True
-
-image.meta.source["study_id"] = "study-001"
-image.meta.is_seg = False
-image.save("with-metadata.mla")
+image = MLArray("sample.mla")
+print(image.spacing)         # (2.5, 0.7, 0.7)
+print(image.origin)          # (-170.1, -201.3, -87.0)
+print(image.matrix())        # 4x4 from-array matrix; an integer index is a voxel centre
+print(image.letter_codes())  # ('S', 'P', 'L'): the direction each array axis increases toward
 ```
 
----
+`spacing`, `origin` and `direction` are derived from the stored matrix and are read-only. Change them
+with `set_geometry`; values you leave out are kept:
 
-## Non-spatial data usage
+```python
+image.set_geometry(spacing=(3.0, 0.7, 0.7))
+```
 
-Use `axis_labels` to mark which axes are spatial and which are non-spatial
-(channels, temporal, components, etc.). Spatial metadata (`spacing`, `origin`,
-`direction`) is specified only for the spatial axes, while the full array shape
-includes both spatial and non-spatial axes.
+Without `space=` the geometry is refused, because spacing and orientation mean nothing until the frame
+is known. For full control, pass `spaces=[...]` with an explicit `from_array` matrix (see
+[Schema](schema.md#spaces)).
+
+### Values, profiles and user metadata
 
 ```python
 import numpy as np
-from mlarray import MLArray, MetaSpatial
+from mlarray import MLArray
 
-# Example shape: (time, z, y, x, channels)
-array = np.random.random((2, 6, 4, 4, 3, 2))
-
-axis_labels = [
-    MetaSpatial.AxisLabel.temporal,
-    MetaSpatial.AxisLabel.spatial_z,
-    MetaSpatial.AxisLabel.spatial_y,
-    "spatial_x",  # Possible to pass predefined labels as strings as well
-    MetaSpatial.AxisLabel.channel,
-    "some-other-type"  # Possible to pass arbitrary strings as well
-]
-
-image = MLArray(
-    array,
-    spacing=(2.5, 0.7, 0.7),  # spatial axes only (z, y, x)
-    origin=(0.0, 0.0, 0.0),
-    axis_labels=axis_labels,
-    patch_size=None,
+seg = MLArray(
+    np.zeros((64, 128, 128), dtype=np.uint8),
+    values={"kind": "label", "labels": {"0": {"name": "background"}, "1": {"name": "liver", "color": [221, 130, 101]}}},
+    profiles={"ml": {"split": "train", "boxes": {"frame": "index", "axes": ["axis_0", "axis_1", "axis_2"],
+                                                 "items": [{"min": [10, 50, 60], "max": [40, 90, 120], "label": 1}]}}},
+    user={"annotator": "A", "notes": ["checked"]},
 )
+seg.user["study_id"] = "study-001"     # user metadata is a plain dict
+seg.profiles["ml"]["split"] = "test"   # profiles too; they are validated when written
+seg.save("seg.mla")
 
-# Optional per-axis units (length = full array ndims)
-image.meta.spatial.axis_units = ["s", "mm", "mm", "mm", ""]
-image.save("time-series.mla")
+seg = MLArray.open("seg.mla")          # opening reads only the small core metadata
+print(seg.values.kind, dict(seg.values.labels))
+print(seg.user)                        # user and source are decoded on first access
 ```
 
----
+Core parts (`axes`, `spaces`, `values`) are immutable values. Replace them as a whole; every change is
+checked against the array shape and leaves the metadata unchanged when it fails:
 
-## Axis labels vs coordinate system
+```python
+seg.axes = ["z", "y", "x"]   # raises: the ml boxes still refer to axis_0 ... axis_2
+```
 
-`axis_labels` defines which array axes are `spatial_x`, `spatial_y`, and
-`spatial_z`. `coord_system` defines what world-space X/Y/Z mean for the spatial
-metadata. Standard values include `RAS` and `LPS`, but arbitrary strings are
-also allowed for conventions outside the built-in vocabulary. `coord_system`
-does not determine array axis order.
+### Derived images
+
+`copy=` takes the metadata of another image: geometry, values, profiles and user metadata. It does not
+take its history, its `ml` statistics and boxes, or its `source` (pass `copy_source=True` for that).
+The `*_like` constructors do the same and also drop label semantics.
 
 ```python
 import numpy as np
-from mlarray import MLArray, Meta
+from mlarray import MLArray
 
-array = np.random.random((64, 128, 128))
-image = MLArray(
-    array,
-    spacing=(1.0, 1.0, 1.5),
-    origin=(10.0, 10.0, 30.0),
-    direction=[[1, 0, 0], [0, 1, 0], [0, 0, 1]],
-    axis_labels=["spatial_z", "spatial_y", "spatial_x"],
-    meta=Meta(spatial={"coord_system": "LPS"}),
-)
-
-print(image.meta.spatial.axis_labels)   # ["spatial_z", "spatial_y", "spatial_x"]
-print(image.meta.spatial.coord_system)  # "LPS"
-
-image.meta.spatial.coord_system = "my_custom_frame"
+ct = MLArray("sample.mla")
+prediction = MLArray(np.zeros(ct.shape, dtype=np.uint8), copy=ct, values={"kind": "label"})
+empty = MLArray.zeros_like(ct)
 ```
 
+## Non-spatial axes
 
+Declare what each axis is. Only axes of type `space` take part in `spaces` and in the layout
+optimisation; channels, time steps and other axes get chunk size 1.
+
+```python
+import numpy as np
+from mlarray import MLArray
+
+array = np.random.random((4, 16, 64, 64, 3))   # (time, z, y, x, channels)
+image = MLArray(
+    array,
+    axes=[
+        {"name": "t", "type": "time", "start": 0.0, "step": 1.5, "unit": "second"},
+        "z", "y", "x",
+        {"name": "c", "type": "channel", "labels": ["T1", "T2", "FLAIR"]},
+    ],
+    spacing=(1.0, 0.8, 0.8),   # for the space axes z, y, x
+    space="patient",
+)
+image.save("multi-axis.mla")
+```
+
+---
 
 ## Patch size variants
 

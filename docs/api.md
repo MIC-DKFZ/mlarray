@@ -16,32 +16,32 @@
 
 ## Metadata Module
 
-::: mlarray.meta.BaseMeta
+::: mlarray.metadata.Meta
 
-::: mlarray.meta.SingleKeyBaseMeta
+::: mlarray.metadata.Axis
 
-::: mlarray.meta.Meta
+::: mlarray.metadata.Space
 
-::: mlarray.meta.MetaSource
+::: mlarray.metadata.SpaceAxis
 
-::: mlarray.meta.MetaExtra
+::: mlarray.metadata.FromArray
 
-::: mlarray.meta.MetaSpatial
+::: mlarray.metadata.Values
 
-::: mlarray.meta.AxisLabelEnum
+::: mlarray.metadata.Storage
 
-::: mlarray.meta.CoordSystemEnum
+::: mlarray.metadata.SourceEntry
 
-::: mlarray.meta.MetaStatistics
+::: mlarray.metadata.space_from_geometry
 
-::: mlarray.meta.MetaBbox
+::: mlarray.metadata.MetadataError
 
-::: mlarray.meta.MetaIsSeg
+## Fingerprint Module
 
-::: mlarray.meta.MetaBlosc2
+::: mlarray.fingerprint.compute
 
-::: mlarray.meta.MetaHasArray
+::: mlarray.fingerprint.matches
 
-::: mlarray.meta.MetaImageFormat
+## Units Module
 
-::: mlarray.meta.MetaVersion
+::: mlarray.units.unit_code
