@@ -7,29 +7,47 @@ Last update: 2026-11-06 (stages 1-4 done and released; follow-up work in `follow
 
 ## Start here (current state)
 
-- **Released:** mlarray 1.0.0 and MedVol 1.0.0 are on PyPI (2026-11-06). `pip install "mlarray[all]"` installs
-  both; `mlarray_convert` delegates to MedVol.
-- **Branches:** mlarray `main` == `rework/v1`; MedVol `main` == `rework/v2` (both pushed). Work on `main` or a new
-  feature branch from now on.
-- **Next work:** `docs/design/followups.md`. The most urgent item is nnunetv3, which still uses the v0 API.
-  Open gaps and decisions are in §6 below.
-- **Envs:** `mlarray` (mlarray dev; its `mlarray` editable install points at the old review worktree, so run tests
-  with `python -m pytest` from the repo root) and `medvol-v2` (both repos installed editable; use it for MedVol and
-  for mlarray's CLI tests).
-- **Tests:** `cd ~/projects/mlarray && ~/miniforge3/envs/medvol-v2/bin/python -m pytest -q -p no:cacheprovider`
-  (163 passed) and `cd ~/projects/medvol && ~/miniforge3/envs/medvol-v2/bin/python -m pytest -q -p no:cacheprovider tests/`
-  (170 passed).
+Last update: 2026-11-06. Everything below is released; the open work is in `followups.md`.
+
+- **Released (PyPI, 2026-11-06):** mlarray 1.0.0, MedVol 1.0.1, napari-bboxes 0.1.1, napari-mlarray 1.1.0,
+  napari-nifti 1.0.0. `pip install "mlarray[all]"` installs MedVol too; `mlarray_convert` delegates to MedVol.
+- **Repos** (all `main` pushed; `rework/*` branches are merged and equal to or behind `main`):
+
+  | repo | path | remote | notes |
+  |---|---|---|---|
+  | mlarray | `~/projects/mlarray` | GitLab → GitHub `MIC-DKFZ/mlarray` | local branch is `rework/v1`; keep `main` == `rework/v1` (`git branch -f main rework/v1`) |
+  | MedVol | `~/projects/medvol` | GitLab → GitHub `MIC-DKFZ/MedVol` | docs https://mic-dkfz.github.io/MedVol/ |
+  | napari-mlarray | `~/projects/napari-mlarray` | GitLab → GitHub `MIC-DKFZ/napari-mlarray` | display convention lives in `src/napari_mlarray/_display.py`; public `layers_from_meta`, `layer_to_array` |
+  | napari-nifti | `~/projects/napari-nifti` | GitLab → GitHub `MIC-DKFZ/napari-nifti` | reads every MedVol format via MedVol + napari-mlarray |
+  | napari-bboxes | `~/projects/napari-bboxes` | GitHub `Karol-G/napari-bboxes` only | 2-D/3-D box layers (outline Labels + slice-following text Points) |
+  | nnunetv3 port | `~/projects/nnunetv3-main` (`project/nnunetv3`) | — | out of scope here: a dedicated nnunetv3 agent continues |
+
+- **Display convention (napari):** patient spaces shown in world `I, P, L` (radiological; `I, P, R` neurological
+  with the 3-D camera depth flipped); data reordered so the affine has no permutation (napari cannot slice
+  permuting affines in 2-D); rotations below 0.1 voxel are snapped, real oblique grids resampled. Evidence:
+  orientation KB ch06 §6.3 (`~/projects/image-orientation-kb`), re-verified on napari 0.10.
+- **Envs:** `medvol-v2` (mlarray + MedVol tests), `napari-mlarray` (napari 0.10 + editable mlarray, MedVol,
+  napari-mlarray, napari-nifti, napari-bboxes; use it for all napari work). The `mlarray` env's editable install
+  points at the old review worktree; `nnunetv3` env has mlarray 1.0 editable.
+- **Tests:**
+  - mlarray: `cd ~/projects/mlarray && ~/miniforge3/envs/medvol-v2/bin/python -m pytest -q -p no:cacheprovider` (163)
+  - MedVol: `cd ~/projects/medvol && ~/miniforge3/envs/medvol-v2/bin/python -m pytest -q -p no:cacheprovider tests/` (173)
+  - napari plugins (each repo): `QT_QPA_PLATFORM=offscreen ~/miniforge3/envs/napari-mlarray/bin/python -m pytest -q -p no:cacheprovider tests`
+    (napari-mlarray 31, napari-nifti 14, napari-bboxes 23 + 7 skipped)
+  - On-screen orientation check (needs a display; here docker image `orient-viewers` with Xvfb, mounting
+    `~/miniforge3` and `~/projects`): `python ~/projects/napari-mlarray/scripts/verify_orientation.py OUTDIR`
+    (26 checks). Example: `docker run --rm -u $(id -u):$(id -g) -e HOME=/tmp -e QT_QPA_PLATFORM=xcb -v $HOME/miniforge3:$HOME/miniforge3 -v $HOME/projects:$HOME/projects orient-viewers bash -c "Xvfb :99 -screen 0 1600x1200x24 & export DISPLAY=:99; sleep 2; $HOME/miniforge3/envs/napari-mlarray/bin/python $HOME/projects/napari-mlarray/scripts/verify_orientation.py /tmp/out"`
+- **Example data:** `/home/k539i/data/mlarray/tmp/<Dataset>/` (Mouse CT, HNTSMRG24, StanfordKnee, Lung, AMOS):
+  `<case>.mla`, `<case>_seg.mla` (label table), `<case>_boxes.mla` (ml boxes per component, synthetic scores).
+  Mouse CT needed `nifti_form="qform"` (its sform is a dummy identity).
 - **Releasing (CD):** local push → GitLab (`codebase.helmholtz.cloud`) → automatic sync to GitHub → GitHub Actions
-  publishes `v*` tags to PyPI by trusted publishing (mlarray: `.github/workflows/workflow.yml`; MedVol:
-  `test_and_deploy.yml`, tests on Python 3.10-3.13 first). Version: mlarray from the git tag (setuptools_scm),
-  MedVol from `medvol/__init__.py`. Pushing a tag is a public action: ask the user to run `git push origin vX.Y.Z`
-  themselves. Check on Python 3.10 too: pip resolves blosc2 4.3.3 there, which behaves differently.
-  Docs (GitHub Pages, `gh-pages`) deploy with each `v*` tag, or on demand with
-  `gh workflow run workflow.yml -R MIC-DKFZ/mlarray --ref main`.
-  MedVol's docs (https://mic-dkfz.github.io/MedVol/, sources in `medvol/docs/*.md` + `mkdocs.yml`) deploy the same
-  way (`gh workflow run test_and_deploy.yml -R MIC-DKFZ/MedVol --ref main`).
-- **MedVol 1.0.1** (2026-11-06) adds the `medvol` command line (1.0.0 declared it without `medvol/cli.py`);
-  released to PyPI and docs deployed.
+  publishes `v*` tags to PyPI by trusted publishing (all five packages). Versions: mlarray and napari-mlarray from
+  the git tag (setuptools_scm); MedVol and napari-nifti from `__init__.py`; napari-bboxes from the tag. Pushing a
+  tag is blocked for the agent (auto-mode classifier): ask the user to run `git tag vX.Y.Z && git push origin vX.Y.Z`.
+  Check Python 3.10 too: pip resolves blosc2 4.3.3 and napari 0.7.1 there. Release order matters when a
+  dependency changes (napari-bboxes → napari-mlarray → napari-nifti).
+  Docs: mlarray and MedVol GitHub Pages deploy with each tag, or `gh workflow run workflow.yml -R MIC-DKFZ/mlarray --ref main`
+  / `gh workflow run test_and_deploy.yml -R MIC-DKFZ/MedVol --ref main`.
 
 ---
 
