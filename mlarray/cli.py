@@ -46,6 +46,8 @@ def _medvol():
     try:
         import medvol
     except ImportError as error:
+        if error.name != "medvol":   # MedVol is installed but one of its dependencies is missing
+            raise
         raise RuntimeError("mlarray_convert needs MedVol 2: pip install 'mlarray[all]'") from error
     major = str(getattr(medvol, "__version__", "0")).split(".")[0]
     if not major.isdigit() or int(major) < 2:
@@ -97,4 +99,7 @@ def cli_convert_to_mlarray() -> None:
         options["source_format"] = args.source_format
     if args.target_format:
         options["target_format"] = args.target_format
-    print(convert_image(args.load_filepath, args.save_filepath, **options))
+    try:
+        print(convert_image(args.load_filepath, args.save_filepath, **options))
+    except (OSError, ValueError, RuntimeError, NotImplementedError) as error:
+        parser.exit(1, f"mlarray_convert: error: {error}\n")

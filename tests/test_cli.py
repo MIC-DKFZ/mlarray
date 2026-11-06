@@ -144,6 +144,21 @@ class TestConvertWithoutMedVol2(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "MedVol 2"):
                 convert_image("a.nii.gz", "b.mla")
 
+    def test_missing_dependency_of_medvol_is_not_hidden(self):
+        error = ImportError("No module named 'nrrd'", name="nrrd")
+        with mock.patch.dict(sys.modules, {"medvol": None}), mock.patch("builtins.__import__", side_effect=error):
+            with self.assertRaisesRegex(ImportError, "nrrd"):
+                convert_image("a.nii.gz", "b.mla")
+
+    def test_conversion_errors_exit_cleanly(self):
+        with mock.patch("mlarray.cli.convert_image", side_effect=ValueError("No reader recognises x.foo")):
+            with mock.patch.object(sys, "argv", ["mlarray_convert", "x.foo", "y.mla"]), \
+                    contextlib.redirect_stderr(io.StringIO()) as err:
+                with self.assertRaises(SystemExit) as exit_info:
+                    cli_convert_to_mlarray()
+        self.assertEqual(exit_info.exception.code, 1)
+        self.assertIn("No reader recognises", err.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()
