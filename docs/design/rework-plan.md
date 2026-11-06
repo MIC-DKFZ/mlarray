@@ -3,7 +3,7 @@
 This document lets any agent or developer continue the rework without prior context. Read it fully before
 touching code. Keep it current: when a stage step is done, tick it and add the commit hash.
 
-Last update: 2026-11-06 (stages 1 and 2 done; stage 3 next).
+Last update: 2026-11-06 (stages 1-3 done; stage 4 next; open questions in §6).
 
 ---
 
@@ -189,37 +189,37 @@ compression is not byte-deterministic), which spec §9 allows.
 
 Implement `docs/design/spec.md` §3–§11. Suggested commit sequence:
 
-1. ☐ JSON Schemas: `schemas/mlarray-1.0.json`, `schemas/profile-medical-1.0.json`,
+1. ☑ `d6feea3` JSON Schemas: `schemas/mlarray-1.0.json`, `schemas/profile-medical-1.0.json`,
    `schemas/profile-ml-1.0.json`, `schemas/units-1.0.json` (curated unit names + UCUM codes; spec §4.5).
-2. ☐ Storage in `metadata_io.py` (spec §3):
+2. ☑ `c70a82e` Storage in `metadata_io.py` (spec §3):
    - three vlmeta keys `mlarray`, `mlarray.source`, `mlarray.user`;
    - write msgpack;
    - **read raw bytes and decode with plain msgpack** (never blosc2's vlmeta decoder);
    - lazy decoding of `source`/`user`;
    - reference: review commits `45c3ff4`, `35b613c` and `tests/test_metadata_storage.py`.
-3. ☐ New model classes: `Axis`, `Space` (+ `from_array`), `Values`, `Profiles`, `SourceEntry`, `History`,
+3. ☑ `1846be9` New model classes: `Axis`, `Space` (+ `from_array`), `Values`, `Profiles`, `SourceEntry`, `History`,
    `Storage`. Validation against the schemas. Unknown keys and unknown profiles are preserved (spec §4.1,
    §5).
-4. ☐ Derived geometry API (spec §11):
+4. ☑ `1846be9` `c70a82e` Derived geometry API (spec §11):
    - `matrix()`, read-only `spacing`/`origin`/`direction`, `letter_codes()`;
    - convenience constructor (`spacing=, origin=, direction=, space=`) composed into a matrix with the
      documented column convention;
    - world geometry without a declared space is refused;
    - fixes the affine-derived property nits: return types, division by zero, shear for non-orthogonal
      matrices.
-5. ☐ `values`: `kind`, `unit`/`unit_code`, `scale`/`offset`, `fill`, `labels`, `label_layout`. This replaces
+5. ☑ `1846be9` `values`: `kind`, `unit`/`unit_code`, `scale`/`offset`, `fill`, `labels`, `label_layout`. This replaces
    `is_seg`.
-6. ☐ `ml` profile: `statistics`, `boxes` with an explicit `frame` (replaces `stats`, `bbox`), `patch_size`,
+6. ☑ `1846be9` `ml` profile: `statistics`, `boxes` with an explicit `frame` (replaces `stats`, `bbox`), `patch_size`,
    `split`. `medical` profile skeleton.
-7. ☐ `source`: read-only API, `index_map`, `fingerprint` (xxh3 data hash; add `xxhash` as a dependency, or use
+7. ☑ `1846be9` `source`: read-only API, `index_map`, `fingerprint` (xxh3 data hash; add `xxhash` as a dependency, or use
    blosc2/numpy hashing if adequate; decide and record here).
-8. ☐ Constructors, `copy=` and `*_like` follow the new rules:
+8. ☑ `c70a82e` `9f612db` Constructors, `copy=` and `*_like` follow the new rules:
    - geometry is copied;
    - `source` is **not** inherited unless `copy_source=True`;
    - statistics, boxes and label semantics are not copied by `*_like` (fixes M13).
-9. ☐ `mlarray_header` prints valid JSON (NaN → `null` or a string; fixes L12) and shows `source`/`user` only on
+9. ☑ `c70a82e` `mlarray_header` prints valid JSON (NaN → `null` or a string; fixes L12) and shows `source`/`user` only on
    request.
-10. ☐ Docs: rewrite `docs/schema.md` and `docs/usage.md`, update README examples.
+10. ☑ `a79be97` Docs: rewrite `docs/schema.md` and `docs/usage.md`, update README examples.
 
 **Requirements carried over from the review** (each needs a test in the new model):
 
@@ -241,6 +241,24 @@ Implement `docs/design/spec.md` §3–§11. Suggested commit sequence:
 `arr.meta.blosc2.{cparams,chunk_size,block_size}`. In stage 3, change **only** these accessors to the new
 `storage` section, and check the 4 compression threads on the written store's cparams instead of the
 metadata (spec §8 persists no thread counts). All layout, codec, level, filter and read-ahead assertions stay.
+
+**Result (2026-11-06).** Suite: 159 passed, 3109 subtests. Modules: `metadata.py` (model), `metadata_io.py`
+(3 keys, raw msgpack, lazy parts), `fingerprint.py`, `units.py`, `schemas/` (inside the package).
+`meta.py` and `utils.py` are removed. Implementation decisions where spec §11 is only a sketch:
+
+| topic | decision |
+|---|---|
+| model shape | core parts are frozen dataclasses (`Axis`, `SpaceAxis`, `FromArray`, `Space`, `Values`, `Storage`, `SourceEntry`); `Meta` replaces them via validated setters / `Meta.update(...)` (all-or-nothing). `profiles` and `user` are plain dicts (profiles validated on write and on `validate()`); `source` and `history` are read-only (`FrozenMap`, tuples) |
+| `MLArray(...)` | keyword-only after `array`: `axes, spaces, values, profiles, user, source, spacing, origin, direction, space, meta, copy, copy_source` + layout args. Constructors (`asarray`, `zeros`, `create`, ...) take `meta=` (a `Meta` or its dict form) |
+| default axes | `axis_0`, `axis_1`, ... of type `space` (neutral names; nothing implies a direction) |
+| convenience geometry | `spacing`/`direction` per array space axis in array order (`direction[:, c]` = unit vector of array axis `c`), `origin` = centre of index 0; requires `space=` (preset `"patient"` = DICOM LPS, mm) or a space description. If a space of that name exists, values not given are kept. `set_geometry(...)` does the same after construction |
+| removed v0 API | `affine`, `translation`, `scale`, `rotation`, `shear`, `spatial_ndim`, geometry setters, `axis_labels`, `is_seg`, `meta.blosc2`, `meta.source` as free dict (now `user`) |
+| derived geometry | `spacing` = column norms (tuple), `origin` = translation (tuple), `direction` = normalised columns (ndarray; unit vectors also for shear), `letter_codes()` = points-to letters of the dominant space axis, `"?"` without `increases_toward`. Zero matrix columns are invalid |
+| storage | `storage.compression` records codec/level by name and filters by name, only what was given or chosen; `["NOFILTER"]` = explicitly no filter. `Storage.to_cparams()` converts back (4 threads by default) |
+| fingerprint | dependency `xxhash`. `data = "xxh3_128:<hex>"` of C-order bytes (streamed for blosc2 arrays), `geometry = "xxh3_64:<hex>"` of msgpack(axes, spaces) with floats rounded to 10 significant digits, `dtype` = numpy name. `mlarray.fingerprint.compute/matches`, `MLArray.fingerprint()` |
+| copy rules | `copy=`: geometry, values, profiles, user; not history, `ml.statistics`/`ml.boxes`, source (unless `copy_source=True`), storage kept as layout hint. `*_like`: same and label semantics dropped |
+| no-array instances | an `MLArray` without data is saved as an empty array of shape `(0,) * len(axes)` (a valid v1 file); it loads as that empty array |
+| lazy parts | `source`/`user` stay undecoded until accessed; unchanged parts are skipped when rewriting their own file and copied as raw bytes otherwise; pickling an opened file re-reads them from the file |
 
 **Done when:**
 - the spec examples (§4–§8) round-trip through save/load;
@@ -308,3 +326,10 @@ Append entries; never delete them.
 | 2026-11-06 | 2a | User decisions: L4 keep the layout record in both (`b94ae9b`); M12 drop machine fields only (`549e5b0`); stage 3 changes only `test_layout.py`'s metadata accessors; keep the landed M4/M5/nit fixes | answered |
 | 2026-11-06 | 2a | M12 sub-item `blosc2.CParams(**meta.blosc2.cparams)` not fixed in stage 2: blosc2 rewrites the filter list in place, which the frozen metadata forbids, and making the stored values enums breaks `is_serializable`. Moved to the stage-3 requirements (§3) | deferred |
 | 2026-11-06 | 2 | stage 2 done: 147 passed, 3074 subtests; invariant tests unchanged | — |
+| 2026-11-06 | 3 | Implementation decisions recorded in §3 "Result" (API shape, convenience geometry, copy rules, storage record, fingerprint encoding) | for review |
+| 2026-11-06 | 3 | **Question (spec text):** the schemas live in `mlarray/schemas/` (installed with the package; `units.py` reads the unit list at runtime) instead of a top-level `schemas/` as spec §4.5/§10 say. Proposal: change the spec's paths | asked |
+| 2026-11-06 | 3 | **Question (spec gap):** the spec has no metadata-only files (v0 had them). Implemented: an instance without data is saved as an empty array `(0,) * len(axes)`. Proposal: add one sentence to spec §3 | asked |
+| 2026-11-06 | 3 | **Question (spec text):** spec §1 says mlarray depends on numpy and blosc2 only; v1 adds `msgpack` (already a blosc2 dependency) and `xxhash` (fingerprint, as the plan allowed). Proposal: say "numpy, blosc2, msgpack and xxhash" | asked |
+| 2026-11-06 | 3 | `mlarray_convert` raises until stage 4 (it was built on MedVol v1 and the v0 metadata); its fake-MedVol tests were removed | — |
+| 2026-11-06 | 3 | blosc2 4.14.1: `blosc2.open(p).schunk.vlmeta.get_vlmeta(k)` on a temporary array segfaults (array freed while vlmeta is used). The library always keeps the store referenced; tests use helpers that do the same | note |
+| 2026-11-06 | 3 | stage 3 done: 159 passed, 3109 subtests; `test_read_ahead.py` unchanged, `test_layout.py` changed only in its metadata accessors (agreed) | — |
