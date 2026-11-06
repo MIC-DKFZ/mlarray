@@ -24,7 +24,6 @@ Usage:
 
 import argparse
 import json
-import math
 import os
 import random
 import shutil
@@ -148,11 +147,11 @@ def convert_blosc2(arr: np.ndarray, out_path: Path) -> None:
     blosc2.asarray(arr, urlpath=str(out_path), mode="w")
 
 
-def convert_mlarray(arr: np.ndarray, out_path: Path) -> None:
-    """MLArray with patch-size optimized chunk/block sizes via comp_blosc2_params."""
+def convert_mlarray(arr: np.ndarray, out_path: Path, patch_size: tuple) -> None:
+    """MLArray with chunk/block sizes optimized for the benchmark patch size via comp_blosc2_params."""
     if out_path.exists():
         out_path.unlink()
-    mla = MLArray.asarray(arr)
+    mla = MLArray.asarray(arr, patch_size=list(patch_size))
     mla.save(out_path)
 
 
@@ -166,7 +165,7 @@ CONVERTERS = {
 }
 
 
-def _convert_one(src: Path, output_dir: Path, source_dir: Path, formats: list[str]) -> None:
+def _convert_one(src: Path, output_dir: Path, source_dir: Path, formats: list[str], patch_size: tuple) -> None:
     """Convert a single source file to all requested formats. Top-level for pickling."""
     arr = load_source_array(src)
     stem = flat_stem(src, source_dir)
@@ -175,7 +174,10 @@ def _convert_one(src: Path, output_dir: Path, source_dir: Path, formats: list[st
         out_path = output_dir / fmt / (stem + suffix)
         if out_path.exists():
             continue
-        converter(arr, out_path)
+        if fmt == "mlarray":
+            converter(arr, out_path, patch_size)
+        else:
+            converter(arr, out_path)
 
 
 def run_conversion(
@@ -184,11 +186,12 @@ def run_conversion(
     output_dir: Path,
     formats: list[str],
     num_workers: int,
+    patch_size: tuple,
 ) -> None:
     for fmt in formats:
         (output_dir / fmt).mkdir(parents=True, exist_ok=True)
 
-    fn = partial(_convert_one, output_dir=output_dir, source_dir=source_dir, formats=formats)
+    fn = partial(_convert_one, output_dir=output_dir, source_dir=source_dir, formats=formats, patch_size=patch_size)
     tqdmp(fn, source_files, num_workers, desc="  Converting")
 
 
@@ -257,10 +260,11 @@ READERS = {
 }
 
 
-def collect_files(output_dir: Path, fmt: str) -> list[Path]:
+def collect_files(output_dir: Path, fmt: str, stems: list[str]) -> list[Path]:
+    """Converted files of the selected source stems that exist on disk."""
     _, suffix = CONVERTERS[fmt]
     fmt_dir = output_dir / fmt
-    return sorted(fmt_dir.glob(f"*{suffix}"))
+    return [p for p in (fmt_dir / (stem + suffix) for stem in sorted(stems)) if p.exists()]
 
 
 def get_shape(filepath: Path, fmt: str) -> tuple:
@@ -295,9 +299,8 @@ def disk_size_mb(path: Path) -> float:
     return path.stat().st_size / 1e6
 
 
-def total_disk_mb(output_dir: Path, fmt: str) -> float:
-    fmt_dir = output_dir / fmt
-    return sum(disk_size_mb(p) for p in fmt_dir.iterdir())
+def total_disk_mb(files: list[Path]) -> float:
+    return sum(disk_size_mb(p) for p in files)
 
 
 def run_benchmark(
@@ -305,13 +308,14 @@ def run_benchmark(
     formats: list[str],
     n_reads: int,
     patch_size: tuple,
-    rng: random.Random,
+    stems: list[str],
+    seed: int,
 ) -> dict:
     results = {}
 
     for fmt in formats:
         reader = READERS[fmt]
-        files = collect_files(output_dir, fmt)
+        files = collect_files(output_dir, fmt, stems)
         if not files:
             print(f"  [{fmt}] No converted files found, skipping.")
             continue
@@ -320,8 +324,10 @@ def run_benchmark(
         file_shapes = [(f, get_shape(f, fmt)) for f in files]
         print("done")
 
+        # Fresh RNG per format so every format reads the same files/patches.
+        rng = random.Random(seed)
         times_ms = []
-        patch_bytes = None
+        bytes_read = 0
 
         with tqdm(total=n_reads, desc=f"  [{fmt}]", unit="read", leave=True, file=sys.stdout) as pbar:
             for _ in range(n_reads):
@@ -330,22 +336,20 @@ def run_benchmark(
                 starts = random_starts(shape, ep, rng)
                 sl = slices_for(starts, ep)
 
-                if patch_bytes is None:
-                    patch_bytes = math.prod(ep) * 4  # float32
-
                 t0 = time.perf_counter()
-                _ = reader(filepath, sl)
+                patch = reader(filepath, sl)
                 t1 = time.perf_counter()
                 times_ms.append((t1 - t0) * 1000.0)
+                bytes_read += patch.nbytes
                 pbar.update(1)
 
         times_arr = np.array(times_ms)
-        throughput_mbs = (patch_bytes / 1e6) / (np.mean(times_arr) / 1000.0)
+        throughput_mbs = (bytes_read / 1e6) / (np.sum(times_arr) / 1000.0)
 
         results[fmt] = {
             "n_reads": n_reads,
-            "patch_bytes": patch_bytes,
-            "disk_mb": round(total_disk_mb(output_dir, fmt), 2),
+            "patch_bytes": round(bytes_read / n_reads),  # mean bytes per read
+            "disk_mb": round(total_disk_mb(files), 2),
             "mean_ms": round(float(np.mean(times_arr)), 3),
             "median_ms": round(float(np.median(times_arr)), 3),
             "std_ms": round(float(np.std(times_arr)), 3),
@@ -446,7 +450,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--max_images", type=int, default=None, help="Maximum number of images to use. The full list is shuffled then sliced. Default: all images.")
     parser.add_argument("--skip_convert", action="store_true", help="Skip Stage 1 (conversion).")
-    parser.add_argument("--num_workers", type=int, default=12, help="Parallel workers for Stage 1 conversion. Default: all CPU cores.")
+    parser.add_argument("--num_workers", type=int, default=12, help="Parallel workers for Stage 1 conversion. Default: 12.")
     parser.add_argument("--seed", type=int, default=42, help="Random seed. Default: 42.")
     return parser.parse_args()
 
@@ -488,7 +492,7 @@ def main() -> None:
     # ------------------------------------------------------------------
     if not args.skip_convert:
         print("\n=== Stage 1: Converting ===")
-        run_conversion(source_files, source_dir, output_dir, args.formats, args.num_workers)
+        run_conversion(source_files, source_dir, output_dir, args.formats, args.num_workers, patch_size)
         print("Conversion complete.")
     else:
         print("\nStage 1 skipped (--skip_convert).")
@@ -500,7 +504,8 @@ def main() -> None:
     print(
         "Note: results reflect OS page cache state. Files will warm in cache during the run."
     )
-    results = run_benchmark(output_dir, args.formats, args.n_reads, patch_size, rng)
+    stems = [flat_stem(f, source_dir) for f in source_files]
+    results = run_benchmark(output_dir, args.formats, args.n_reads, patch_size, stems, args.seed)
 
     # ------------------------------------------------------------------
     # Results
