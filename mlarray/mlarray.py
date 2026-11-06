@@ -5,7 +5,6 @@ import math
 from typing import Any, Dict, Optional, Union, List, Tuple
 from pathlib import Path
 import os
-import tempfile
 from mlarray.meta import (
     Meta,
     MetaBlosc2,
@@ -14,13 +13,10 @@ from mlarray.meta import (
     _meta_internal_write,
 )
 from mlarray import blosc2_layout_strategies as _layout
-from mlarray.utils import is_serializable
-import pickle
-import gzip
+from mlarray import metadata_io
+from mlarray import storage as _storage
+from mlarray.storage import MLARRAY_SUFFIX, MLARRAY_VERSION, MLARRAY_DEFAULT_PATCH_SIZE
 
-MLARRAY_SUFFIX = "mla"
-MLARRAY_VERSION = "v0"
-MLARRAY_DEFAULT_PATCH_SIZE = 192
 MLARRAY_DEFAULT_READ_AHEAD = 4
 
 _read_ahead_configured = False
@@ -1123,25 +1119,13 @@ class MLArray:
 
         store, meta = self._blosc2_store_for_save()
 
-        target_dir = os.path.dirname(os.path.abspath(str(filepath)))
-        fd, tmp_filepath = tempfile.mkstemp(prefix=".", suffix=f".{MLARRAY_SUFFIX}", dir=target_dir)
-        os.close(fd)
-        os.remove(tmp_filepath)
-        try:
-            store.save(tmp_filepath)
-            saved = blosc2.open(urlpath=tmp_filepath, mode="a")
-            saved.schunk.vlmeta["mlarray"] = self._serialize_metadata(meta)
-            del saved
-            os.replace(tmp_filepath, str(filepath))
-        except BaseException:
-            if os.path.exists(tmp_filepath):
-                os.remove(tmp_filepath)
-            raise
+        _storage.save_atomically(
+            store, filepath, lambda vlmeta: metadata_io.write(vlmeta, self._serialize_metadata(meta))
+        )
 
         if saves_onto_source:
             # The open store still refers to the replaced file; rebind it to the new one.
-            reopen_mode = {'w': 'a'}.get(self.mode, self.mode)
-            reopen_mmap_mode = {'w+': 'r+'}.get(self.mmap_mode, self.mmap_mode)
+            reopen_mode, reopen_mmap_mode = _storage.reopen_modes(self.mode, self.mmap_mode)
             self._open(filepath, reopen_mode, reopen_mmap_mode, self._store.schunk.dparams)
 
     def close(self):
@@ -1190,17 +1174,14 @@ class MLArray:
         if store is None or self._backend == "numpy":
             state["_store_state"] = ("value", store)
         elif self.mode is not None or self.mmap_mode is not None:
+            mode, mmap_mode = _storage.reopen_modes(self.mode, self.mmap_mode)
             state["_store_state"] = ("file", {
-                "mode": {'w': 'a'}.get(self.mode, self.mode),
-                "mmap_mode": {'w+': 'r+'}.get(self.mmap_mode, self.mmap_mode),
+                "mode": mode,
+                "mmap_mode": mmap_mode,
                 "dparams": store.schunk.dparams,
             })
         else:
-            state["_store_state"] = ("cframe", {
-                "cframe": store.to_cframe(),
-                "cparams": store.schunk.cparams,
-                "dparams": store.schunk.dparams,
-            })
+            state["_store_state"] = ("cframe", _storage.in_memory_state(store))
         return state
 
     def __setstate__(self, state):
@@ -1209,10 +1190,7 @@ class MLArray:
         if kind == "value":
             self._store = payload
         elif kind == "cframe":
-            store = blosc2.ndarray_from_cframe(payload["cframe"])
-            store.schunk.cparams = payload["cparams"]
-            store.schunk.dparams = payload["dparams"]
-            self._store = store
+            self._store = _storage.restore_in_memory(payload)
         else:
             meta = self._meta
             self._store = None
@@ -1700,21 +1678,7 @@ class MLArray:
             raise RuntimeError(f"MLArray requires '.{MLARRAY_SUFFIX}' as extension.")
         self.filepath = str(filepath)
         self.support_metadata = True
-        dparams = MLArray._resolve_dparams(dparams)
-        ondisk = blosc2.open(str(filepath), dparams=dparams, mode="r")
-        in_memory = blosc2.empty(
-            ondisk.shape,
-            dtype=ondisk.dtype,
-            chunks=ondisk.chunks,
-            blocks=ondisk.blocks,
-            cparams=ondisk.schunk.cparams,
-            dparams=ondisk.schunk.dparams,
-        )
-        for i in range(ondisk.schunk.nchunks):
-            in_memory.schunk.update_chunk(i, ondisk.schunk.get_chunk(i))
-        for key, value in ondisk.schunk.vlmeta.getall().items():
-            in_memory.schunk.vlmeta[key] = value
-        self._store = in_memory
+        self._store = _storage.load_into_memory(filepath, MLArray._resolve_dparams(dparams))
         self._backend = "blosc2"
         self.mode = None
         self.mmap_mode = None
@@ -1962,81 +1926,8 @@ class MLArray:
         return np.reshape(arr, shape, order="C" if c_order else "F")
 
     def _comp_and_validate_blosc2_meta(self, meta_blosc2, patch_size, chunk_size, block_size, shape, dtype_itemsize, spatial_axis_mask, cparams, dparams, array=None):
-        """Compute and validate Blosc2 chunk/block metadata.
-
-        Args:
-            meta_blosc2 (Optional[MetaBlosc2]): Existing Blosc2 metadata to use
-                as defaults.
-            patch_size (Optional[Union[int, List, Tuple, str]]): Patch size hint
-                or "default". See ``open``/``save`` for expected shapes.
-            chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
-            block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
-            shape (Union[List, Tuple, np.ndarray]): Full array shape including non-spatial axes.
-            dtype_itemsize (int): Number of bytes per array element.
-            spatial_axis_mask (Optional[list[bool]]): Mask indicating for every axis whether it is spatial or not.
-            cparams: Compression parameters, or None for the defaults.
-            dparams: Decompression parameters, or None for the defaults.
-            array (Optional[np.ndarray]): The data to be compressed, if known.
-                With the default compression parameters, the filter
-                (NOFILTER or SHUFFLE) is then chosen per array as nnU-Net
-                does; without data, blosc2's default (SHUFFLE) applies.
-
-        Returns:
-            MetaBlosc2: Validated Blosc2 metadata instance.
-        """
-        num_spatial_axes = sum(spatial_axis_mask)
-        is_default_patch_size = isinstance(patch_size, str) and patch_size == "default"
-        if patch_size is not None and not is_default_patch_size and (chunk_size is not None or block_size is not None):
-            raise RuntimeError("patch_size and chunk_size / block_size cannot both be explicitly set.")
-        if (chunk_size is not None and block_size is None) or (chunk_size is None and block_size is not None):
-            raise RuntimeError("If either chunk/block size is used then both must be set.")
-
-        if is_default_patch_size:
-            if meta_blosc2 is not None and meta_blosc2.patch_size is not None:  # Use previously loaded patch size, when patch size is not explicitly set and a patch size from a previously loaded image exists
-                patch_size = meta_blosc2.patch_size
-            elif meta_blosc2 is not None and (meta_blosc2.chunk_size is not None):
-                chunk_size = meta_blosc2.chunk_size
-                block_size = meta_blosc2.block_size
-            elif num_spatial_axes > 0:  # Use default patch size, when patch size is not explicitly set and no patch size from a previously loaded image exists
-                patch_size = [MLARRAY_DEFAULT_PATCH_SIZE] * num_spatial_axes
-            else:  # No spatial axis to optimize for: let Blosc2 choose the layout
-                patch_size = None
-        if chunk_size is not None or block_size is not None:
-            patch_size = None
-
-        patch_size = MLArray._normalize_patch_size(patch_size, num_spatial_axes)
-
-        if patch_size is not None and num_spatial_axes == 0:
-            raise RuntimeError(
-                "Automatic patch-size optimization requires at least one spatial axis. "
-                "Set patch_size=None and provide chunk_size/block_size manually, "
-                "or let Blosc2 determine the layout."
-            )
-
-        if patch_size is not None and 0 in shape:
-            # An array without elements has no layout to optimize; Blosc2 chooses one.
-            chunk_size, block_size, patch_size = None, None, None
-        elif patch_size is not None:
-            chunk_size, block_size = MLArray.comp_blosc2_params(shape, patch_size, spatial_axis_mask, bytes_per_pixel=dtype_itemsize)
-
-        choose_filter = array is not None and chunk_size is not None and MLArray._is_default_cparams(cparams)
-        cparams = MLArray._resolve_cparams(cparams)
-        dparams = MLArray._resolve_dparams(dparams)
-        if choose_filter:
-            cparams = dict(cparams)
-            cparams["filters"] = [_layout.select_blosc2_filter(
-                array, chunk_size, block_size, codec=cparams["codec"], clevel=cparams["clevel"],
-            )]
-
-        meta_blosc2 = MetaBlosc2(
-            chunk_size=chunk_size,
-            block_size=block_size,
-            patch_size=patch_size,
-            cparams=cparams,
-            dparams=dparams,
-        )
-        meta_blosc2._validate_and_cast(ndims=len(shape), spatial_ndims=num_spatial_axes)
-        return meta_blosc2
+        """Compute and validate Blosc2 chunk/block metadata (see :func:`mlarray.storage.comp_blosc2_meta`)."""
+        return _storage.comp_blosc2_meta(meta_blosc2, patch_size, chunk_size, block_size, shape, dtype_itemsize, spatial_axis_mask, cparams, dparams, array=array)
 
     def _validate_and_add_meta(
             self,
@@ -2130,9 +2021,7 @@ class MLArray:
         """Read MLArray metadata from the underlying store, if available."""
         meta = Meta()
         if self.support_metadata and self._backend == "blosc2":
-            meta = self._store.vlmeta["mlarray"]
-            meta = pickle.loads(gzip.decompress(meta))
-            meta = Meta.from_mapping(meta)
+            meta = metadata_io.read(self._store.vlmeta)
         self._validate_and_add_meta(meta)
 
     def _write_metadata(self):
@@ -2150,14 +2039,11 @@ class MLArray:
         if self._backend != "blosc2":
             return
 
-        self._store.vlmeta["mlarray"] = self._serialize_metadata()
+        metadata_io.write(self._store.vlmeta, self._serialize_metadata())
 
     def _serialize_metadata(self, meta: Optional[Meta] = None) -> bytes:
         """Serialize MLArray metadata (default: ``self.meta``) into the bytes stored in vlmeta."""
-        meta = (self.meta if meta is None else meta).to_mapping()
-        if not is_serializable(meta):
-            raise RuntimeError("Metadata is not serializable.")
-        return gzip.compress(pickle.dumps(meta, protocol=pickle.HIGHEST_PROTOCOL))
+        return metadata_io.encode(self.meta if meta is None else meta)
 
     def _blosc2_store_for_save(self) -> Tuple[Any, Meta]:
         """Return the Blosc2 store and metadata to write, without changing this instance.
@@ -2208,27 +2094,8 @@ class MLArray:
             meta.blosc2._validate_and_cast(ndims=len(shape), spatial_ndims=sum(spatial_axis_mask))
         return store, meta
 
-    @staticmethod
-    def _normalize_patch_size(patch_size, num_spatial_axes: int) -> Optional[List[int]]:
-        """Expand an int patch size and validate that all entries are positive ints."""
-        if patch_size is None:
-            return None
-        if isinstance(patch_size, (int, np.integer)) and not isinstance(patch_size, (bool, np.bool_)):
-            patch_size = [patch_size] * num_spatial_axes
-        elif isinstance(patch_size, (list, tuple, np.ndarray)):
-            patch_size = list(patch_size)
-        else:
-            raise ValueError(f"patch_size must be 'default', None, an int or a sequence of ints, got {patch_size!r}.")
-        for value in patch_size:
-            if not isinstance(value, (int, np.integer)) or isinstance(value, (bool, np.bool_)) or value < 1:
-                raise ValueError(f"patch_size values must be positive ints, got {patch_size!r}.")
-        return [int(value) for value in patch_size]
-
-    @staticmethod
-    def _normalize_shape(shape: Union[int, List, Tuple, np.ndarray]) -> Tuple[int, ...]:
-        if isinstance(shape, (int, np.integer)):
-            return (int(shape),)
-        return tuple(int(v) for v in shape)
+    _normalize_patch_size = staticmethod(_storage.normalize_patch_size)
+    _normalize_shape = staticmethod(_storage.normalize_shape)
 
     def _replace_with_converted(self, other: "MLArray") -> None:
         """Replace in-memory state from another MLArray and detach file state."""
@@ -2261,56 +2128,7 @@ class MLArray:
         dtype = src_dtype if dtype is None else dtype
         return shape, np.dtype(dtype), meta
 
-    @staticmethod
-    def _default_cparams() -> Dict:
-        """MLArray's default compression parameters (nnU-Net's: LZ4HC level 5, 4 threads)."""
-        return {
-            "codec": _layout.DEFAULT_CODEC,
-            "clevel": _layout.DEFAULT_CLEVEL,
-            "nthreads": _layout.DEFAULT_COMPRESS_NTHREADS,
-        }
-
-    @staticmethod
-    def _is_default_cparams(cparams) -> bool:
-        """True for the default compression parameters without a chosen filter."""
-        if cparams is None:
-            return True
-        if isinstance(cparams, blosc2.CParams) or not hasattr(cparams, "keys"):
-            return False
-        cparams = dict(cparams)
-        default = MLArray._default_cparams()
-        if set(cparams) != set(default):
-            return False
-        try:
-            return (blosc2.Codec(cparams["codec"]) == default["codec"]
-                    and cparams["clevel"] == default["clevel"]
-                    and cparams["nthreads"] == default["nthreads"])
-        except (ValueError, TypeError):
-            return False
-
-    @staticmethod
-    def _resolve_cparams(cparams: Optional[Union[Dict, blosc2.CParams]]) -> Union[Dict, blosc2.CParams]:
-        """Resolve compression params with MLArray defaults."""
-        if cparams is None:
-            return MLArray._default_cparams()
-        if isinstance(cparams, dict):
-            cparams = dict(cparams)
-            if "codec" in cparams and not isinstance(cparams["codec"], blosc2.Codec):
-                cparams["codec"] = blosc2.Codec(cparams["codec"])
-            if "splitmode" in cparams and not isinstance(cparams["splitmode"], blosc2.SplitMode):
-                cparams["splitmode"] = blosc2.SplitMode(cparams["splitmode"])
-            if "tuner" in cparams and not isinstance(cparams["tuner"], blosc2.Tuner):
-                cparams["tuner"] = blosc2.Tuner(cparams["tuner"])
-            if "filters" in cparams and isinstance(cparams["filters"], (list, tuple)):
-                cparams["filters"] = [
-                    f if isinstance(f, blosc2.Filter) else blosc2.Filter(f)
-                    for f in cparams["filters"]
-                ]
-        return cparams
-
-    @staticmethod
-    def _resolve_dparams(dparams: Optional[Union[Dict, blosc2.DParams]]) -> Union[Dict, blosc2.DParams]:
-        """Resolve decompression params with MLArray defaults."""
-        if dparams is None:
-            return {"nthreads": 1}
-        return dparams
+    _default_cparams = staticmethod(_storage.default_cparams)
+    _is_default_cparams = staticmethod(_storage.is_default_cparams)
+    _resolve_cparams = staticmethod(_storage.resolve_cparams)
+    _resolve_dparams = staticmethod(_storage.resolve_dparams)
