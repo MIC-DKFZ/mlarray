@@ -3,7 +3,7 @@
 This document lets any agent or developer continue the rework without prior context. Read it fully before
 touching code. Keep it current: when a stage step is done, tick it and add the commit hash.
 
-Last update: 2026-11-06 (stage 1 done; stage 2 in progress).
+Last update: 2026-11-06 (stage 1 done; stage 2b done; stage 2a waiting for user decisions on L4 and M12, see §6).
 
 ---
 
@@ -48,6 +48,9 @@ The spec is the source of truth. If implementation shows that the spec is wrong 
 - Conda env `mlarray` (`~/miniforge3/envs/mlarray/bin/python`): Python 3.12, blosc2 4.14.1, numpy 2.5.4,
   medvol 0.0.22, nibabel, pynrrd.
 - Tests: `cd ~/projects/mlarray && ~/miniforge3/envs/mlarray/bin/python -m pytest -q -p no:cacheprovider`.
+  - **Careful:** the env's editable install of `mlarray` points at `~/projects/mlarray-review`. `python -m pytest`
+    from the repo root imports the local package, but scripts run elsewhere import the review code unless
+    `PYTHONPATH=~/projects/mlarray` is set.
   - **Baseline on `rework/v1` @ `8f0511c` + spec commits: 111 passed, 3038 subtests passed.**
 - For MedVol work, use the experiment envs of the KB (`orient-kb` etc., see `~/projects/image-orientation-kb/TOOLS.md`) to cross-check against other libraries.
 
@@ -108,14 +111,14 @@ its own commit.
 
 ### 2a. Fixes (one commit per finding, with a regression test)
 
-| ☐ | finding | what to do |
+| done | finding | what to do |
 |---|---|---|
-| ☐ | **M1** not picklable | `__getstate__`/`__setstate__`. Opened files store `(filepath, mode, mmap_mode, dparams)` and reopen; in-memory blosc2 stores serialise via `to_cframe()`; numpy-backed arrays pickle the array. Test with `multiprocessing` spawn and a torch-free DataLoader-style worker. |
-| ☐ | **M4** `save()` on numpy-backed arrays converts the instance to blosc2 and loses `patch_size` | save from a temporary blosc2 store; the instance stays unchanged |
-| ☐ | **M5** remainder: empty arrays and zero-length dimensions | stop using the `(0,)` placeholder as the "no array" marker; use an explicit flag. Layout: handle zero-length axes without calling the heuristic, or clamp |
-| ☐ | **M12** machine-specific `cparams` persisted | persist only portable settings (codec, level, filters; spec §8 `storage`). Thread counts come from runtime defaults. Must keep `tests/test_layout.py`/`test_read_ahead.py` green |
-| ☐ | **L4** `load(compressed=False)` keeps `meta.blosc2` while `decompress()` clears it | pick one rule (keep the layout record) and apply it in both |
-| ☐ | Nits | consistent optional `dtype` for `empty`/`zeros`; document memory sharing of `asarray(compressed=False)`; arrays with only non-spatial axes work without `patch_size=None` (check if the new heuristic already solves this); fix docstrings ("ignored when patch_size is provided") |
+| ☑ `28b61ab` | **M1** not picklable | `__getstate__`/`__setstate__`. Opened files store `(filepath, mode, mmap_mode, dparams)` and reopen; in-memory blosc2 stores serialise via `to_cframe()`; numpy-backed arrays pickle the array. Test with `multiprocessing` spawn and a torch-free DataLoader-style worker. |
+| ☑ `bc0e993` | **M4** `save()` on numpy-backed arrays converts the instance to blosc2 and loses `patch_size` | save from a temporary blosc2 store; the instance stays unchanged |
+| ☑ `9f6a2ba` | **M5** remainder: empty arrays and zero-length dimensions | stop using the `(0,)` placeholder as the "no array" marker; use an explicit flag. Layout: handle zero-length axes without calling the heuristic, or clamp |
+| ☐ waiting (§6) | **M12** machine-specific `cparams` persisted | persist only portable settings (codec, level, filters; spec §8 `storage`). Thread counts come from runtime defaults. Must keep `tests/test_layout.py`/`test_read_ahead.py` green |
+| ☐ waiting (§6) | **L4** `load(compressed=False)` keeps `meta.blosc2` while `decompress()` clears it | pick one rule (keep the layout record) and apply it in both |
+| ☑ `e004e6c` `b5e87eb` `a936880` | Nits | consistent optional `dtype` for `empty`/`zeros`; document memory sharing of `asarray(compressed=False)`; arrays with only non-spatial axes work without `patch_size=None` (check if the new heuristic already solves this); fix docstrings ("ignored when patch_size is provided") |
 
 Not in stage 2:
 - metadata findings M10, M11, M13, L7, L9: they belong to stage 3;
@@ -142,6 +145,34 @@ Rules:
   `mlarray/__init__.py` and `docs/api.md`.
 - Pure moves first (one commit), then internal simplifications (separate commits).
 - The full test suite passes after every commit. Don't edit existing tests except for import paths.
+
+**Result of 2b (2026-11-06)**, commits `3a0bce7` `2c63460` `da11b87` `47914c1`. The layout above was adjusted
+because the invariant test `tests/test_read_ahead.py` does `import mlarray.mlarray as mlmod`, resets
+`mlmod._read_ahead_configured` and patches `mlmod.blosc2`:
+
+```
+mlarray/
+  mlarray.py           MLArray class: __init__, open/create/load/save/close/flush, pickling, numpy interop,
+                       properties, metadata glue; set_read_ahead and its state (pinned here by test_read_ahead.py)
+  constructors.py      MLArrayConstructors mixin: empty, zeros, ones, full, arange, linspace, asarray, *_like
+  storage.py           stateless blosc2 helpers: cparams/dparams, comp_blosc2_meta (layout metadata), whole-file
+                       load, atomic save, pickling helpers; file constants (suffix, version, default patch size)
+  metadata_io.py       the ONLY place that encodes/decodes metadata (stage 3 swaps its internals)
+  blosc2_layout_strategies.py   unchanged (invariant tests and docs/optimization.md reference it; no layout.py)
+  meta.py, cli.py      unchanged until stages 3 and 4
+```
+
+Benchmark (`bench/benchmark_formats.py`, 8 synthetic CT-like int16 NIfTI volumes 256×256×160–216, patch
+128×128×64, 2000 reads, warm cache, 3 alternating rounds per version, blosc2 4.14.1):
+
+| version | mlarray MB/s (3 rounds) | blosc2 control MB/s | mlarray disk |
+|---|---|---|---|
+| stage 1 (`d853721`) | 718, 721, 703 | 300, 305, 306 | 116.29 MB |
+| stage 2 (`47914c1`) | 684, 709, 712 | 303, 299, 297 | 116.29 MB |
+
+No regression beyond run-to-run noise. Decoded data, metadata, layout and cparams of the written files are
+identical. Compressed chunk bytes differ even between two runs of the same code (multi-threaded blosc2
+compression is not byte-deterministic), which spec §9 allows.
 
 **Done when:**
 - all 2a rows are ticked;
@@ -262,3 +293,8 @@ Append entries; never delete them.
 | 2026-11-06 | — | plan written; specs agreed with the user (see spec decision logs) | — |
 | 2026-11-06 | 1 | `012c896` ported with its `medvol>=0.0.22` pin: the current CLI still needs it; stage 4 step 8 replaces it | — |
 | 2026-11-06 | 1 | stage 1 done, 127 passed / 3056 subtests | — |
+| 2026-11-06 | 2a | Landed bug fixes that change observable behaviour (listed for review; revert on request): M4 (`save()` leaves a NumPy-backed instance NumPy-backed, `patch_size` kept), M5 (empty arrays report their shape instead of `None`; zero-length axes save, Blosc2 picks their layout and no patch size is recorded), nits (`dtype` optional for `empty`/`zeros`; arrays with only non-spatial axes no longer raise with the implied default patch size, Blosc2 picks the layout) | landed |
+| 2026-11-06 | 2a | **Question L4:** `decompress()` clears `meta.blosc2`, documented and asserted by `tests/test_compress_decompress.py::test_decompress_in_place_clears_blosc2_and_detaches`. The plan's rule "keep the layout record in both" changes that behaviour and needs that test changed. | asked |
+| 2026-11-06 | 2a | **Question M12:** `tests/test_layout.py:193` (invariant) asserts `meta.blosc2.cparams["nthreads"] == 4` after save, so "persist no thread counts" (plan, spec §8) cannot land in stage 2 without editing it. Proposal for stage 2: drop only machine-derived fields (`typesize`, `blocksize`, and `nthreads` of `blosc2.CParams` objects, which blosc2 fills with the core count); keep dict input as given; fix `blosc2.CParams(**meta.blosc2.cparams)` failing on the frozen filter list. | asked |
+| 2026-11-06 | 3 | **Question (spec vs invariant):** `tests/test_layout.py` reads `arr.meta.blosc2.{cparams,chunk_size,block_size}`. Spec v1 replaces `meta.blosc2` with `storage` without thread counts, so the test cannot stay unchanged through stage 3. Proposal: in stage 3 change only its metadata accessors (`meta.blosc2.*` → `meta.storage.*`) and check the 4 compression threads on the written store's cparams instead of the metadata; all layout, codec, level, filter and read-ahead assertions stay. | asked |
+| 2026-11-06 | 2b | Restructure done with the adjusted layout above; benchmark shows no regression | — |
