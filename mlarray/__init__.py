@@ -4,7 +4,7 @@ from importlib import metadata as _metadata
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from mlarray.mlarray import MLArray, MLARRAY_DEFAULT_PATCH_SIZE
+    from mlarray.mlarray import MLArray, MLARRAY_DEFAULT_PATCH_SIZE, MLARRAY_DEFAULT_READ_AHEAD, set_read_ahead
     from mlarray.meta import (
         Meta,
         MetaBbox,
@@ -27,6 +27,8 @@ __all__ = [
     "__version__",
     "MLArray",
     "MLARRAY_DEFAULT_PATCH_SIZE",
+    "MLARRAY_DEFAULT_READ_AHEAD",
+    "set_read_ahead",
     "Meta",
     "MetaBbox",
     "MetaBlosc2",
@@ -54,6 +56,8 @@ except _metadata.PackageNotFoundError:  # pragma: no cover - during editable ins
 _LAZY_ATTRS = {
     "MLArray": ("mlarray.mlarray", "MLArray"),
     "MLARRAY_DEFAULT_PATCH_SIZE": ("mlarray.mlarray", "MLARRAY_DEFAULT_PATCH_SIZE"),
+    "MLARRAY_DEFAULT_READ_AHEAD": ("mlarray.mlarray", "MLARRAY_DEFAULT_READ_AHEAD"),
+    "set_read_ahead": ("mlarray.mlarray", "set_read_ahead"),
     "Meta": ("mlarray.meta", "Meta"),
     "MetaBbox": ("mlarray.meta", "MetaBbox"),
     "MetaBlosc2": ("mlarray.meta", "MetaBlosc2"),

@@ -20,6 +20,53 @@ import gzip
 MLARRAY_SUFFIX = "mla"
 MLARRAY_VERSION = "v0"
 MLARRAY_DEFAULT_PATCH_SIZE = 192
+MLARRAY_DEFAULT_READ_AHEAD = 4
+
+_read_ahead_configured = False
+
+
+def set_read_ahead(nthreads: int = MLARRAY_DEFAULT_READ_AHEAD) -> int:
+    """Set blosc2's read-ahead for this process (``blosc2.set_prefetch``).
+
+    With read-ahead, reading a slice of an on-disk array fetches the chunks it
+    needs with ``nthreads`` background threads in parallel, instead of one
+    small request after another. For data that is not in the page cache this
+    makes patch reads several times faster, most on network storage (in our
+    benchmark with 12 nnU-Net-style loader processes on network storage, 3D
+    patches took 64-82% less time). For data already in the page cache it can
+    cost a little (up to about 15% per read with a single reader).
+
+    MLArray turns it on with ``MLARRAY_DEFAULT_READ_AHEAD`` (4) threads the
+    first time a file is opened, unless this function was called before or
+    the ``BLOSC_PREFETCH`` environment variable is set. The setting applies to
+    the whole process, including other blosc2 arrays it reads; each reader
+    thread gets its own read-ahead threads. Call ``set_read_ahead(0)`` to turn
+    it off. Without read-ahead support in the installed blosc2 this does
+    nothing.
+
+    Args:
+        nthreads (int): Read-ahead threads per slice being read; 0 turns
+            read-ahead off.
+
+    Returns:
+        int: The previous number of read-ahead threads (0 if unsupported).
+    """
+    global _read_ahead_configured
+    _read_ahead_configured = True
+    if not hasattr(blosc2, "set_prefetch"):
+        return 0
+    return int(blosc2.set_prefetch(int(nthreads)))
+
+
+def _apply_default_read_ahead() -> None:
+    """Turn on read-ahead once per process unless the user configured it."""
+    global _read_ahead_configured
+    if _read_ahead_configured:
+        return
+    _read_ahead_configured = True
+    if "BLOSC_PREFETCH" in os.environ or not hasattr(blosc2, "set_prefetch"):
+        return
+    blosc2.set_prefetch(MLARRAY_DEFAULT_READ_AHEAD)
 
 
 class MLArray:
@@ -156,6 +203,11 @@ class MLArray:
             dparams: Optional[Union[Dict, blosc2.DParams]] = None
         ):
         """Open an existing MLArray file with memory mapping.
+
+        The first open in a process turns on blosc2's read-ahead with 4
+        threads, which makes reads of data not in the page cache several
+        times faster; see :func:`mlarray.set_read_ahead` to change or turn it
+        off.
 
         Args:
             filepath (Union[str, Path]): Target file path. Must end with
@@ -1431,6 +1483,7 @@ class MLArray:
 
         dparams = MLArray._resolve_dparams(dparams)
         
+        _apply_default_read_ahead()
         self._store = blosc2.open(urlpath=str(filepath), dparams=dparams, mode=mode, mmap_mode=mmap_mode)
         self._backend = "blosc2"
         self._read_meta()
