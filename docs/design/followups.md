@@ -61,10 +61,13 @@ remote → a GitHub Actions workflow on a `v*` tag publishes to PyPI.
 - [ ] napari-nifti should reuse `napari_mlarray._display` (the same convention) on top of MedVol.
 
 ### SlicerMLArray
-- Plan: `~/projects/SlicerMLArray/docs/design/rework-plan.md` (branch `rework/v1`; decisions in its §8). Slicer 5.12.4 at `~/Slicer-5.12.4-linux-amd64`.
-- [ ] Map the v1 space matrix to Slicer's RAS IJKToRAS (via `increases_toward`, never letter codes); `values.labels` → segmentation with names, colours and codes; boxes in `profiles.ml`.
-- [ ] Remove the v0 helpers (`coord_system`, `axis_labels`, affine-based bbox conversion).
-- [ ] Export: write v1 metadata.
+- [x] Rewritten for MLArray 1.0 (2026-11-06; `~/projects/SlicerMLArray`, branch `rework/v1`, not pushed): Slicer
+  extension with a pure-Python core; v1 geometry via `increases_toward`, labels as segmentations (names, colours,
+  codes), boxes as ROIs, channels/vector/time, saving keeps metadata. 36 pytest tests; in Slicer 5.12.4
+  (`~/Slicer-5.12.4-linux-amd64`) `scripts/verify_in_slicer.py` passes 95/95. Plan and status:
+  `~/projects/SlicerMLArray/docs/design/rework-plan.md`.
+- [ ] After the user's approval: create the public GitHub mirror `MIC-DKFZ/SlicerMLArray`, merge `rework/v1` into
+  `main`, push, submit to the Slicer Extensions Index (checklist in the plan, §10).
 
 ### napari-nifti
 - [x] Reworked (`~/projects/napari-nifti`, merged into `main` at `93118f9`, pushed, CI green): reads every MedVol format (NIfTI,
