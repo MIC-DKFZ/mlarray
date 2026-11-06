@@ -66,5 +66,10 @@ remote → a GitHub Actions workflow on a `v*` tag publishes to PyPI.
 - [ ] Export: write v1 metadata.
 
 ### napari-nifti
-- [ ] Rework on top of MedVol 1.0 (faithful geometry, policies, reports) instead of its own NIfTI handling; same orientation recipe as napari-mlarray.
-- [ ] Decide on PyPI publishing (token or trusted publisher).
+- [x] Reworked on branch `rework/v1` (`~/projects/napari-nifti`, not pushed): reads every MedVol format (NIfTI,
+  NRRD, MetaImage, MGH/MGZ, DICOM files and folders) and displays through napari-mlarray's
+  `layers_from_meta` (same convention); writes Image/Labels layers through `medvol.write` (`layer_to_array`).
+  Integer images whose values look like class ids show as Labels. 14 tests; on-screen check of the KB letter
+  phantoms (NIfTI ras/lps/sag/obl25, NRRD) passes. Version 1.0.0, needs napari-mlarray 1.1.0 (`6231d39`).
+- [ ] Release: napari-mlarray v1.1.0 first, then set up PyPI trusted publishing for napari-nifti
+  (workflow `test_and_deploy.yml`) and tag v1.0.0.
