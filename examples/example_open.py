@@ -1,5 +1,5 @@
 import numpy as np
-import os
+import tempfile
 from pathlib import Path
 from mlarray import MLArray, Meta, MetaSpatial, MetaBbox
 import json
@@ -13,24 +13,19 @@ if __name__ == '__main__':
     direction = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
     source_meta = {"tmp1": "This is an image", "tmp2": 5, "tmp3": {"test1": 16.4587, "test2": [1, 2, 3, 4, 5, 6]}}
     bboxes = [[[0, 1], [0, 1], [0, 1]]]
-    filepath = "tmp.mla"
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        filepath = Path(tmp_dir) / "tmp.mla"
 
-    if Path(filepath).is_file():
-        os.remove(filepath)
+        print("Initializing image...")
+        image = MLArray.create(filepath, array.shape, array.dtype)
+        print("Saving image...")
+        image[...] = array
+        image.meta.copy_from(Meta(source=source_meta, spatial=MetaSpatial(spacing=spacing, origin=origin, direction=direction), bbox=MetaBbox(bboxes)))
+        image.meta.is_seg = True
+        image.close()
 
-    print("Initializing image...")
-    image = MLArray.create(filepath, array.shape, array.dtype)
-    print("Saving image...")
-    image[...] = array
-    image.meta.copy_from(Meta(source=source_meta, spatial=MetaSpatial(spacing=spacing, origin=origin, direction=direction), bbox=MetaBbox(bboxes)))
-    image.meta.is_seg = True
-    image.close()
-
-    print("Loading image...")
-    image = MLArray.open(filepath)
-    print(json.dumps(image.meta.to_mapping(), indent=2, sort_keys=True))
-    print("Image mean value: ", np.mean(image.to_numpy()))
-    print("Some array data: \n", image[:2, :2, 0])
-
-    if Path(filepath).is_file():
-        os.remove(filepath)
+        print("Loading image...")
+        image = MLArray.open(filepath)
+        print(json.dumps(image.meta.to_mapping(), indent=2, sort_keys=True))
+        print("Image mean value: ", np.mean(image.to_numpy()))
+        print("Some array data: \n", image[:2, :2, 0])

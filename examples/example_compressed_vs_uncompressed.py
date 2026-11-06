@@ -1,3 +1,4 @@
+import tempfile
 from pathlib import Path
 
 import numpy as np
@@ -17,25 +18,26 @@ def main():
     )
     uncompressed_img = MLArray.asarray(array, compressed=False)
 
-    compressed_path = Path("example_compressed_output.mla")
-    uncompressed_path = Path("example_uncompressed_output.mla")
-
     print("compressed in-memory backend (before save):", type(compressed_img._store))
     print(
         "uncompressed in-memory backend (before save):",
         type(uncompressed_img._store),
     )
 
-    compressed_img.save(compressed_path)
-    uncompressed_img.save(uncompressed_path)
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        compressed_path = Path(tmp_dir) / "example_compressed_output.mla"
+        uncompressed_path = Path(tmp_dir) / "example_uncompressed_output.mla"
 
-    print("compressed in-memory backend (after save):", type(compressed_img._store))
-    print(
-        "uncompressed in-memory backend (after save):",
-        type(uncompressed_img._store),
-    )
-    print("saved compressed file:", compressed_path)
-    print("saved uncompressed->compressed file:", uncompressed_path)
+        compressed_img.save(compressed_path)
+        uncompressed_img.save(uncompressed_path)
+
+        print("compressed in-memory backend (after save):", type(compressed_img._store))
+        print(
+            "uncompressed in-memory backend (after save):",
+            type(uncompressed_img._store),
+        )
+        print("saved compressed file:", compressed_path)
+        print("saved uncompressed->compressed file:", uncompressed_path)
 
 
 if __name__ == "__main__":

@@ -1,3 +1,4 @@
+import tempfile
 from pathlib import Path
 
 import numpy as np
@@ -74,10 +75,11 @@ def main():
     print("ones_like sum:", float(a_ones_like[...].sum()))
     print("full_like sum:", float(a_full_like[...].sum()))
 
-    out_path = Path("example_in_memory_constructors_output.mla")
-    a_full_like.save(out_path)
-    loaded = MLArray(out_path)
-    print("saved shape:", loaded.shape, "dtype:", loaded.dtype)
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        out_path = Path(tmp_dir) / "example_in_memory_constructors_output.mla"
+        a_full_like.save(out_path)
+        loaded = MLArray(out_path)
+        print("saved shape:", loaded.shape, "dtype:", loaded.dtype)
 
 
 if __name__ == "__main__":
