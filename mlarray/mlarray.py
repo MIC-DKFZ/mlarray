@@ -12,9 +12,7 @@ from mlarray.meta import (
     _spatial_axis_mask,
     _meta_internal_write,
 )
-from mlarray.blosc2_layout_strategies import (
-    comp_blosc2_params_spatial_only_magnitude,
-)
+from mlarray import blosc2_layout_strategies as _layout
 from mlarray.utils import is_serializable
 import pickle
 import gzip
@@ -1341,58 +1339,50 @@ class MLArray:
             image_size: Tuple[int, ...],
             patch_size: Tuple[int, ...],
             spatial_axis_mask: Optional[list[bool]] = None,
-            bytes_per_pixel: int = 4,  # 4 byte are float32
-            l1_cache_size_per_core_in_bytes: int = 32768,  # 1 Kibibyte (KiB) = 2^10 Byte;  32 KiB = 32768 Byte
-            l3_cache_size_per_core_in_bytes: int = 1441792, # 1 Mibibyte (MiB) = 2^20 Byte = 1.048.576 Byte; 1.375MiB = 1441792 Byte
-            safety_factor: float = 0.8  # we dont will the caches to the brim. 0.8 means we target 80% of the caches
+            bytes_per_pixel: int = 4,
+            max_block_nbytes: int = _layout.DEFAULT_MAX_BLOCK_NBYTES,
+            max_chunk_nbytes: int = _layout.DEFAULT_MAX_CHUNK_NBYTES,
         ):
         """
         Compute recommended Blosc2 chunk and block sizes from a patch-size hint.
 
-        This method uses the ``comp_blosc2_params_spatial_only_magnitude``
-        strategy from :mod:`mlarray.blosc2_layout_strategies`.
+        Uses nnU-Net's layout heuristic, generalized to any number of spatial
+        and non-spatial axes (:func:`mlarray.blosc2_layout_strategies.comp_blosc2_params`):
 
-        Strategy summary:
-            1. Split axes into spatial and non-spatial using
-               ``spatial_axis_mask``.
-            2. Keep non-spatial axes at ``1`` in both blocks and chunks so the
-               layout is driven by spatial patch sampling instead of stretching
-               cache budgets across non-spatial dimensions.
-            3. Grow block sizes along spatial axes under the L1 cache budget.
-               Growth is weighted by the relative magnitude of the requested
-               patch size, so larger patch axes are allowed to grow faster.
-            4. Grow chunk sizes in multiples of the block sizes under the L3
-               cache budget, again weighted by patch-size magnitude.
-            5. Enforce structural constraints that keep the layout regular:
-               non-clipped spatial axes stay even, and non-clipped chunk axes
-               remain multiples of their corresponding block axes.
+            1. Non-spatial axes (channels, time, ...) get chunk and block
+               size 1, so reading one channel touches only its own data.
+            2. Blocks start at the next power of two of the patch size per
+               spatial axis and are halved until they fit ``max_block_nbytes``
+               (128 KiB).
+            3. Chunks grow by whole blocks on the least covered spatial axis
+               until they reach ``max_chunk_nbytes`` (6 MiB), the image extent,
+               or 1.5x the patch size per axis.
 
-        This strategy supports arbitrary numbers of spatial and non-spatial axes 
-        as long as the patch size dimensionality matches the number of spatial axes.
+        For 2 and 3 spatial axes the layout is identical to nnU-Net's.
 
         Args:
             image_size (Tuple[int, ...]): Full array shape.
             patch_size (Tuple[int, ...]): Patch size over spatial axes only.
+                A 1 keeps that axis at chunk size 1 (e.g. ``(1, 256, 256)``
+                for 2D slices of a 3D image).
             spatial_axis_mask (Optional[list[bool]]): Mask indicating for every
                 array axis whether it is spatial. If omitted, all axes are
                 treated as spatial.
             bytes_per_pixel (int): Number of bytes per element. Defaults to 4
                 for float32.
-            l1_cache_size_per_core_in_bytes (int): L1 cache per core in bytes.
-            l3_cache_size_per_core_in_bytes (int): L3 cache per core in bytes.
-            safety_factor (float): Safety factor to avoid filling caches.
+            max_block_nbytes (int): Largest block in bytes.
+            max_chunk_nbytes (int): Largest chunk in bytes.
 
         Returns:
             Tuple[List[int], List[int]]: Recommended chunk size and block size.
         """
-        return comp_blosc2_params_spatial_only_magnitude(
+        return _layout.comp_blosc2_params(
             image_size=tuple(int(v) for v in image_size),
             patch_size=tuple(int(v) for v in patch_size),
             spatial_axis_mask=spatial_axis_mask,
             bytes_per_pixel=bytes_per_pixel,
-            l1_cache_size_per_core_in_bytes=l1_cache_size_per_core_in_bytes,
-            l3_cache_size_per_core_in_bytes=l3_cache_size_per_core_in_bytes,
-            safety_factor=safety_factor,
+            max_block_nbytes=max_block_nbytes,
+            max_chunk_nbytes=max_chunk_nbytes,
         )
 
     def _open(
