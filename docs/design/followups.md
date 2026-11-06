@@ -16,7 +16,7 @@ remote → a GitHub Actions workflow on a `v*` tag publishes to PyPI.
 | napari-mlarray | yes | workflow uses trusted publishing (`id-token: write`) |
 | napari-bboxes | yes | GitHub only (no GitLab mirror); tag `v*` publishes |
 | SlicerMLArray | no | released through the Slicer extension index, not PyPI (check) |
-| napari-nifti | no | publishes with an API token, or set up trusted publishing |
+| napari-nifti | yes | trusted publishing since 1.0.0 (old token workflow replaced) |
 
 ## TODO
 
@@ -66,10 +66,10 @@ remote → a GitHub Actions workflow on a `v*` tag publishes to PyPI.
 - [ ] Export: write v1 metadata.
 
 ### napari-nifti
-- [x] Reworked on branch `rework/v1` (`~/projects/napari-nifti`, not pushed): reads every MedVol format (NIfTI,
+- [x] Reworked (`~/projects/napari-nifti`, merged into `main` at `93118f9`, pushed, CI green): reads every MedVol format (NIfTI,
   NRRD, MetaImage, MGH/MGZ, DICOM files and folders) and displays through napari-mlarray's
   `layers_from_meta` (same convention); writes Image/Labels layers through `medvol.write` (`layer_to_array`).
   Integer images whose values look like class ids show as Labels. 14 tests; on-screen check of the KB letter
   phantoms (NIfTI ras/lps/sag/obl25, NRRD) passes. Version 1.0.0, needs napari-mlarray 1.1.0 (`6231d39`).
-- [ ] Release: napari-mlarray v1.1.0 first, then set up PyPI trusted publishing for napari-nifti
-  (workflow `test_and_deploy.yml`) and tag v1.0.0.
+- [x] napari-mlarray 1.1.0 released; napari-nifti is a PyPI trusted publisher now.
+- [ ] Tag napari-nifti v1.0.0 (user).
