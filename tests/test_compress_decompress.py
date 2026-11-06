@@ -33,7 +33,7 @@ class TestCompressDecompress(unittest.TestCase):
         self.assertIsNone(image.mode)
         self.assertIsNone(image.mmap_mode)
 
-    def test_decompress_in_place_clears_blosc2_and_detaches(self):
+    def test_decompress_in_place_keeps_blosc2_and_detaches(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             array = _make_array(seed=2)
             path = Path(tmpdir) / "switch-source.mla"
@@ -44,17 +44,14 @@ class TestCompressDecompress(unittest.TestCase):
             self.assertEqual(image.mmap_mode, "r+")
             self.assertEqual(image.filepath, str(path))
             self.assertIsNotNone(image.meta.blosc2.chunk_size)
+            blosc2_before = image.meta.blosc2.to_mapping()
 
             image.decompress()
 
             self.assertTrue(isinstance(image._store, np.ndarray))
             self.assertTrue(np.allclose(image.to_numpy(), array))
             self.assertEqual(image.meta.source.to_plain(), {"case": "decompress"})
-            self.assertIsNone(image.meta.blosc2.chunk_size)
-            self.assertIsNone(image.meta.blosc2.block_size)
-            self.assertIsNone(image.meta.blosc2.patch_size)
-            self.assertIsNone(image.meta.blosc2.cparams)
-            self.assertIsNone(image.meta.blosc2.dparams)
+            self.assertEqual(image.meta.blosc2.to_mapping(), blosc2_before)
             self.assertIsNone(image.filepath)
             self.assertIsNone(image.mode)
             self.assertIsNone(image.mmap_mode)
@@ -93,6 +90,23 @@ class TestCompressDecompress(unittest.TestCase):
             image.compress()
         with self.assertRaises(TypeError):
             image.decompress()
+
+    def test_decompress_matches_uncompressed_load_and_save_reuses_layout(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            array = _make_array(seed=5)
+            path = Path(tmpdir) / "layout.mla"
+            MLArray(array, patch_size=(4, 8, 8)).save(path)
+
+            decompressed = MLArray(path)
+            decompressed.decompress()
+            loaded = MLArray.load(path, compressed=False)
+
+            self.assertEqual(decompressed.meta.blosc2.to_mapping(), loaded.meta.blosc2.to_mapping())
+            self.assertEqual(decompressed.meta.blosc2.patch_size, [4, 8, 8])
+
+            resaved = Path(tmpdir) / "resaved.mla"
+            decompressed.save(resaved)
+            self.assertEqual(MLArray(resaved).meta.blosc2.patch_size, [4, 8, 8])
 
 
 if __name__ == "__main__":

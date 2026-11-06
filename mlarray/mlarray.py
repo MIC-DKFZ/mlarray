@@ -6,7 +6,6 @@ from pathlib import Path
 import os
 from mlarray.meta import (
     Meta,
-    MetaBlosc2,
     AxisLabel,
     _spatial_axis_mask,
     _meta_internal_write,
@@ -365,7 +364,9 @@ class MLArray(MLArrayConstructors):
 
         The instance is detached from any previously opened file state and
         becomes an in-memory object. Persist changes by calling ``save()``.
-        ``meta.blosc2`` metadata is cleared.
+        ``meta.blosc2`` keeps the layout record (patch, chunk and block size,
+        cparams), as ``load(compressed=False)`` does, so a later ``save()``
+        or ``compress()`` reuses it.
 
         Raises:
             TypeError: If no array data is loaded.
@@ -385,7 +386,7 @@ class MLArray(MLArrayConstructors):
         )
         converted.meta.copy_from(source_meta, overwrite=True)
         with _meta_internal_write():
-            converted.meta.blosc2 = MetaBlosc2()
+            converted.meta.blosc2 = deepcopy(source_meta.blosc2)
         self._replace_with_converted(converted)
 
     def save(
