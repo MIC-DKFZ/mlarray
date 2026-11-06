@@ -46,7 +46,7 @@ remote → a GitHub Actions workflow on a `v*` tag publishes to PyPI.
   KB ch05) and decide whether it should move to MedVol/mlarray.
 
 ### napari-mlarray
-- [x] Rewritten on branch `rework/v1` (`90764fc`, `f2c47bc`; not pushed, not released). Patient spaces are shown in the
+- [x] Rewritten (branch `rework/v1`, merged into `main` at `ce3b141`, pushed; CI green on Linux/macOS/Windows, Python 3.10-3.13; not released yet). Patient spaces are shown in the
   world `I, P, L` (radiological; `I, P, R` neurological, 3-D camera depth flipped), data reordered so the affine has
   no permutation (napari cannot slice permuting affines in 2-D), oblique grids resampled/snapped/kept, labels with
   the label table, channels split, lazy reads above 1 GiB, ml boxes as box-shell Labels (3-D) or rectangles (2-D),
