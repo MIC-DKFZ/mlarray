@@ -26,6 +26,10 @@ Last update: 2026-11-06 (stages 1-4 done and released; follow-up work in `follow
   themselves. Check on Python 3.10 too: pip resolves blosc2 4.3.3 there, which behaves differently.
   Docs (GitHub Pages, `gh-pages`) deploy with each `v*` tag, or on demand with
   `gh workflow run workflow.yml -R MIC-DKFZ/mlarray --ref main`.
+  MedVol's docs (https://mic-dkfz.github.io/MedVol/, sources in `medvol/docs/*.md` + `mkdocs.yml`) deploy the same
+  way (`gh workflow run test_and_deploy.yml -R MIC-DKFZ/MedVol --ref main`).
+- **MedVol 1.0.1** (the `medvol` command line; 1.0.0 declared it without `medvol/cli.py`) is committed on `main`
+  (`9300a7a`) but not tagged: the user pushes `v1.0.1`.
 
 ---
 
