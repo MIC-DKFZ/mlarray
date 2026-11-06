@@ -13,7 +13,8 @@ remote → a GitHub Actions workflow on a `v*` tag publishes to PyPI.
 |---|---|---|
 | mlarray | yes | released as 1.0.0 from `main` |
 | MedVol | yes | 1.0.1 from `main` (tests on Python 3.10-3.13 before publishing; docs on GitHub Pages) |
-| napari-mlarray | yes | check the workflow uses trusted publishing |
+| napari-mlarray | yes | workflow uses trusted publishing (`id-token: write`) |
+| napari-bboxes | yes | GitHub only (no GitLab mirror); tag `v*` publishes |
 | SlicerMLArray | no | released through the Slicer extension index, not PyPI (check) |
 | napari-nifti | no | publishes with an API token, or set up trusted publishing |
 
@@ -52,7 +53,11 @@ remote → a GitHub Actions workflow on a `v*` tag publishes to PyPI.
   writer keeps all metadata and writes new layers in LPS. Tests: `tests/test_reader_writer.py` (28); on-screen
   check: `scripts/verify_orientation.py` (26 checks pass under Xvfb, docker image `orient-viewers`, env
   `napari-mlarray`, napari 0.10).
-- [ ] Release (trusted publisher; version from the git tag via setuptools_scm).
+- [x] Box drawing moved to the new package **napari-bboxes** (`~/projects/napari-bboxes`, GitHub
+  `Karol-G/napari-bboxes`, pushed directly to GitHub, CI green, trusted publisher configured); napari-mlarray
+  `74bdaf9` depends on `napari-bboxes>=0.1`.
+- [ ] Release napari-bboxes `v0.1.0` first (user pushes the tag), then napari-mlarray (trusted publisher; version
+  from the git tag via setuptools_scm).
 - [ ] napari-nifti should reuse `napari_mlarray._display` (the same convention) on top of MedVol.
 
 ### SlicerMLArray
