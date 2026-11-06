@@ -68,6 +68,9 @@ remote → a GitHub Actions workflow on a `v*` tag publishes to PyPI.
   `~/projects/SlicerMLArray/docs/design/rework-plan.md`.
 - [x] GitHub mirror live; submitted to the Slicer Extensions Index: https://github.com/Slicer/ExtensionsIndex/pull/2444 (2026-11-06).
 - [ ] After the merge and green preview builds: PR to the index's `5.12` branch.
+- [ ] When the MLArray technical report is out (planned by the user in the coming weeks): link it in the READMEs of
+  mlarray, MedVol, napari-mlarray and SlicerMLArray, and tick "Publication" in the Extensions Index PR #2444 (or
+  mention it there if already merged).
 
 ### napari-nifti
 - [x] Reworked (`~/projects/napari-nifti`, merged into `main` at `93118f9`, pushed, CI green): reads every MedVol format (NIfTI,
