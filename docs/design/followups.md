@@ -24,6 +24,10 @@ remote → a GitHub Actions workflow on a `v*` tag publishes to PyPI.
 - [ ] Remaining gaps (mlarray `rework-plan.md` §6): Siemens mosaic (needs dcm2niix), RTSTRUCT writing, vector frame in MetaImage/MGH writers.
 
 ### nnunetv2 and nnunetv3: check that they load data correctly
+
+> The nnunetv3 items are **out of scope here**: a dedicated nnunetv3 agent does them (merge into
+> `feat/config-schema`, push, end-to-end run on real data).
+
 - [x] **nnunetv3 ported to v1** (2026-11-06): branch `fix/mlarray-v1` (worktree `~/projects/nnunetv3-mlarray-v1`,
   commit `7d769d48`, merged into `project/nnunetv3` (worktree `~/projects/nnunetv3-main`, not pushed).
   `mlarray_geometry()` in `nnunet_dataset.py` turns nnU-Net's array-aligned geometry (world rows S,P,L) into the
