@@ -12,7 +12,7 @@
 
 **tl;dr:** Working with large medical or scientific images for machine learning? -> Use MLArray.
 
-MLArray is a purpose-built file format for *N*-dimensional medical and scientific array data in machine learning workflows. It replaces the usual patchwork of source formats and late-stage conversions to NumPy/Zarr/Blosc2 by layering **standardized metadata** on top of a **Blosc2-backed** storage layout, so the same files work reliably across training, analysis, and visualization tools (including [Napari](https://napari.org) and [MITK](https://www.mitk.org/wiki/The_Medical_Imaging_Interaction_Toolkit_%28MITK%29)).
+MLArray is a purpose-built file format for *N*-dimensional medical and scientific array data in machine learning workflows. It replaces the usual patchwork of source formats and late-stage conversions to NumPy/Zarr/Blosc2 by layering **standardized metadata** on top of a **Blosc2-backed** storage layout, so the same files work reliably across training, analysis, and visualization tools (including [napari](https://github.com/MIC-DKFZ/napari-mlarray) and [3D Slicer](https://github.com/MIC-DKFZ/SlicerMLArray)).
 
 ## Installation
 
