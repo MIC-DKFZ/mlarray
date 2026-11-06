@@ -3,7 +3,7 @@
 This document lets any agent or developer continue the rework without prior context. Read it fully before
 touching code. Keep it current: when a stage step is done, tick it and add the commit hash.
 
-Last update: 2026-11-06 (stages 1-3 done; stage 4 in progress: skeleton, .mla, phantom, NIfTI done).
+Last update: 2026-11-06 (stages 1-4 done; open questions in §6).
 
 ---
 
@@ -282,15 +282,15 @@ Work in `~/projects/medvol` on `rework/v2`, following its `docs/design/spec.md`.
 3. ☑ medvol `cc4a9a4` Conformance phantom and test harness (spec §9). Port the generators from
    `~/projects/image-orientation-kb/experiments/` (e.g. `05_python_libraries/synth.py`,
    `02_dicom/_synth.py`, `verify_dicom_real/_data.py`).
-4. ◐ NIfTI plugin (☑ medvol `b54a8c5`), then NRRD, MetaImage, MGH/MGZ (in progress). Each comes with the round-trip suite and the
+4. ☑ NIfTI `b54a8c5`, MGH/MGZ `0b9960a`, MetaImage `c2d9459`, NRRD `47bd5b5` (medvol); conformance matrix `a983099`. Each comes with the round-trip suite and the
    field-ownership regeneration test.
-5. ☐ DICOM read, phases 1–3 (spec §7.5), then DICOM write (re-emit original series, SEG; spec §7.6).
-6. ☐ mlarray CLI (`mlarray/cli.py`): `mlarray_convert` delegates to `medvol.convert`. Rewrite
+5. ☑ DICOM read phase 1 `54c4403`, phases 2–3 `d5a251a`; write: re-emit `b579767` (multi-frame re-emit and SEG in `d5a251a`).
+6. ☑ mlarray `d1a626f` `0626299` mlarray CLI (`mlarray/cli.py`): `mlarray_convert` delegates to `medvol.convert`. Rewrite
    `tests/test_cli.py` against real MedVol with small nibabel/pynrrd fixtures (fixes M25). CI installs the
    extras.
-7. ☐ Close the deferred review findings by verifying them against the new code: H10, H11, H12, M14–M18, L11,
+7. ☑ medvol `3677dbc` (H10, H11, M14, M17, L11) + `test_nrrd.py` (H12, M15, M16, M18), mlarray `0626299` (CLI nits), `d1a626f` (CLI docs): Close the deferred review findings by verifying them against the new code: H10, H11, H12, M14–M18, L11,
    the CLI nits, and the stale CLI docs (`README.md`, `docs/cli.md`).
-8. ☐ Pin `medvol>=2` in mlarray's `[all]` extra.
+8. ☑ mlarray `8dd5775` Pin `medvol>=2` (`>=2.0.0.dev0`) in mlarray's `[all]` extra.
 
 **Environment for stage 4:** conda env `medvol-v2` (Python 3.12, blosc2 4.14.1, nibabel 5.4.2, pynrrd 1.1.3,
 pydicom 3.0.2, highdicom 0.28.2; `mlarray` and `medvol` installed editable from the rework branches; install
@@ -350,3 +350,8 @@ Append entries; never delete them.
 | 2026-11-06 | 3 | `mlarray_convert` raises until stage 4 (it was built on MedVol v1 and the v0 metadata); its fake-MedVol tests were removed | — |
 | 2026-11-06 | 3 | blosc2 4.14.1: `blosc2.open(p).schunk.vlmeta.get_vlmeta(k)` on a temporary array segfaults (array freed while vlmeta is used). The library always keeps the store referenced; tests use helpers that do the same | note |
 | 2026-11-06 | 3 | stage 3 done: 159 passed, 3109 subtests; `test_read_ahead.py` unchanged, `test_layout.py` changed only in its metadata accessors (agreed) | — |
+| 2026-11-06 | 4 | stage 4 done. medvol: 127 passed, 213 subtests (reader x writer matrix over nifti, nrrd, metaimage, mgh, dicom, mla); mlarray: 163 passed in env `medvol-v2` (161 + 2 skipped without MedVol 2). NRRD, MetaImage, MGH and DICOM phases 2-3 were implemented in parallel and reviewed/integrated | — |
+| 2026-11-06 | 4 | **Open (not implemented):** policy `reorient` (accepted, not applied); policy `vector_frame` and applying the NRRD `measurement frame` to vector components (spec 7.2 says "applied"; currently kept verbatim, values unchanged); `resample` options of `dicom_tilt` / `dicom_irregular_spacing` (raise NotImplementedError); DICOM phases 4 (RTSTRUCT) and 5 (mosaic); per-slice/per-frame differing DICOM rescale (refused); regenerating geometry when re-emitting enhanced multi-frame DICOM (refused) | asked |
+| 2026-11-06 | 4 | **Question (spec):** §3.3 says a NIfTI `descrip` written to NRRD is "kept as a key-value pair", §6/M18 forbid copying fields across formats. Implemented: nothing mapped. Proposal: drop the §3.3 example or define explicit cross-format mappings (e.g. descrip <-> NRRD content) | asked |
+| 2026-11-06 | 4 | Decisions for review: NRRD `space dimension` without `space` -> non-patient space `nrrd` (ITK assumes LPS); `scanner-xyz`/`3D-*-handed` read as LPS (ITK/Slicer) with a warning; NIfTI time series -> NRRD `left-posterior-superior-time`; MGH shear stored exactly (Mdc non-orthonormal, KB 04 4.4); MetaImage shear written as closest orthonormal direction (reported); MGH goodRASFlag < 0 treated like 0 (only 0 verified in KB); fractional SEG -> values.kind probability with scale 1/MaximumFractionalValue; layout='default' changes only the encoding (all plugins) | for review |
+| 2026-11-06 | 4 | CI note: mlarray CI cannot install MedVol 2 until it is released; its CLI conversion tests skip without it | note |
