@@ -123,9 +123,9 @@ class MLArray:
                 chunk/block optimization. Use ``"default"`` to use the default
                 patch size of 192.
             chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
-                Ignored when ``patch_size`` is provided.
+                Cannot be combined with an explicit ``patch_size``.
             block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
-                Ignored when ``patch_size`` is provided.
+                Cannot be combined with an explicit ``patch_size``.
             cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2 compression
                 parameters used when creating in-memory compressed array data.
             dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
@@ -271,10 +271,10 @@ class MLArray:
                 dimensions. Use "default" to use the default patch size of 192.
             chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
                 Provide an int or tuple/list with length equal to the array
-                dimensions. Ignored when ``patch_size`` is provided.
+                dimensions. Cannot be combined with an explicit ``patch_size``.
             block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
                 Provide an int or tuple/list with length equal to the array
-                dimensions. Ignored when ``patch_size`` is provided.
+                dimensions. Cannot be combined with an explicit ``patch_size``.
             cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2
                 compression parameters used when
                 creating/writing array data (for example codec, compression
@@ -345,9 +345,9 @@ class MLArray:
                 chunk/block optimization. Use ``"default"`` to use the default
                 patch size of 192.
             chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
-                Ignored when ``patch_size`` is provided.
+                Cannot be combined with an explicit ``patch_size``.
             block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
-                Ignored when ``patch_size`` is provided.
+                Cannot be combined with an explicit ``patch_size``.
             cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2 compression
                 parameters used when writing chunks.
             dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
@@ -395,9 +395,9 @@ class MLArray:
             patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
                 chunk/block optimization.
             chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
-                Ignored when ``patch_size`` is provided.
+                Cannot be combined with an explicit ``patch_size``.
             block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
-                Ignored when ``patch_size`` is provided.
+                Cannot be combined with an explicit ``patch_size``.
             cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2 compression
                 parameters.
             dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
@@ -446,9 +446,9 @@ class MLArray:
             patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
                 chunk/block optimization.
             chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
-                Ignored when ``patch_size`` is provided.
+                Cannot be combined with an explicit ``patch_size``.
             block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
-                Ignored when ``patch_size`` is provided.
+                Cannot be combined with an explicit ``patch_size``.
             cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2 compression
                 parameters.
             dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
@@ -501,9 +501,9 @@ class MLArray:
             patch_size (Optional[Union[int, List, Tuple]]): Patch size hint for
                 chunk/block optimization.
             chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
-                Ignored when ``patch_size`` is provided.
+                Cannot be combined with an explicit ``patch_size``.
             block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
-                Ignored when ``patch_size`` is provided.
+                Cannot be combined with an explicit ``patch_size``.
             cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2 compression
                 parameters.
             dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
@@ -747,12 +747,12 @@ class MLArray:
                 Use "default" to use the default patch size of 192.
             chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
                 Provide an int or a tuple/list with length equal to the number
-                of dimensions, or None to let Blosc2 decide. Ignored when
-                patch_size is not None.
+                of dimensions, or None to let Blosc2 decide. Cannot be combined with an
+                explicit ``patch_size``.
             block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
                 Provide an int or a tuple/list with length equal to the number
-                of dimensions, or None to let Blosc2 decide. Ignored when
-                patch_size is not None.
+                of dimensions, or None to let Blosc2 decide. Cannot be combined with an
+                explicit ``patch_size``.
             cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2
                 compression parameters used when creating the in-memory Blosc2
                 container (for example codec, compression level, and filters).
@@ -765,6 +765,11 @@ class MLArray:
                 accessing compressed chunks (for example number of
                 decompression threads). Controls runtime decompression behavior.
                 If None, defaults to ``{'nthreads': 1}``.
+            compressed (bool): If True (default), the data is compressed into
+                an in-memory Blosc2 array, which is a copy. If False, the
+                MLArray wraps ``array`` without copying when it is already
+                C-contiguous, so writes through either object are visible in
+                the other. Pass ``array.copy()`` to avoid that.
 
         Returns:
             MLArray: A newly created MLArray instance.
@@ -1023,9 +1028,9 @@ class MLArray:
                 chunk/block optimization. Use ``"default"`` to use the default
                 patch size of 192.
             chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
-                Ignored when ``patch_size`` is provided.
+                Cannot be combined with an explicit ``patch_size``.
             block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
-                Ignored when ``patch_size`` is provided.
+                Cannot be combined with an explicit ``patch_size``.
             cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2 compression
                 parameters.
             dparams (Optional[Union[Dict, blosc2.DParams]]): Blosc2
@@ -1622,10 +1627,10 @@ class MLArray:
                 dimensions. Use "default" to use the default patch size of 192.
             chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
                 Provide an int or tuple/list with length equal to the array
-                dimensions. Ignored when ``patch_size`` is provided.
+                dimensions. Cannot be combined with an explicit ``patch_size``.
             block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
                 Provide an int or tuple/list with length equal to the array
-                dimensions. Ignored when ``patch_size`` is provided.
+                dimensions. Cannot be combined with an explicit ``patch_size``.
             cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2
                 compression parameters used when
                 creating/writing array data (for example codec, compression
@@ -1739,12 +1744,12 @@ class MLArray:
                 Use "default" to use the default patch size of 192.
             chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
                 Provide an int or a tuple/list with length equal to the number
-                of dimensions, or None to let Blosc2 decide. Ignored when
-                patch_size is not None.
+                of dimensions, or None to let Blosc2 decide. Cannot be combined with an
+                explicit ``patch_size``.
             block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
                 Provide an int or a tuple/list with length equal to the number
-                of dimensions, or None to let Blosc2 decide. Ignored when
-                patch_size is not None.
+                of dimensions, or None to let Blosc2 decide. Cannot be combined with an
+                explicit ``patch_size``.
             cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2
                 compression parameters used when creating the in-memory Blosc2
                 container (for example codec, compression level, and filters).
@@ -1811,9 +1816,9 @@ class MLArray:
                 chunk/block optimization. Use ``"default"`` to use the default
                 patch size of 192.
             chunk_size (Optional[Union[int, List, Tuple]]): Explicit chunk size.
-                Ignored when ``patch_size`` is provided.
+                Cannot be combined with an explicit ``patch_size``.
             block_size (Optional[Union[int, List, Tuple]]): Explicit block size.
-                Ignored when ``patch_size`` is provided.
+                Cannot be combined with an explicit ``patch_size``.
             cparams (Optional[Union[Dict, blosc2.CParams]]): Blosc2 compression
                 parameters. If None, defaults to
                 ``{'codec': blosc2.Codec.LZ4HC, 'clevel': 5, 'nthreads': 4}``.
