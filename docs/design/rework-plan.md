@@ -318,6 +318,8 @@ medvol with `--no-deps` because mlarray's version is not 1.0 yet). Tests:
 
 ## 5. After the stages
 
+The follow-up work (consumers, MedVol release, CD notes) is tracked in `docs/design/followups.md`.
+
 - SlicerMLArray and napari-mlarray read the v1 core. napari should use the axis-order recipe from KB ch06
   §6.3 for correct on-screen orientation.
 - Pyramids (spec §4.6, storage still to design) and lazy or streaming IO are later versions.
