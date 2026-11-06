@@ -45,10 +45,15 @@ remote → a GitHub Actions workflow on a `v*` tag publishes to PyPI.
   KB ch05) and decide whether it should move to MedVol/mlarray.
 
 ### napari-mlarray
-- [ ] Read the v1 core: `axes`, `spaces` (from-array matrix), `values` (labels → napari Labels layer with names/colours), profiles.
-- [ ] Correct on-screen orientation with the axis-order recipe from the orientation KB (ch06 §6.3).
-- [ ] Writer: build v1 metadata instead of the `_original_*` keys and `meta.spatial`.
-- [ ] Tests against files written by mlarray 1.0 and MedVol 1.0.
+- [x] Rewritten on branch `rework/v1` (`90764fc`, `f2c47bc`; not pushed, not released). Patient spaces are shown in the
+  world `I, P, L` (radiological; `I, P, R` neurological, 3-D camera depth flipped), data reordered so the affine has
+  no permutation (napari cannot slice permuting affines in 2-D), oblique grids resampled/snapped/kept, labels with
+  the label table, channels split, lazy reads above 1 GiB, ml boxes as box-shell Labels (3-D) or rectangles (2-D),
+  writer keeps all metadata and writes new layers in LPS. Tests: `tests/test_reader_writer.py` (28); on-screen
+  check: `scripts/verify_orientation.py` (26 checks pass under Xvfb, docker image `orient-viewers`, env
+  `napari-mlarray`, napari 0.10).
+- [ ] Release (trusted publisher; version from the git tag via setuptools_scm).
+- [ ] napari-nifti should reuse `napari_mlarray._display` (the same convention) on top of MedVol.
 
 ### SlicerMLArray
 - [ ] Map the v1 space matrix to Slicer's RAS IJKToRAS (via `increases_toward`, never letter codes); `values.labels` → segmentation with names, colours and codes; boxes in `profiles.ml`.
