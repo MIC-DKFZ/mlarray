@@ -94,8 +94,8 @@ One entry per array axis, in array order. `len(axes) == array.ndim`. Required.
 | `name` | yes | unique name of the array axis, e.g. `z`, `y`, `x`, `t`, `c`. A name only: it says nothing about direction in space. |
 | `type` | yes | `space` · `time` · `channel` · `component` (vector or tensor components) · `other` (any other categorical or indexed axis: echo, b-value, batch, …) |
 | `labels` | no | one label per index for categorical axes: `["T1", "T2", "FLAIR"]`, `["red", "green", "blue"]` |
-| `start`, `step`, `unit` | no | uniform sampling of a non-space axis: coordinate of index *i* = `start + i·step` in `unit`, e.g. time in seconds |
-| `coordinates`, `unit` | no | explicit coordinate per index for non-uniform sampling: timestamps, b-values, wavelengths |
+| `start`, `step`, `unit`, `unit_code` | no | uniform sampling of a non-space axis: coordinate of index *i* = `start + i·step` in `unit` (§4.5), e.g. time in seconds |
+| `coordinates`, `unit`, `unit_code` | no | explicit coordinate per index for non-uniform sampling: timestamps, b-values, wavelengths |
 
 Space axes carry no spacing or unit here. Their geometry lives in `spaces` (§4.3), so it has exactly one
 source of truth.
@@ -126,7 +126,7 @@ spaces:
 |---|---|---|
 | `name` | yes | unique space name, chosen freely (`patient`, `stage`, `slide`, `sky`, `atlas`, `map`) |
 | `reference` | no | identifies the physical frame, so files can be compared: `{scheme, id}`. Two spaces are the **same frame iff `scheme` and `id` are equal**. Examples: `dicom_frame_of_reference`, `atlas` (`MNI152NLin2009cAsym`), `epsg` (`32632`), `celestial` (`ICRS`) |
-| `axes` | yes | the space's own axes, in order: `name`, `unit`, optional `increases_toward` |
+| `axes` | yes | the space's own axes, in order: `name`, `unit` (+ `unit_code`, §4.5), optional `increases_toward` |
 | `from_array` | yes | how array indices map into this space (below) |
 
 **`increases_toward`** gives the direction in which a coordinate grows, as a plain word from a vocabulary:
@@ -167,7 +167,7 @@ Optional. Defaults to `{kind: measurement}`.
 | field | meaning |
 |---|---|
 | `kind` | `measurement` (physical or intensity values) · `label` (integer class per element) · `instance` (integer object id per element) · `probability` · `vector` · `other` |
-| `unit` | unit of the physical value: `hounsfield_unit`, `counts`, `kelvin`, `reflectance`, `arbitrary`, … |
+| `unit`, `unit_code` | unit of the physical value (§4.5): `hounsfield_unit`, `counts`, `kelvin`, `reflectance`, `arbitrary`, … |
 | `scale`, `offset` | physical value = `scale · stored + offset`. Stored values are never pre-applied (keeps exact round trips, §9). |
 | `fill` | value meaning "no data / outside the field of view" |
 | `labels` | for `label`/`instance`/`probability`: map from value (or channel index) to `{name, color, code}` |
@@ -183,6 +183,49 @@ values:
 
 `code` is an optional ontology reference: scheme, value and human-readable meaning. For medical
 segmentations it carries the DICOM SEG coded concept.
+
+### 4.5 Units
+
+Wherever a unit appears (space axes, non-space axes, `values`), it is given as:
+
+| field | meaning |
+|---|---|
+| `unit` | human-readable name. Writers **SHOULD** use a name from the curated list in `schemas/units-1.0.json`; free text is allowed when no listed unit fits. |
+| `unit_code` | optional machine-readable code in **UCUM** (Unified Code for Units of Measure, also used by DICOM and HL7). Writers **SHOULD** set it whenever it is known. The curated list gives the code for every listed name. |
+
+```yaml
+{name: x, unit: millimeter, unit_code: mm, increases_toward: left}
+values: {kind: measurement, unit: hounsfield_unit, unit_code: "[hnsf'U]"}
+```
+
+Tools compare units by `unit_code` when present, otherwise by `unit`. The curated list starts with:
+- SI lengths (nanometer … kilometer) and time units;
+- angles: degree, radian, arcsecond;
+- hounsfield_unit, counts, percent, kelvin, reflectance, arbitrary.
+
+It grows through profiles.
+
+### 4.6 Image pyramids (geometry reserved, storage not yet defined)
+
+One file holds **one image**. The only planned exception is a multi-resolution pyramid of that same image
+(pathology, microscopy). Its storage layout is **not part of v1**. v1 only fixes how a level's geometry is
+described, so that the later storage design cannot reopen geometry questions:
+
+```yaml
+pyramid:                      # optional, reserved. v1 readers ignore it, v1 writers do not write it
+  levels:
+    - level: 1
+      shape: [1, 4096, 4096]
+      to_base_index:          # base-array index of each element of this level
+        scale: [1, 2, 2]      #   base_index = scale * level_index + offset
+        offset: [0, 0.5, 0.5] #   0.5 = centre of a 2x2 block (averaging); 0 = nearest-sample decimation
+      storage: null           # to be defined (separate blosc2 array, sub-file, ...)
+```
+
+- Each level's position in every space is the space's `from_array` composed with `to_base_index`, so levels
+  never need their own copy of the space geometry.
+- `offset` is explicit because producers differ. With averaging, the first level-1 pixel's centre is at
+  base index 0.5, not 0. Ignoring that is the classic half-pixel shift between levels (KB ch07 §3).
 
 ## 5. Profiles
 
@@ -255,6 +298,16 @@ ml:
 | `earth_observation` | bands (name, centre wavelength), acquisition time, sensor | `map` space with `reference.scheme: epsg` |
 | `natural` | camera and lens (EXIF subset), colour space | usually none |
 | `physics` | quantity names, solver, per-component units | SI-unit space, `component` axis |
+
+**How non-medical formats map onto the core** (informative). This is the check that the model covers other
+domains; converters for these formats come later.
+
+| format | geometry | values | other |
+|---|---|---|---|
+| OME-TIFF / OME-Zarr | `PhysicalSizeX/Y/Z` (+ unit) → `scale` of a `stage` space; NGFF `scale`/`translation` → same | — | channels → `channel` axis `labels`; wavelengths, objective → `microscopy` profile |
+| FITS | linear WCS (`CRPIX`, `CRVAL`, `CDELT`/`CD`/`PC`, `CUNIT`) → `matrix` of a `sky` space. FITS pixel indices are 1-based with integer = pixel centre, so `CRPIX` − 1 gives the 0-based reference index. The projection (`CTYPE` e.g. `RA---TAN`) → `astronomy` `profile_mapping` | `BUNIT` → `unit`; `BSCALE`/`BZERO` → `scale`/`offset`; `BLANK` → `fill` | all cards verbatim in `source` |
+| GeoTIFF / COG | `ModelTransformation` or `ModelPixelScale` + `ModelTiepoint` → `matrix` of a `map` space; CRS → `reference: {scheme: epsg, id: ...}`. `PixelIsArea` describes the pixel *corner*, so add half a pixel to reach our centre convention; `PixelIsPoint` is already a centre | `GDAL_NODATA` → `fill`; scale/offset tags → `scale`/`offset` | bands → `channel` axis; band wavelengths → `earth_observation` profile |
+| Plain TIFF / PNG / JPEG | none (index space), or DPI → `scale` in inch/millimeter | — | EXIF → `natural` profile or `source` |
 
 ## 6. Source — the original metadata
 
@@ -386,11 +439,23 @@ MLArray(array, axes=[...], spaces=[...], values=...)        # explicit construct
 MLArray(array, spacing=..., origin=..., direction=..., space="patient")  # convenience; composed into matrix
 ```
 
-## 12. Open questions
+## 12. Decisions log
 
-See the companion discussion. Items still open in this spec:
+| topic | decision |
+|---|---|
+| geometry vocabulary | own, domain-neutral vocabulary; not NGFF field names |
+| default world frame (MedVol output) | DICOM patient frame (LPS) |
+| array layout | acquisition grid as stored; reorientation only on request |
+| metadata encoding | msgpack maps in three blosc2 `vlmeta` keys; core loaded on open, `source` and `user` lazily |
+| `source` | kept readable and authentic; core-owned fields regenerated on export; data-dependent fields guarded by a fingerprint; read-only |
+| round-trip accuracy | §9: format-level accuracy, not byte identity |
+| backwards compatibility | none; no v0 migration |
+| de-identification | not done, ever (not MLArray's concern) |
+| units | curated readable names + free text + optional UCUM `unit_code` |
+| files | one image per file; future exception: pyramid levels of that image |
+| pyramids | level geometry reserved in v1 (§4.6); storage designed later |
+| non-medical domains | covered by the core and profile mapping (§5.3); converters later |
 
-1. Unit vocabulary: a curated list of readable names (proposed), with free strings allowed, and optionally an
-   additional machine code (UCUM) per unit?
-2. Multi-resolution pyramids (pathology, microscopy): part of v1, or a later extension?
-3. More than one array per file (e.g. image + segmentation): out of scope (proposed)?
+## 13. Open questions
+
+None at the moment.
