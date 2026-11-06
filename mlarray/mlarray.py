@@ -948,12 +948,12 @@ class MLArray(MLArrayConstructors):
         self._validate_and_add_meta(meta, has_array=True)
         spatial_axis_mask = [True] * len(shape) if self.meta.spatial.axis_labels is None else _spatial_axis_mask(self.meta.spatial.axis_labels)
         with _meta_internal_write():
-            self.meta.blosc2 = _storage.comp_blosc2_meta(self.meta.blosc2, patch_size, chunk_size, block_size, shape, np.dtype(dtype).itemsize, spatial_axis_mask, cparams, dparams)
+            self.meta.blosc2, cparams = _storage.comp_blosc2_meta(self.meta.blosc2, patch_size, chunk_size, block_size, shape, np.dtype(dtype).itemsize, spatial_axis_mask, cparams, dparams)
             self.meta._has_array.has_array = True
         
         self.support_metadata = True
         
-        self._store = blosc2.empty(shape=shape, dtype=np.dtype(dtype), urlpath=str(filepath), chunks=self.meta.blosc2.chunk_size, blocks=self.meta.blosc2.block_size, cparams=_storage.resolve_cparams(self.meta.blosc2.cparams), dparams=_storage.resolve_dparams(self.meta.blosc2.dparams), mode=mode, mmap_mode=mmap_mode)
+        self._store = blosc2.empty(shape=shape, dtype=np.dtype(dtype), urlpath=str(filepath), chunks=self.meta.blosc2.chunk_size, blocks=self.meta.blosc2.block_size, cparams=cparams, dparams=_storage.resolve_dparams(self.meta.blosc2.dparams), mode=mode, mmap_mode=mmap_mode)
         self._backend = "blosc2"
         self.mode = mode
         self.mmap_mode = mmap_mode
@@ -1132,7 +1132,7 @@ class MLArray(MLArrayConstructors):
             else _spatial_axis_mask(meta.spatial.axis_labels)
         )
         with _meta_internal_write():
-            meta.blosc2 = _storage.comp_blosc2_meta(
+            meta.blosc2, cparams = _storage.comp_blosc2_meta(
                 meta.blosc2,
                 patch_size="default",
                 chunk_size=None,
@@ -1148,7 +1148,7 @@ class MLArray(MLArrayConstructors):
             array,
             chunks=meta.blosc2.chunk_size,
             blocks=meta.blosc2.block_size,
-            cparams=_storage.resolve_cparams(meta.blosc2.cparams),
+            cparams=cparams,
             dparams=_storage.resolve_dparams(meta.blosc2.dparams),
         )
         with _meta_internal_write():

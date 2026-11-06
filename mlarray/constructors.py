@@ -846,7 +846,7 @@ class MLArrayConstructors:
         )
 
         with _meta_internal_write():
-            self.meta.blosc2 = _storage.comp_blosc2_meta(
+            self.meta.blosc2, cparams = _storage.comp_blosc2_meta(
                 self.meta.blosc2,
                 patch_size,
                 chunk_size,
@@ -866,7 +866,7 @@ class MLArrayConstructors:
             blosc2_storage_kwargs = {
                 "chunks": self.meta.blosc2.chunk_size,
                 "blocks": self.meta.blosc2.block_size,
-                "cparams": _storage.resolve_cparams(self.meta.blosc2.cparams),
+                "cparams": cparams,
                 "dparams": _storage.resolve_dparams(self.meta.blosc2.dparams),
             }
 

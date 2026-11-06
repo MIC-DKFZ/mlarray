@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import blosc2
 import numpy as np
 
 from mlarray import MLArray
@@ -159,6 +160,36 @@ class TestSave(unittest.TestCase):
             image.save(Path(tmpdir) / "meta_only.mla")
             self.assertIs(image._store, store)
             self.assertEqual(MLArray(Path(tmpdir) / "meta_only.mla").spacing, [1.0, 2.0, 3.0])
+
+    def test_persisted_cparams_have_no_machine_specific_fields(self):
+        cparams_object = blosc2.CParams(codec=blosc2.Codec.ZSTD, clevel=3, nthreads=2)
+        cparams_dict = {"codec": blosc2.Codec.ZSTD, "clevel": 3, "nthreads": 2, "typesize": 8, "blocksize": 4096}
+        with tempfile.TemporaryDirectory() as tmpdir:
+            for name, cparams in (("object", cparams_object), ("dict", cparams_dict)):
+                with self.subTest(cparams=name):
+                    path = Path(tmpdir) / f"{name}.mla"
+                    image = MLArray(_make_array(seed=9), cparams=cparams)
+                    self.assertEqual(image._store.schunk.cparams.nthreads, 2)
+                    image.save(path)
+
+                    persisted = dict(MLArray(path).meta.blosc2.cparams)
+                    self.assertNotIn("typesize", persisted)
+                    self.assertNotIn("blocksize", persisted)
+                    self.assertEqual((blosc2.Codec(persisted["codec"]), persisted["clevel"]), (blosc2.Codec.ZSTD, 3))
+                    if name == "object":
+                        self.assertNotIn("nthreads", persisted)
+                    else:
+                        self.assertEqual(persisted["nthreads"], 2)
+
+    def test_create_compresses_with_given_cparams_object(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "created.mla"
+            cparams = blosc2.CParams(codec=blosc2.Codec.ZSTD, clevel=3, nthreads=2)
+            created = MLArray.create(path, shape=(8, 16, 16), dtype=np.float32, cparams=cparams)
+            self.assertEqual(created._store.schunk.cparams.nthreads, 2)
+            self.assertNotIn("nthreads", dict(created.meta.blosc2.cparams))
+            created.close()
+            self.assertNotIn("nthreads", dict(MLArray.open(path).meta.blosc2.cparams))
 
 
 if __name__ == "__main__":

@@ -76,6 +76,24 @@ def resolve_cparams(cparams: Optional[Union[Dict, blosc2.CParams]]) -> Union[Dic
     return cparams
 
 
+def portable_cparams(cparams: Union[Dict, blosc2.CParams]) -> Dict:
+    """Compression parameters as recorded in the metadata.
+
+    Machine-specific fields are left out so a file does not carry them to
+    other machines: ``typesize`` and ``blocksize`` always, and the
+    ``nthreads`` of a ``blosc2.CParams`` object, which blosc2 fills with the
+    number of cores. Thread counts given in a dict are kept.
+    """
+    if isinstance(cparams, blosc2.CParams):
+        portable = dict(vars(cparams))
+        portable.pop("nthreads", None)
+    else:
+        portable = dict(cparams)
+    portable.pop("typesize", None)
+    portable.pop("blocksize", None)
+    return portable
+
+
 def resolve_dparams(dparams: Optional[Union[Dict, blosc2.DParams]]) -> Union[Dict, blosc2.DParams]:
     """Resolve decompression params with MLArray defaults."""
     if dparams is None:
@@ -109,7 +127,7 @@ def normalize_patch_size(patch_size, num_spatial_axes: int) -> Optional[List[int
     return [int(value) for value in patch_size]
 
 
-def comp_blosc2_meta(meta_blosc2, patch_size, chunk_size, block_size, shape, dtype_itemsize, spatial_axis_mask, cparams, dparams, array=None) -> MetaBlosc2:
+def comp_blosc2_meta(meta_blosc2, patch_size, chunk_size, block_size, shape, dtype_itemsize, spatial_axis_mask, cparams, dparams, array=None) -> Tuple[MetaBlosc2, Union[Dict, blosc2.CParams]]:
     """Compute and validate Blosc2 chunk/block metadata.
 
     Args:
@@ -130,7 +148,10 @@ def comp_blosc2_meta(meta_blosc2, patch_size, chunk_size, block_size, shape, dty
             does; without data, blosc2's default (SHUFFLE) applies.
 
     Returns:
-        MetaBlosc2: Validated Blosc2 metadata instance.
+        Tuple[MetaBlosc2, Union[Dict, blosc2.CParams]]: The validated Blosc2
+        metadata, which records the portable compression parameters (see
+        :func:`portable_cparams`), and the full compression parameters to
+        create the store with.
     """
     num_spatial_axes = sum(spatial_axis_mask)
     is_default_patch_size = isinstance(patch_size, str) and patch_size == "default"
@@ -185,11 +206,11 @@ def comp_blosc2_meta(meta_blosc2, patch_size, chunk_size, block_size, shape, dty
         chunk_size=chunk_size,
         block_size=block_size,
         patch_size=patch_size,
-        cparams=cparams,
+        cparams=portable_cparams(cparams),
         dparams=dparams,
     )
     meta_blosc2._validate_and_cast(ndims=len(shape), spatial_ndims=num_spatial_axes)
-    return meta_blosc2
+    return meta_blosc2, cparams
 
 
 # ----------------------------------------------------------------------------
