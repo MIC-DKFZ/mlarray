@@ -24,13 +24,13 @@ remote → a GitHub Actions workflow on a `v*` tag publishes to PyPI.
 - [ ] Remaining gaps (mlarray `rework-plan.md` §6): Siemens mosaic (needs dcm2niix), RTSTRUCT writing, vector frame in MetaImage/MGH writers.
 
 ### nnunetv2 and nnunetv3: check that they load data correctly
-- [ ] **nnunetv3 (urgent):** it uses the v0 API (`Meta(is_seg=...)`, `MLArray(..., meta=...)` in
-  `nnunetv3/training/dataloading/nnunet_dataset.py`, about 6 call sites; also `planning/layouts.py`,
-  `preprocessing/`, `inference/export_prediction.py`, `training/nnUNetTrainer/pretrained/totalseg.py`) and pins
-  only `mlarray>=0.0.43`, so a fresh install gets mlarray 1.0.0 and breaks. Either pin `mlarray<1` right away or
-  port it to v1 (`values={"kind": "label"}` instead of `is_seg`, `meta.storage` instead of `meta.blosc2`,
-  `MLArray.comp_blosc2_params` is unchanged). Preprocessed datasets written as v0 `.mla` cannot be read by
-  mlarray 1.0 and must be preprocessed again.
+- [x] **nnunetv3 ported to v1** (2026-11-06): branch `fix/mlarray-v1` (worktree `~/projects/nnunetv3-mlarray-v1`,
+  commit `7d769d48`, based on `project/nnunetv3`, merges cleanly into `feat/config-schema`; not pushed, not merged).
+  `mlarray_geometry()` in `nnunet_dataset.py` turns nnU-Net's array-aligned geometry (world rows S,P,L) into the
+  patient space (L,P,S); segmentations are `values.kind = "label"`; the layout is now nnU-Net's own (the old L1/L3
+  budgets of the preprocessor are gone); pin `mlarray>=1.0.0,<2`. Test: `nnunetv3/tests/test_mlarray_dataset.py`
+  (checks the matrix against nnU-Net's own NIfTI affine). The `nnunetv3` conda env still has mlarray v0: upgrade
+  it when the branch is merged. Preprocessed `.mla` folders written with v0 must be preprocessed again.
 - [ ] **nnunetv3:** check that loading keeps the layout and geometry: patch reads, segmentation labels, spacing
   used for resampling (now derived from the space matrix, per array axis in array order), and that the storage
   defaults (nnU-Net layout, LZ4HC-5, read-ahead) still apply (`docs/optimization.md`).
