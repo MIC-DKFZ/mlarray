@@ -34,7 +34,7 @@ def set_read_ahead(nthreads: int = MLARRAY_DEFAULT_READ_AHEAD) -> int:
     makes patch reads several times faster, most on network storage (in our
     benchmark with 12 nnU-Net-style loader processes on network storage, 3D
     patches took 64-82% less time). For data already in the page cache it can
-    cost a little (up to about 15% per read with a single reader).
+    cost a little (up to about 17% per read with a single reader).
 
     MLArray turns it on with ``MLARRAY_DEFAULT_READ_AHEAD`` (4) threads the
     first time a file is opened, unless this function was called before or

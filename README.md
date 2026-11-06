@@ -67,6 +67,10 @@ image = MLArray.create("sample.mla", shape=array.shape, dtype=array.dtype, mmap_
 image[...] = array  # Modify image in memory and disk
 ```
 
+### Fast reading
+
+`MLArray.open` reads lazily: `image[...]` decompresses only the chunks a patch touches. The first open in a process also turns on blosc2's read-ahead (4 threads), which fetches those chunks in parallel and makes reads of data not in the page cache several times faster, especially on network storage. Change it with `mlarray.set_read_ahead(n)` (`0` turns it off) or the `BLOSC_PREFETCH` environment variable. Files are written with nnU-Net's layout and compression settings; see [ML Optimization](docs/optimization.md) for details.
+
 ### Metadata inspection and manipulation
 
 ```python

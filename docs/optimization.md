@@ -4,31 +4,34 @@ MLArray is designed around a simple goal: **make training-time I/O fast and pred
 
 To achieve this, MLArray builds on **Blosc2 ND arrays**, which store data in a two-level tiled layout:
 
-* **Chunks**: larger partitions that are typically sized to fit higher-level CPU caches (and amortize overhead).
-* **Blocks**: smaller partitions inside chunks that are typically sized to fit lower-level CPU caches and improve decompression speed.
+* **Chunks**: the unit stored on disk and fetched from storage.
+* **Blocks**: the unit decompressed; a read decompresses only the blocks it touches.
 
-On top of that, MLArray supports **memory-mapped access** via Blosc2, so reading `image[x0:x1, y0:y1, ...]` can touch *only the required on-disk regions*, instead of loading the whole array.
+On top of that, MLArray supports **memory-mapped access** via Blosc2, so reading `image[x0:x1, y0:y1, ...]` touches *only the required on-disk regions*, instead of loading the whole array.
 
-The key challenge is that choosing good `chunk_size` and `block_size` is **hard**:
+MLArray's defaults come from a benchmark of nnU-Net-style patch loading on a compute cluster (random patches, 1 to 12 loader processes, network and node-local storage, data in and not in the page cache, several datasets). In short: **nnU-Net's layout and codec, `mmap_mode='r'` and blosc2's read-ahead** were as fast as every alternative we tested, and they write fastest.
 
-* the optimal values depend on CPU cache sizes, dtype, dimensionality, and—most importantly—your **training patch size**,
-* and the wrong choices can silently tank throughput.
+### Patch-size-driven layout
 
-### Patch-size-driven layout optimization
+You tell MLArray the **patch size** you expect to sample during training (e.g., `192³`), and it derives `chunk_size` and `block_size` with nnU-Net's heuristic, generalized to any number of axes:
 
-Instead of requiring users to be storage experts, MLArray introduces a **patch size optimization**:
+1. **Non-spatial axes** (channels, time, ... from `axis_labels`) get chunk and block size 1, so reading one channel touches only its own data.
+2. **Blocks** start at the next power of two of the patch size per spatial axis and are halved until they fit **128 KiB**.
+3. **Chunks** grow by whole blocks on the least covered axis until they reach **6 MiB**, the image extent, or **1.5x the patch size** per axis.
+4. A patch entry of 1 (e.g. `(1, 256, 256)` for 2D slices of a 3D image) keeps that axis at chunk size 1.
 
-1. You tell MLArray the **patch size** you expect to sample during training (e.g., `192³`).
-2. MLArray derives **block_size** and **chunk_size** automatically to match this access pattern.
-3. Internally, the heuristic considers:
+For 2D and 3D images the layout is identical to nnU-Net's. In the benchmark, smaller chunks (1.5 MiB) with LZ4HC level 9 read 4-10% faster than nnU-Net's files without read-ahead; with read-ahead the difference was gone (within 2 points), while they wrote up to 3x slower.
 
-   * element size (bytes per pixel),
-   * CPU cache sizes (L1 / L3 per core),
-   * your patch size (2D or 3D),
-   * non-spatial axes layout (via `axis_labels`),
-   * and then chooses block/chunk sizes that aim to keep decompression and reads cache-friendly.
+### Compression
 
-Practically: this means *reading a training patch should tend to require as few chunk/block touches as possible*, while keeping the decompressed working set aligned with CPU caches.
+By default MLArray compresses with **LZ4HC level 5** and **4 compression threads**, and chooses the **filter per array** as nnU-Net does: it compresses a centered chunk-sized slab with and without SHUFFLE and keeps the better one (resampled intensities usually favour SHUFFLE, integer-valued ones no filter). Without data to look at (`MLArray.create`, `empty`, ...), blosc2's default SHUFFLE applies. Pass `cparams` to use anything else, e.g. `{"codec": blosc2.Codec.ZSTD, "clevel": 5}` for smaller, slower-to-read archives.
+
+### Reading: memory mapping and read-ahead
+
+* **`mmap_mode='r'`** (the default of `MLArray.open`) with **1 decompression thread** per reader. With read-ahead on, plain reads (`mmap_mode=None`) were no faster for uncached data and slower for cached data.
+* **Read-ahead**: the first `MLArray.open` in a process turns on blosc2's read-ahead with **4 threads** (`blosc2.set_prefetch(4)`). Reading a slice then fetches all chunks it needs in parallel instead of one small request after another. In the benchmark, with 12 loader processes reading 3D patches that were not in the page cache from network storage, this cut the time per read by 64-82% (3-5x faster), for larger-than-memory datasets by about 70-78% in every epoch. Reader threads in one process each get their own read-ahead threads, so threaded readers gain as much as processes.
+* For data already in the page cache, read-ahead costs a little: about 0-8% per patch with 12 processes and up to about 17% with a single reader.
+* Change or turn it off with `mlarray.set_read_ahead(n)` (`0` = off) before opening files, or set the `BLOSC_PREFETCH` environment variable, which MLArray leaves alone. The setting applies to the whole process. It needs a blosc2 with read-ahead support (`blosc2.set_prefetch`); with older versions nothing changes.
 
 ---
 
@@ -197,13 +200,14 @@ image.save("blosc2-auto.mla")
 
 When to use:
 
-* you want to compare MLArray’s patch optimization against Blosc2 defaults,
+* you want to compare MLArray’s layout against Blosc2 defaults,
 * you don’t have a meaningful patch size (non-ML access patterns).
 
 ---
 
 ## Notes and practical tips
 
-* **Patch optimization is currently implemented for 2D and 3D images** (with at most one further non-spatial axis). If your data falls outside that, you can still set `chunk_size`/`block_size` manually or let Blosc2 decide.
+* **Patch optimization works for any number of spatial and non-spatial axes**; for 2D and 3D images it gives nnU-Net's layout. You can still set `chunk_size`/`block_size` manually or let Blosc2 decide.
+* **Reading from network storage or datasets larger than RAM:** keep read-ahead on (the default). If your data always fits in RAM and is read many times by a single process, `mlarray.set_read_ahead(0)` can save a few percent per read.
 * The best patch size to use is usually the **patch size your dataloader requests most often** (training patch, not necessarily inference tile size).
 * If you’re unsure: start with the default (`patch_size='default'`) and only tune if profiling shows I/O bottlenecks.

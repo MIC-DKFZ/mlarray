@@ -4,6 +4,14 @@
 
 ::: mlarray.mlarray.MLArray
 
+::: mlarray.mlarray.set_read_ahead
+
+## Layout Module
+
+::: mlarray.blosc2_layout_strategies.comp_blosc2_params
+
+::: mlarray.blosc2_layout_strategies.select_blosc2_filter
+
 ## Metadata Module
 
 ::: mlarray.meta.BaseMeta
