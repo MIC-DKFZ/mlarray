@@ -12,7 +12,7 @@ remote → a GitHub Actions workflow on a `v*` tag publishes to PyPI.
 | package | PyPI trusted publisher | notes |
 |---|---|---|
 | mlarray | yes | released as 1.0.0 from `main` |
-| MedVol | yes | `rework/v2`, version 1.0.0.dev0; release after mlarray 1.0.0 is on PyPI (needs `mlarray>=1.0`). Its workflow (`test_and_deploy.yml`) still uploads with a twine token and must be switched to trusted publishing (`id-token: write`, `pypa/gh-action-pypi-publish`) |
+| MedVol | yes | released as 1.0.0 from `main` (trusted publishing, tests on Python 3.10-3.13 before publishing) |
 | napari-mlarray | yes | check the workflow uses trusted publishing |
 | SlicerMLArray | no | released through the Slicer extension index, not PyPI (check) |
 | napari-nifti | no | publishes with an API token, or set up trusted publishing |
@@ -20,8 +20,7 @@ remote → a GitHub Actions workflow on a `v*` tag publishes to PyPI.
 ## TODO
 
 ### MedVol 1.0 release
-- [ ] Switch `test_and_deploy.yml` to trusted publishing; check that the workflow file name matches the PyPI registration.
-- [ ] Pin `mlarray>=1.0.0` (currently `>=1.0.0.dev0`), set the version to 1.0.0, merge `rework/v2` into `main`, tag `v1.0.0`.
+- [x] Trusted publishing, `mlarray>=1.0.0`, version 1.0.0, `rework/v2` merged into `main`, tagged `v1.0.0` (on PyPI 2026-11-06).
 - [ ] Remaining gaps (mlarray `rework-plan.md` §6): Siemens mosaic (needs dcm2niix), RTSTRUCT writing, vector frame in MetaImage/MGH writers.
 
 ### napari-mlarray
