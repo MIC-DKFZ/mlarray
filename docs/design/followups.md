@@ -72,4 +72,4 @@ remote → a GitHub Actions workflow on a `v*` tag publishes to PyPI.
   Integer images whose values look like class ids show as Labels. 14 tests; on-screen check of the KB letter
   phantoms (NIfTI ras/lps/sag/obl25, NRRD) passes. Version 1.0.0, needs napari-mlarray 1.1.0 (`6231d39`).
 - [x] napari-mlarray 1.1.0 released; napari-nifti is a PyPI trusted publisher now.
-- [ ] Tag napari-nifti v1.0.0 (user).
+- [x] napari-nifti 1.0.0 released (2026-11-06).
