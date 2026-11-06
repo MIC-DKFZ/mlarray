@@ -61,6 +61,7 @@ remote → a GitHub Actions workflow on a `v*` tag publishes to PyPI.
 - [ ] napari-nifti should reuse `napari_mlarray._display` (the same convention) on top of MedVol.
 
 ### SlicerMLArray
+- Plan: `~/projects/SlicerMLArray/docs/design/rework-plan.md` (branch `rework/v1`; decisions in its §8). Slicer 5.12.4 at `~/Slicer-5.12.4-linux-amd64`.
 - [ ] Map the v1 space matrix to Slicer's RAS IJKToRAS (via `increases_toward`, never letter codes); `values.labels` → segmentation with names, colours and codes; boxes in `profiles.ml`.
 - [ ] Remove the v0 helpers (`coord_system`, `axis_labels`, affine-based bbox conversion).
 - [ ] Export: write v1 metadata.
