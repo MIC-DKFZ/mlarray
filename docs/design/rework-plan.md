@@ -3,7 +3,7 @@
 This document lets any agent or developer continue the rework without prior context. Read it fully before
 touching code. Keep it current: when a stage step is done, tick it and add the commit hash.
 
-Last update: 2026-11-06 (planning complete; no implementation started).
+Last update: 2026-11-06 (stage 1 done; stage 2 in progress).
 
 ---
 
@@ -75,15 +75,15 @@ Goal: bring over every fix from `review/findings` that concerns code surviving t
 tests. Prefer `git cherry-pick -x <hash>` when it applies cleanly. Otherwise re-implement by hand and copy
 the tests. `mlarray/mlarray.py` changed on `rework/v1`, so expect conflicts there. Drop `FINDINGS.md` hunks.
 
-| ☐ | review commit | content | findings | notes |
+| done | review commit | content | findings | notes |
 |---|---|---|---|---|
-| ☐ | `6c52edd` | atomic `save()`: write to temp file, write metadata into it, `os.replace`; never modify the source file; reopen with the same mode when saving onto itself | C1, H1, M2 | brings `tests/test_save.py`. Keep the metadata writing behind one function so stage 3 can swap the serialisation |
-| ☐ | `2ce1242` | `flush()` and context manager (`with MLArray.open(...) as a:`) | M3 | |
-| ☐ | `ac433cb` | `arange` length via `ceil`; float detection via `np.floating` | H2, H3 | |
-| ☐ | `4f6604b` | 0-d arrays stay 0-d; `create(mmap_mode=None)` overwrites; `__array__(copy=)`; opening `r+`/`a` doesn't rewrite metadata; int `shape` in `create`; `patch_size` validation; numpy ints in `patch_size` | M5 (part), M6, L1, L2, L3, L5, M9 (part) | its `tests/test_optimization.py` hunk: keep only what still applies to the new layout heuristic |
-| ☐ | `012c896` | packaging and CI: CI on Python 3.10–3.13, real pytest exit code, banner not installed as data files, keywords | L16, L18, Nit | the `medvol>=0.0.22` pin (L17) is obsolete: in stage 4 mlarray's CLI delegates to MedVol v2. Pin the new version then |
-| ☐ | `1ab1641` | benchmark measurement fixes | M19–M22 | **only the `bench/benchmark_formats.py` and `bench/README.md` parts**. The other two scripts were deleted on `rework/v1` |
-| ☐ | `bed5c54` | examples write to a temp dir instead of the cwd | Nit | skip the `docs/schema.md` and `docs/optimization.md` hunks: schema docs are rewritten in stage 3, and optimisation docs were rewritten on `rework/v1` |
+| ☑ `12dc805` | `6c52edd` | atomic `save()`: write to temp file, write metadata into it, `os.replace`; never modify the source file; reopen with the same mode when saving onto itself | C1, H1, M2 | brings `tests/test_save.py`. Keep the metadata writing behind one function so stage 3 can swap the serialisation |
+| ☑ `4ea3528` | `2ce1242` | `flush()` and context manager (`with MLArray.open(...) as a:`) | M3 | |
+| ☑ `8e9859b` | `ac433cb` | `arange` length via `ceil`; float detection via `np.floating` | H2, H3 | |
+| ☑ `e267669` | `4f6604b` | 0-d arrays stay 0-d; `create(mmap_mode=None)` overwrites; `__array__(copy=)`; opening `r+`/`a` doesn't rewrite metadata; int `shape` in `create`; `patch_size` validation; numpy ints in `patch_size` | M5 (part), M6, L1, L2, L3, L5, M9 (part) | its `tests/test_optimization.py` hunk: keep only what still applies to the new layout heuristic |
+| ☑ `7bc9eed` | `012c896` | packaging and CI: CI on Python 3.10–3.13, real pytest exit code, banner not installed as data files, keywords | L16, L18, Nit | the `medvol>=0.0.22` pin (L17) is obsolete: in stage 4 mlarray's CLI delegates to MedVol v2. Pin the new version then |
+| ☑ `b4239a6` | `1ab1641` | benchmark measurement fixes | M19–M22 | **only the `bench/benchmark_formats.py` and `bench/README.md` parts**. The other two scripts were deleted on `rework/v1` |
+| ☑ `efafaf1` | `bed5c54` | examples write to a temp dir instead of the cwd | Nit | skip the `docs/schema.md` and `docs/optimization.md` hunks: schema docs are rewritten in stage 3, and optimisation docs were rewritten on `rework/v1` |
 
 **Not ported** (handled by the redesign instead):
 - `45c3ff4`, `35b613c`, `1ac9bcc` (msgpack storage, lazy source/extra decoding): stage 3 implements the
@@ -98,6 +98,9 @@ the tests. `mlarray/mlarray.py` changed on `rework/v1`, so expect conflicts ther
 
 **Done when:** every row is ticked, the full suite is green (baseline tests + ported tests), and each port is
 its own commit.
+
+**Result (2026-11-06):** all 7 ported in the review branch's order (`4f6604b` before `2ce1242`, because
+`2ce1242`'s tests build on it). Suite: 127 passed, 3056 subtests.
 
 ---
 
@@ -257,3 +260,5 @@ Append entries; never delete them.
 | date | stage | entry | status |
 |---|---|---|---|
 | 2026-11-06 | — | plan written; specs agreed with the user (see spec decision logs) | — |
+| 2026-11-06 | 1 | `012c896` ported with its `medvol>=0.0.22` pin: the current CLI still needs it; stage 4 step 8 replaces it | — |
+| 2026-11-06 | 1 | stage 1 done, 127 passed / 3056 subtests | — |
