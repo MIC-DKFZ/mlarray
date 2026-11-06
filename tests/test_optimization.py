@@ -164,6 +164,21 @@ class TestOptimizationExamples(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     MLArray(array, patch_size=patch_size)
 
+    def test_only_non_spatial_axes_use_blosc2_layout_by_default(self):
+        array = _make_array(shape=(3, 4))
+        axis_labels = [MetaSpatial.AxisLabel.channel, MetaSpatial.AxisLabel.temporal]
+
+        image = MLArray(array, axis_labels=axis_labels)
+
+        self.assertIsNone(image.meta.blosc2.patch_size)
+        self.assertEqual(image.meta.blosc2.chunk_size, list(image._store.chunks))
+        self.assertTrue(np.array_equal(image.to_numpy(), array))
+
+    def test_only_non_spatial_axes_reject_explicit_patch_size(self):
+        axis_labels = [MetaSpatial.AxisLabel.channel, MetaSpatial.AxisLabel.temporal]
+        with self.assertRaises(RuntimeError):
+            MLArray(_make_array(shape=(3, 4)), axis_labels=axis_labels, patch_size=8)
+
 
 if __name__ == "__main__":
     unittest.main()
