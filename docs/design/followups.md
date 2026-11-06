@@ -46,7 +46,7 @@ remote → a GitHub Actions workflow on a `v*` tag publishes to PyPI.
   KB ch05) and decide whether it should move to MedVol/mlarray.
 
 ### napari-mlarray
-- [x] Rewritten (branch `rework/v1`, merged into `main` at `ce3b141`, pushed; CI green on Linux/macOS/Windows, Python 3.10-3.13; not released yet). Patient spaces are shown in the
+- [x] Rewritten (branch `rework/v1`, merged into `main` at `ce3b141`, pushed; CI green on Linux/macOS/Windows, Python 3.10-3.13; **released as 1.0.0 on 2026-11-06**). Patient spaces are shown in the
   world `I, P, L` (radiological; `I, P, R` neurological, 3-D camera depth flipped), data reordered so the affine has
   no permutation (napari cannot slice permuting affines in 2-D), oblique grids resampled/snapped/kept, labels with
   the label table, channels split, lazy reads above 1 GiB, ml boxes as box-shell Labels (3-D) or rectangles (2-D),
@@ -57,8 +57,7 @@ remote → a GitHub Actions workflow on a `v*` tag publishes to PyPI.
   `Karol-G/napari-bboxes`, pushed directly to GitHub, CI green, trusted publisher configured); napari-mlarray
   `74bdaf9` depends on `napari-bboxes>=0.1`.
 - [x] napari-bboxes 0.1.0 and 0.1.1 released (2026-11-06; 0.1.1: 3-D wireframe, slice-following texts, cut outlines).
-- [ ] Release napari-mlarray (trusted publisher; version
-  from the git tag via setuptools_scm).
+- [x] napari-mlarray 1.0.0 released (trusted publisher; version from the git tag via setuptools_scm).
 - [ ] napari-nifti should reuse `napari_mlarray._display` (the same convention) on top of MedVol.
 
 ### SlicerMLArray
