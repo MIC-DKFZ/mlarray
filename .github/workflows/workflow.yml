@@ -67,10 +67,8 @@ jobs:
       - name: Check metadata
         run: python -m twine check dist/*
 
-      - name: Publish to PyPI
+      - name: Publish to PyPI (trusted publishing)
         uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
 
   docs:
     needs: tests
