@@ -3,7 +3,7 @@
 This document lets any agent or developer continue the rework without prior context. Read it fully before
 touching code. Keep it current: when a stage step is done, tick it and add the commit hash.
 
-Last update: 2026-11-06 (stages 1-3 done; stage 4 next; open questions in §6).
+Last update: 2026-11-06 (stages 1-3 done; stage 4 in progress: skeleton, .mla, phantom, NIfTI done).
 
 ---
 
@@ -274,15 +274,15 @@ metadata (spec §8 persists no thread counts). All layout, codec, level, filter 
 
 Work in `~/projects/medvol` on `rework/v2`, following its `docs/design/spec.md`.
 
-1. ☐ Skeleton:
+1. ☑ medvol `84d1626` Skeleton:
    - `Image`, `Report`, `Policy`;
    - plugin registry via entry points, with `sniff`/`read`/`write`, capabilities and field tables (spec
      §3–§5).
-2. ☐ `.mla` plugin (via mlarray).
-3. ☐ Conformance phantom and test harness (spec §9). Port the generators from
+2. ☑ medvol `84d1626` `.mla` plugin (via mlarray).
+3. ☑ medvol `cc4a9a4` Conformance phantom and test harness (spec §9). Port the generators from
    `~/projects/image-orientation-kb/experiments/` (e.g. `05_python_libraries/synth.py`,
    `02_dicom/_synth.py`, `verify_dicom_real/_data.py`).
-4. ☐ NIfTI plugin, then NRRD, MetaImage, MGH/MGZ. Each comes with the round-trip suite and the
+4. ◐ NIfTI plugin (☑ medvol `b54a8c5`), then NRRD, MetaImage, MGH/MGZ (in progress). Each comes with the round-trip suite and the
    field-ownership regeneration test.
 5. ☐ DICOM read, phases 1–3 (spec §7.5), then DICOM write (re-emit original series, SEG; spec §7.6).
 6. ☐ mlarray CLI (`mlarray/cli.py`): `mlarray_convert` delegates to `medvol.convert`. Rewrite
@@ -291,6 +291,23 @@ Work in `~/projects/medvol` on `rework/v2`, following its `docs/design/spec.md`.
 7. ☐ Close the deferred review findings by verifying them against the new code: H10, H11, H12, M14–M18, L11,
    the CLI nits, and the stale CLI docs (`README.md`, `docs/cli.md`).
 8. ☐ Pin `medvol>=2` in mlarray's `[all]` extra.
+
+**Environment for stage 4:** conda env `medvol-v2` (Python 3.12, blosc2 4.14.1, nibabel 5.4.2, pynrrd 1.1.3,
+pydicom 3.0.2, highdicom 0.28.2; `mlarray` and `medvol` installed editable from the rework branches; install
+medvol with `--no-deps` because mlarray's version is not 1.0 yet). Tests:
+`cd ~/projects/medvol && ~/miniforge3/envs/medvol-v2/bin/python -m pytest -q -p no:cacheprovider tests/`.
+
+**Implementation notes (stage 4):**
+- MedVol v1 (RAS canonicalisation, backends, snapping), its tests and examples are deleted; packaging is
+  `pyproject.toml` with the plugin entry-point group `medvol.formats`.
+- Phantom (`tests/phantom.py`): every voxel stores its own Fortran-order file index, so `world_error` checks the
+  world position of every voxel against an oblique, mirrored LPS truth (KB ch05 geometry).
+- Exactness rule used by all writers: geometry-bound source fields are reused bit-identically while the source
+  fingerprint's geometry hash matches the current core; otherwise they are regenerated from the core (spec §4's
+  regeneration test then holds to float32 rounding, e.g. NIfTI quaternions to 1e-6).
+- NIfTI: header re-read as stored (nibabel moves scaling into the data proxy); header, extensions and data written
+  by MedVol through nibabel's header objects and `array_to_file`; `.hdr/.img` need nibabel's *Pair* header
+  classes (`is_single` is a class attribute).
 
 **Done when:**
 - every reader × writer pair passes the phantom test (< 1e-4 mm);
