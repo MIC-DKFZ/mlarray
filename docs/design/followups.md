@@ -66,7 +66,8 @@ remote → a GitHub Actions workflow on a `v*` tag publishes to PyPI.
   codes), boxes as ROIs, channels/vector/time, saving keeps metadata. 36 pytest tests; in Slicer 5.12.4
   (`~/Slicer-5.12.4-linux-amd64`) `scripts/verify_in_slicer.py` passes 95/95. Plan and status:
   `~/projects/SlicerMLArray/docs/design/rework-plan.md`.
-- [ ] GitHub mirror (user sets it up), then submit to the Slicer Extensions Index (checklist in the plan, §10).
+- [x] GitHub mirror live; submitted to the Slicer Extensions Index: https://github.com/Slicer/ExtensionsIndex/pull/2444 (2026-11-06).
+- [ ] After the merge and green preview builds: PR to the index's `5.12` branch.
 
 ### napari-nifti
 - [x] Reworked (`~/projects/napari-nifti`, merged into `main` at `93118f9`, pushed, CI green): reads every MedVol format (NIfTI,
