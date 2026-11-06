@@ -3,6 +3,8 @@
 ## MLArray Module
 
 ::: mlarray.mlarray.MLArray
+    options:
+      inherited_members: true
 
 ::: mlarray.mlarray.set_read_ahead
 
