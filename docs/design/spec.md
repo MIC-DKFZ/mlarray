@@ -28,8 +28,8 @@ Keywords **MUST**, **SHOULD** and **MAY** are normative. Everything marked *info
 - De-identification or any other modification of metadata. Metadata is stored as given.
 - Backwards compatibility with v0 files. There is no migration; v0 files must be re-converted from their
   sources.
-- Reading or writing other formats inside `mlarray`. That is MedVol's job. `mlarray` depends on numpy and
-  blosc2 only.
+- Reading or writing other formats inside `mlarray`. That is MedVol's job. `mlarray` depends on numpy,
+  blosc2, msgpack and xxhash only.
 
 ## 2. Terminology (informative)
 
@@ -66,6 +66,8 @@ radiologist read them the same way.
   blosc2 versions (review finding C2, branch `review/findings`).
 - Values **MUST** be msgpack-native types: map, array, string, integer, float, boolean, nil, binary.
   Map key order is preserved.
+- A file always holds an array. Metadata without array data is saved as an empty array of shape
+  `(0,) * len(axes)`, so `len(axes) == array.ndim` holds for every file.
 
 *Informative. Benchmark (blosc2 4.14.1, 2026-11-06), synthetic DICOM-like headers:*
 
@@ -193,7 +195,7 @@ Wherever a unit appears (space axes, non-space axes, `values`), it is given as:
 
 | field | meaning |
 |---|---|
-| `unit` | human-readable name. Writers **SHOULD** use a name from the curated list in `schemas/units-1.0.json`; free text is allowed when no listed unit fits. |
+| `unit` | human-readable name. Writers **SHOULD** use a name from the curated list in `mlarray/schemas/units-1.0.json`; free text is allowed when no listed unit fits. |
 | `unit_code` | optional machine-readable code in **UCUM** (Unified Code for Units of Measure, also used by DICOM and HL7). Writers **SHOULD** set it whenever it is known. The curated list gives the code for every listed name. |
 
 ```yaml
@@ -426,8 +428,8 @@ cannot represent.
 
 ## 10. Validation
 
-The normative definitions are JSON Schemas shipped in the repo: `schemas/mlarray-1.0.json`,
-`schemas/profile-medical-1.0.json`, `schemas/profile-ml-1.0.json`. They are applied to the msgpack content
+The normative definitions are JSON Schemas shipped in the repo: `mlarray/schemas/mlarray-1.0.json`,
+`mlarray/schemas/profile-medical-1.0.json`, `mlarray/schemas/profile-ml-1.0.json`. They are installed with the package. They are applied to the msgpack content
 as if it were JSON, with binary allowed in `source`/`user`. The Python model implements the schemas.
 Third-party readers (SlicerMLArray, napari-mlarray, future C++/JS) validate against the same files.
 
@@ -466,6 +468,9 @@ MLArray(array, spacing=..., origin=..., direction=..., space="patient")  # conve
 | files | one image per file; future exception: pyramid levels of that image |
 | pyramids | level geometry reserved in v1 (§4.6); storage designed later |
 | non-medical domains | covered by the core and profile mapping (§5.3); converters later |
+| schema location | `mlarray/schemas/`, installed with the package (2026-11-06) |
+| metadata without array data | saved as an empty array of shape `(0,) * len(axes)` (2026-11-06) |
+| dependencies | numpy, blosc2, msgpack, xxhash (xxh3 for the source fingerprint) (2026-11-06) |
 
 ## 13. Open questions
 
