@@ -22,45 +22,31 @@ The output is strict JSON (`jq` accepts it): non-finite numbers are printed as t
 
 ## `mlarray_convert`
 
-!!! warning
-    `mlarray_convert` is being rebuilt on MedVol 2, which writes MLArray v1 metadata. On this
-    development branch the command raises an error; the description below refers to the previous
-    version.
-
-Convert between MLArray and NIfTI/NRRD files.
-
-This provides an easy way to move medical imaging data into or out of an MLArray-based workflow.
-
-When converting from NIfTI/NRRD to MLArray, the source header is copied into `meta.source`.
-
-When converting from NIfTI/NRRD to MLArray, `meta.spatial.coord_system` is
-propagated conservatively:
-
-- For NRRD input, the converter looks for explicit NRRD space metadata in the
-  header (`space`, falling back to `NRRD_space` from the SimpleITK path). It
-  maps `right-anterior-superior` to `RAS`, `left-posterior-superior` to `LPS`,
-  and preserves other explicit NRRD space strings verbatim. If no explicit
-  space metadata is available, `coord_system` is left unset.
-- For NIfTI input, the converter sets `coord_system` to `LPS`. This is based on
-  the current `MedVol -> SimpleITK/ITK` import path: the imported geometry is
-  represented in the ITK physical-space convention, and MedVol only reindexes
-  axes to match NumPy array layout. It is not a statement that raw NIfTI
-  qform/sform metadata is preserved verbatim.
-
-When converting from MLArray to NIfTI/NRRD, only `meta.source` is copied into
-the output header. Spatial metadata (`spacing`, `origin`, and `direction`) is
-written explicitly from `meta.spatial`.
-
-- For NRRD output, `coord_system="RAS"` and `coord_system="LPS"` are written as
-  the corresponding NRRD `space` strings. A small set of already-valid NRRD
-  space strings is also preserved. Unsupported arbitrary `coord_system` strings
-  are not written as NRRD `space` metadata.
-- For NIfTI output, geometry is preserved through the existing affine-related
-  path, but `coord_system` is not exported as an explicit NIfTI metadata field
-  because the current conversion path does not expose a reliable direct
-  representation for it.
+Convert between MLArray (`.mla`) and NIfTI (`.nii`, `.nii.gz`, `.hdr/.img`), NRRD (`.nrrd`, `.nhdr`), MetaImage
+(`.mha`, `.mhd`), MGH/MGZ and DICOM. Conversion is done by [MedVol 2](https://github.com/MIC-DKFZ/MedVol); install
+it with `pip install "mlarray[all]"`.
 
 ```bash
-mlarray_convert sample.nii.gz output.mla
-mlarray_convert sample.mla output.nrrd
+mlarray_convert sample.nii.gz sample.mla
+mlarray_convert sample.mla roundtrip.nii.gz
+mlarray_convert dicom_dir/ ct.mla
+mlarray_convert ct.mla out_dir/ --target-format dicom
 ```
+
+What a conversion guarantees (MedVol spec):
+
+- The array keeps its stored values, dtype and storage order. Nothing is reoriented or rescaled; scaling such as
+  NIfTI `scl_slope` or DICOM `RescaleSlope` becomes `values.scale`/`offset`.
+- The geometry comes from the file's own fields and is stored as an explicit space (DICOM patient frame, LPS, by
+  default; `--world-frame ras` for RAS). Voxel positions agree between input and output to the formats'
+  precision.
+- The original header is kept, readable, in `source`. Converting back to the same format reproduces it; other
+  formats get only the fields they can represent.
+- Every ambiguity is an explicit policy, and every choice, warning and dropped field is printed and stored in the
+  file's `history`.
+
+Policy flags (defaults first): `--nifti-form {nibabel,sform,qform,itk}`, `--nifti-form-disagreement
+{warn,error,ignore}`, `--nifti-no-codes {error,spec,nibabel,itk}`, `--world-frame {dicom_patient,ras}`,
+`--dicom-tilt {exact,resample,error}`, `--dicom-irregular-spacing {error,split,resample}`, `--dicom-stacks
+{split,largest,error}`, `--vector-frame {from_file,lps,ras,error}`, `--on-loss {warn,error}`, `--layout
+{source,default}`; `--source-format` and `--target-format` name a format that cannot be detected.

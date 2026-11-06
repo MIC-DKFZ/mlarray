@@ -21,7 +21,7 @@ You can install mlarray via [pip](https://pypi.org/project/mlarray/):
 pip install mlarray
 ```
 
-To enable the `mlarray_convert` CLI command, install MLArray with the necessary extra dependencies:
+To enable the `mlarray_convert` CLI command (conversion with MedVol 2), install MLArray with the extra dependencies:
 ```bash
 pip install mlarray[all]
 ```
@@ -192,8 +192,20 @@ mlarray_header sample.mla
 
 ### mlarray_convert
 
-Conversion between MLArray and NIfTI/NRRD/DICOM is being rebuilt on MedVol 2, which writes MLArray v1
-metadata; on this development branch the command raises an error.
+Convert between MLArray and NIfTI, NRRD, MetaImage, MGH/MGZ and DICOM with
+[MedVol 2](https://github.com/MIC-DKFZ/MedVol) (`pip install "mlarray[all]"`). Nothing is reoriented, rescaled or
+dropped silently: the array keeps its stored order and dtype, the geometry is taken from the file's own fields,
+the original header is kept in `source` so the file can be written back faithfully, and every choice is reported.
+
+```bash
+mlarray_convert sample.nii.gz sample.mla
+mlarray_convert sample.mla roundtrip.nii.gz
+mlarray_convert dicom_dir/ ct.mla --dicom-tilt exact
+mlarray_convert ct.mla out_dir/ --target-format dicom      # re-emits the original DICOM series
+```
+
+Ambiguities are resolved by explicit MedVol policies, e.g. `--nifti-form sform` when a NIfTI's qform and sform
+disagree, or `--world-frame ras` to store the patient space in RAS instead of DICOM's LPS.
 
 ## Contributing
 

@@ -41,11 +41,26 @@ def print_header(filepath: Union[str, Path], source: bool = False, user: bool = 
     print(json.dumps(header(filepath, source=source, user=user), indent=2, allow_nan=False))
 
 
-def convert_image(load_filepath: Union[str, Path], save_filepath: Union[str, Path]) -> None:
-    raise RuntimeError(
-        "mlarray_convert is not available on this development branch: conversion is being rebuilt "
-        "on MedVol 2, which writes MLArray v1 metadata."
-    )
+def _medvol():
+    """MedVol 2, which does all format conversion (MLArray itself reads and writes only .mla)."""
+    try:
+        import medvol
+    except ImportError as error:
+        raise RuntimeError("mlarray_convert needs MedVol 2: pip install 'mlarray[all]'") from error
+    major = str(getattr(medvol, "__version__", "0")).split(".")[0]
+    if not major.isdigit() or int(major) < 2:
+        raise RuntimeError(f"mlarray_convert needs MedVol 2 or newer; found {medvol.__version__}. "
+                           "Upgrade with: pip install -U 'mlarray[all]'")
+    return medvol
+
+
+def convert_image(load_filepath: Union[str, Path], save_filepath: Union[str, Path], **options):
+    """Convert between any two formats MedVol supports (``.mla``, NIfTI, NRRD, MetaImage, MGH, DICOM).
+
+    ``options`` are MedVol policy options (e.g. ``nifti_form="sform"``) and ``source_format`` /
+    ``target_format``. Returns MedVol's report.
+    """
+    return _medvol().convert(load_filepath, save_filepath, **options)
 
 
 def cli_print_header() -> None:
@@ -63,9 +78,23 @@ def cli_print_header() -> None:
 def cli_convert_to_mlarray() -> None:
     parser = argparse.ArgumentParser(
         prog="mlarray_convert",
-        description="Convert between MLArray and NIfTI/NRRD files.",
+        description="Convert between MLArray (.mla) and NIfTI, NRRD, MetaImage, MGH/MGZ and DICOM with MedVol. "
+                    "Nothing is reoriented, rescaled or dropped silently; the report lists every choice.",
     )
-    parser.add_argument("load_filepath", help="Input path.")
-    parser.add_argument("save_filepath", help="Output path.")
+    parser.add_argument("load_filepath", help="Input file or DICOM directory.")
+    parser.add_argument("save_filepath", help="Output file (or directory for DICOM).")
+    parser.add_argument("--source-format", help="Input format if it cannot be detected (e.g. dicom).")
+    parser.add_argument("--target-format", help="Output format if the extension does not say (e.g. dicom).")
+    try:
+        from medvol.policy import OPTIONS
+    except ImportError:
+        OPTIONS = {}
+    for name, choices in OPTIONS.items():
+        parser.add_argument(f"--{name.replace('_', '-')}", choices=choices, help=f"MedVol policy (default {choices[0]}).")
     args = parser.parse_args()
-    convert_image(args.load_filepath, args.save_filepath)
+    options = {name: getattr(args, name) for name in OPTIONS if getattr(args, name) is not None}
+    if args.source_format:
+        options["source_format"] = args.source_format
+    if args.target_format:
+        options["target_format"] = args.target_format
+    print(convert_image(args.load_filepath, args.save_filepath, **options))
