@@ -12,7 +12,7 @@ remote → a GitHub Actions workflow on a `v*` tag publishes to PyPI.
 | package | PyPI trusted publisher | notes |
 |---|---|---|
 | mlarray | yes | released as 1.0.0 from `main` |
-| MedVol | yes | released as 1.0.0 from `main` (trusted publishing, tests on Python 3.10-3.13 before publishing) |
+| MedVol | yes | 1.0.1 from `main` (tests on Python 3.10-3.13 before publishing; docs on GitHub Pages) |
 | napari-mlarray | yes | check the workflow uses trusted publishing |
 | SlicerMLArray | no | released through the Slicer extension index, not PyPI (check) |
 | napari-nifti | no | publishes with an API token, or set up trusted publishing |
@@ -25,12 +25,14 @@ remote → a GitHub Actions workflow on a `v*` tag publishes to PyPI.
 
 ### nnunetv2 and nnunetv3: check that they load data correctly
 - [x] **nnunetv3 ported to v1** (2026-11-06): branch `fix/mlarray-v1` (worktree `~/projects/nnunetv3-mlarray-v1`,
-  commit `7d769d48`, based on `project/nnunetv3`, merges cleanly into `feat/config-schema`; not pushed, not merged).
+  commit `7d769d48`, merged into `project/nnunetv3` (worktree `~/projects/nnunetv3-main`, not pushed).
   `mlarray_geometry()` in `nnunet_dataset.py` turns nnU-Net's array-aligned geometry (world rows S,P,L) into the
   patient space (L,P,S); segmentations are `values.kind = "label"`; the layout is now nnU-Net's own (the old L1/L3
   budgets of the preprocessor are gone); pin `mlarray>=1.0.0,<2`. Test: `nnunetv3/tests/test_mlarray_dataset.py`
-  (checks the matrix against nnU-Net's own NIfTI affine). The `nnunetv3` conda env still has mlarray v0: upgrade
-  it when the branch is merged. Preprocessed `.mla` folders written with v0 must be preprocessed again.
+  (checks the matrix against nnU-Net's own NIfTI affine). The `nnunetv3` conda env has mlarray 1.0 (editable,
+  `~/projects/mlarray`). Preprocessed `.mla` folders written with v0 must be preprocessed again.
+- [ ] **nnunetv3:** merge `project/nnunetv3` (or `fix/mlarray-v1`) into `feat/config-schema`: the env's nnunetv3
+  install points at `~/projects/nnunetv3` (that branch), which still uses the v0 API. Push `project/nnunetv3`.
 - [ ] **nnunetv3:** check that loading keeps the layout and geometry: patch reads, segmentation labels, spacing
   used for resampling (now derived from the space matrix, per array axis in array order), and that the storage
   defaults (nnU-Net layout, LZ4HC-5, read-ahead) still apply (`docs/optimization.md`).
