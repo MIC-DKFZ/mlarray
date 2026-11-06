@@ -1,0 +1,922 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="MLArray documentation">
+      
+      
+      
+      
+        <link rel="prev" href="../optimization/">
+      
+      
+        <link rel="next" href="../api/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>Schema - MLArray</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.57a0d79d.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#mlarray-metadata-schema" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="MLArray" class="md-header__button md-logo" aria-label="MLArray" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            MLArray
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Schema
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="MLArray" class="md-nav__button md-logo" aria-label="MLArray" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    MLArray
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../why/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why MLArray
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Storage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#version-and-writer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        version and writer
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#axes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        axes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#spaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        spaces
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        values
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#units" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Units
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#profiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        profiles
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#history-and-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        history and storage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#source-and-user" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        source and user
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Storage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#version-and-writer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        version and writer
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#axes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        axes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#spaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        spaces
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        values
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#units" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Units
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#profiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        profiles
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#history-and-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        history and storage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#source-and-user" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        source and user
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="mlarray-metadata-schema">MLArray Metadata Schema<a class="headerlink" href="#mlarray-metadata-schema" title="Permanent link">&para;</a></h1>
+<p>This page describes the metadata stored in an <code>.mla</code> file (format version 1). The normative definition is
+the <a href="../design/spec/">v1 specification</a> and the JSON Schemas shipped with the package
+(<code>mlarray/schemas/mlarray-1.0.json</code>, <code>profile-ml-1.0.json</code>, <code>profile-medical-1.0.json</code>).</p>
+<h2 id="storage">Storage<a class="headerlink" href="#storage" title="Permanent link">&para;</a></h2>
+<p>An <code>.mla</code> file is a blosc2 NDArray. Its metadata lives in three blosc2 <code>vlmeta</code> keys, each a msgpack map
+that blosc2 compresses separately:</p>
+<table>
+<thead>
+<tr>
+<th>key</th>
+<th>content</th>
+<th>read</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mlarray</code></td>
+<td><code>version</code>, <code>writer</code>, <code>axes</code>, <code>spaces</code>, <code>values</code>, <code>profiles</code>, <code>history</code>, <code>storage</code></td>
+<td>on open</td>
+</tr>
+<tr>
+<td><code>mlarray.source</code></td>
+<td><code>{"source": [...]}</code>, original metadata of converted files</td>
+<td>on first access</td>
+</tr>
+<tr>
+<td><code>mlarray.user</code></td>
+<td><code>{"user": {...}}</code>, arbitrary user metadata</td>
+<td>on first access</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Only plain msgpack types are stored: maps, arrays, strings, integers, floats, booleans, nil, binary.
+  Nothing is pickled, and readers decode the raw bytes with plain msgpack, never through blosc2's own
+  vlmeta decoder.</li>
+<li>Opening a file reads only the <code>mlarray</code> key, so it stays fast however large <code>source</code> is.</li>
+<li>Unknown keys are kept and written back at every level.</li>
+<li>Files written by MLArray before v1 are not readable; convert them again from their original files.</li>
+</ul>
+<p>Inspect a file with <code>mlarray_header file.mla</code> (add <code>--source</code> and <code>--user</code> for the lazy keys).</p>
+<h2 id="version-and-writer"><code>version</code> and <code>writer</code><a class="headerlink" href="#version-and-writer" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="s">"1.0"</span><span class="w">            </span><span class="c1"># metadata format version; readers accept any 1.x</span>
+<span class="nt">writer</span><span class="p">:</span><span class="w"> </span><span class="s">"mlarray</span><span class="nv"> </span><span class="s">1.0.0"</span><span class="w">   </span><span class="c1"># software that wrote the file</span>
+</code></pre></div>
+<h2 id="axes"><code>axes</code><a class="headerlink" href="#axes" title="Permanent link">&para;</a></h2>
+<p>One entry per array axis, in array (C) order. Required.</p>
+<table>
+<thead>
+<tr>
+<th>field</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>unique name, e.g. <code>z</code>, <code>y</code>, <code>x</code>, <code>t</code>, <code>c</code>. A name only: it says nothing about direction. Defaults: <code>axis_0</code>, <code>axis_1</code>, ...</td>
+</tr>
+<tr>
+<td><code>type</code></td>
+<td><code>space</code> · <code>time</code> · <code>channel</code> · <code>component</code> · <code>other</code></td>
+</tr>
+<tr>
+<td><code>labels</code></td>
+<td>one label per index, for categorical axes: <code>["T1", "T2", "FLAIR"]</code></td>
+</tr>
+<tr>
+<td><code>start</code>, <code>step</code>, <code>unit</code>, <code>unit_code</code></td>
+<td>uniform sampling of a non-space axis: coordinate of index <em>i</em> = <code>start + i·step</code></td>
+</tr>
+<tr>
+<td><code>coordinates</code>, <code>unit</code>, <code>unit_code</code></td>
+<td>explicit coordinate per index (timestamps, b-values, wavelengths)</td>
+</tr>
+</tbody>
+</table>
+<p>Space axes carry no sampling or unit here: their geometry lives in <code>spaces</code>.</p>
+<h2 id="spaces"><code>spaces</code><a class="headerlink" href="#spaces" title="Permanent link">&para;</a></h2>
+<p>Optional. Without spaces the array lives in index space only (photos, ML tensors). Each space is a named
+coordinate system and the matrix that maps array indices into it:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">spaces</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">patient</span>
+<span class="w">    </span><span class="nt">reference</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">scheme</span><span class="p">:</span><span class="w"> </span><span class="nv">dicom_frame_of_reference</span><span class="p p-Indicator">,</span><span class="nt"> id</span><span class="p">:</span><span class="w"> </span><span class="s">"1.2.826.0.1.3680043.8.498.1"</span><span class="p p-Indicator">}</span>
+<span class="w">    </span><span class="nt">axes</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="nv">x</span><span class="p p-Indicator">,</span><span class="nt"> unit</span><span class="p">:</span><span class="w"> </span><span class="nv">millimeter</span><span class="p p-Indicator">,</span><span class="nt"> unit_code</span><span class="p">:</span><span class="w"> </span><span class="nv">mm</span><span class="p p-Indicator">,</span><span class="nt"> increases_toward</span><span class="p">:</span><span class="w"> </span><span class="nv">left</span><span class="p p-Indicator">}</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="nv">y</span><span class="p p-Indicator">,</span><span class="nt"> unit</span><span class="p">:</span><span class="w"> </span><span class="nv">millimeter</span><span class="p p-Indicator">,</span><span class="nt"> unit_code</span><span class="p">:</span><span class="w"> </span><span class="nv">mm</span><span class="p p-Indicator">,</span><span class="nt"> increases_toward</span><span class="p">:</span><span class="w"> </span><span class="nv">posterior</span><span class="p p-Indicator">}</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="nv">z</span><span class="p p-Indicator">,</span><span class="nt"> unit</span><span class="p">:</span><span class="w"> </span><span class="nv">millimeter</span><span class="p p-Indicator">,</span><span class="nt"> unit_code</span><span class="p">:</span><span class="w"> </span><span class="nv">mm</span><span class="p p-Indicator">,</span><span class="nt"> increases_toward</span><span class="p">:</span><span class="w"> </span><span class="nv">superior</span><span class="p p-Indicator">}</span>
+<span class="w">    </span><span class="nt">from_array</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">array_axes</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">z</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">y</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">x</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">matrix</span><span class="p">:</span><span class="w">                              </span><span class="c1"># rows: space axes x, y, z (+1)</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="w"> </span><span class="nv">0.0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0.0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0.7</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">-170.1</span><span class="p p-Indicator">]</span><span class="w">         </span><span class="c1"># columns: array_axes z, y, x (+ translation)</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="w"> </span><span class="nv">0.0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0.7</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0.0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">-201.3</span><span class="p p-Indicator">]</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">-2.5</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0.0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0.0</span><span class="p p-Indicator">,</span><span class="w">  </span><span class="nv">-87.0</span><span class="p p-Indicator">]</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="w"> </span><span class="nv">0.0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0.0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0.0</span><span class="p p-Indicator">,</span><span class="w">    </span><span class="nv">1.0</span><span class="p p-Indicator">]</span>
+</code></pre></div>
+<ul>
+<li><code>reference</code> identifies the physical frame; two spaces are the same frame if <code>scheme</code> and <code>id</code> match.</li>
+<li><code>increases_toward</code> says in which direction a coordinate grows: <code>left</code>/<code>right</code>, <code>anterior</code>/<code>posterior</code>,
+  <code>superior</code>/<code>inferior</code>, <code>east</code>/<code>west</code>, <code>north</code>/<code>south</code>, <code>up</code>/<code>down</code>. It replaces letter codes such as
+  <code>RAS</code> or <code>LPS</code>, which mean different things in different tools. The example is the DICOM patient frame
+  (LPS), the recommended world frame for medical images (<code>space="patient"</code> in the Python API).</li>
+<li><code>from_array.matrix</code> has one row per space axis plus <code>[0, ..., 0, 1]</code>, and one column per entry of
+  <code>array_axes</code> plus the translation. Rotations, oblique and mirrored grids and shear are allowed.
+  Axis-aligned grids may use <code>scale</code> and <code>translation</code> (per array axis) instead.</li>
+<li><strong>An integer index is the centre of its voxel:</strong> <code>matrix · [index, 1]</code> is the coordinate of the voxel
+  centre.</li>
+<li>Spacing, origin, direction and letter codes are derived (<code>MLArray.spacing</code>, <code>.origin</code>, <code>.direction</code>,
+  <code>.letter_codes()</code>), never stored.</li>
+<li>Several spaces are allowed (e.g. <code>patient</code> and <code>atlas</code>); the first is the default.</li>
+</ul>
+<h2 id="values"><code>values</code><a class="headerlink" href="#values" title="Permanent link">&para;</a></h2>
+<p>What the stored numbers mean. Defaults to <code>{kind: measurement}</code>.</p>
+<table>
+<thead>
+<tr>
+<th>field</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>kind</code></td>
+<td><code>measurement</code> · <code>label</code> · <code>instance</code> · <code>probability</code> · <code>vector</code> · <code>other</code></td>
+</tr>
+<tr>
+<td><code>unit</code>, <code>unit_code</code></td>
+<td>unit of the values, e.g. <code>hounsfield_unit</code></td>
+</tr>
+<tr>
+<td><code>scale</code>, <code>offset</code></td>
+<td>physical value = <code>scale · stored + offset</code>; stored values are never pre-scaled</td>
+</tr>
+<tr>
+<td><code>fill</code></td>
+<td>value meaning "no data"</td>
+</tr>
+<tr>
+<td><code>labels</code></td>
+<td>for label kinds: map from value (as a decimal string) to <code>{name, color, code}</code>; <code>code</code> is an ontology reference <code>{scheme, value, meaning}</code></td>
+</tr>
+<tr>
+<td><code>label_layout</code></td>
+<td><code>index</code> (one label value per element) or <code>channel</code> (one channel per label)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="units">Units<a class="headerlink" href="#units" title="Permanent link">&para;</a></h2>
+<p>Units are a readable name plus an optional UCUM code. Use a name from the curated list
+(<code>mlarray/schemas/units-1.0.json</code>: nanometer ... kilometer, second, degree, hounsfield_unit, counts,
+percent, kelvin, arbitrary, ...); MLArray fills in <code>unit_code</code> for listed names. Free text is allowed
+when no listed unit fits.</p>
+<h2 id="profiles"><code>profiles</code><a class="headerlink" href="#profiles" title="Permanent link">&para;</a></h2>
+<p>Optional, independent domain metadata. Profiles never repeat what the core states.</p>
+<div class="highlight"><pre><span></span><code><span class="nt">profiles</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">medical</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">profile_version</span><span class="p">:</span><span class="w"> </span><span class="s">"1.0"</span>
+<span class="w">    </span><span class="nt">dicom</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">Modality</span><span class="p">:</span><span class="w"> </span><span class="nv">MR</span><span class="p p-Indicator">,</span><span class="nt"> BodyPartExamined</span><span class="p">:</span><span class="w"> </span><span class="nv">BRAIN</span><span class="p p-Indicator">,</span><span class="nt"> RepetitionTime</span><span class="p">:</span><span class="w"> </span><span class="nv">2300</span><span class="p p-Indicator">}</span><span class="w">   </span><span class="c1"># DICOM keywords</span>
+<span class="w">  </span><span class="nt">ml</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">profile_version</span><span class="p">:</span><span class="w"> </span><span class="s">"1.0"</span>
+<span class="w">    </span><span class="nt">statistics</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">min</span><span class="p">:</span><span class="w"> </span><span class="nv">-1024</span><span class="p p-Indicator">,</span><span class="nt"> max</span><span class="p">:</span><span class="w"> </span><span class="nv">3071</span><span class="p p-Indicator">,</span><span class="nt"> mean</span><span class="p">:</span><span class="w"> </span><span class="nv">40.2</span><span class="p p-Indicator">,</span><span class="nt"> standard_deviation</span><span class="p">:</span><span class="w"> </span><span class="nv">410.0</span><span class="p p-Indicator">,</span><span class="nt"> percentiles</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="s">"99.5"</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="nv">1500</span><span class="p p-Indicator">}}</span>
+<span class="w">    </span><span class="nt">boxes</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">frame</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">index</span><span class="w">            </span><span class="c1"># "index" (array axes) or a space name (space coordinates)</span>
+<span class="w">      </span><span class="nt">axes</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">z</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">y</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">x</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">items</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[{</span><span class="nt">min</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">10</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">50</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">60</span><span class="p p-Indicator">],</span><span class="nt"> max</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">40</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">90</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">120</span><span class="p p-Indicator">],</span><span class="nt"> label</span><span class="p">:</span><span class="w"> </span><span class="nv">1</span><span class="p p-Indicator">,</span><span class="nt"> score</span><span class="p">:</span><span class="w"> </span><span class="nv">0.97</span><span class="p p-Indicator">}]</span>
+<span class="w">    </span><span class="nt">patch_size</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">128</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">128</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">128</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">split</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">train</span>
+</code></pre></div>
+<ul>
+<li><code>medical.dicom</code> holds curated medical metadata for files without a DICOM source, or deliberate
+  overrides of source values. Files converted from DICOM keep their full DICOM metadata in <code>source</code>.</li>
+<li>Profiles from third parties use a reverse-domain name (<code>org_example_cryoem</code>) and are kept as they are.</li>
+</ul>
+<h2 id="history-and-storage"><code>history</code> and <code>storage</code><a class="headerlink" href="#history-and-storage" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><span class="nt">history</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">action</span><span class="p">:</span><span class="w"> </span><span class="nv">converted</span><span class="p p-Indicator">,</span><span class="nt"> tool</span><span class="p">:</span><span class="w"> </span><span class="s">"medvol</span><span class="nv"> </span><span class="s">2.0.0"</span><span class="p p-Indicator">,</span><span class="nt"> time</span><span class="p">:</span><span class="w"> </span><span class="s">"2026-11-06T10:12:00Z"</span><span class="p p-Indicator">,</span><span class="nt"> from</span><span class="p">:</span><span class="w"> </span><span class="nv">nifti</span><span class="p p-Indicator">,</span><span class="nt"> warnings</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">...</span><span class="p p-Indicator">]}</span>
+<span class="nt">storage</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">chunk_size</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">1</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">256</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">256</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">block_size</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">1</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">64</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">64</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">patch_size</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">128</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">128</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">128</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">compression</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">codec</span><span class="p">:</span><span class="w"> </span><span class="nv">LZ4HC</span><span class="p p-Indicator">,</span><span class="nt"> level</span><span class="p">:</span><span class="w"> </span><span class="nv">5</span><span class="p p-Indicator">,</span><span class="nt"> filters</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">SHUFFLE</span><span class="p p-Indicator">]}</span>
+</code></pre></div>
+<p><code>storage</code> records only portable layout settings. Thread counts, typesize and similar runtime settings
+are never stored; they come from the library defaults (see <a href="../optimization/">ML Optimization</a>).
+<code>meta.storage.to_cparams()</code> returns the recorded compression as <code>blosc2.CParams</code>.</p>
+<h2 id="source-and-user"><code>source</code> and <code>user</code><a class="headerlink" href="#source-and-user" title="Permanent link">&para;</a></h2>
+<p><code>source</code> keeps the original metadata of converted files readable and complete, so a converter can write
+the original format back. Each entry has <code>format</code>, <code>files</code>, <code>reader</code>, an <code>index_map</code> (how the stored
+array relates to the source file's own index order), a <code>fingerprint</code> (shape, dtype and hashes of the
+geometry and data) and the <code>header</code> as nested native values. It is read-only, and images derived from
+another image do not inherit it unless asked to (<code>copy_source=True</code>).</p>
+<p><code>user</code> holds any msgpack-compatible metadata of your own and is never interpreted.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": [], "search": "../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+    
+  </body>
+</html>

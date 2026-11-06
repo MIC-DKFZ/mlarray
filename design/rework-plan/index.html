@@ -1,0 +1,1368 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="MLArray documentation">
+      
+      
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>MLArray / MedVol rework — process and handoff - MLArray</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.57a0d79d.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#mlarray-medvol-rework-process-and-handoff" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="MLArray" class="md-header__button md-logo" aria-label="MLArray" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            MLArray
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              MLArray / MedVol rework — process and handoff
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="MLArray" class="md-nav__button md-logo" aria-label="MLArray" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    MLArray
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../why/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why MLArray
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#start-here-current-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Start here (current state)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#0-orientation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0. Orientation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0. Orientation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-the-rework-is" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the rework is
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#normative-documents-read-these-first" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Normative documents (read these first)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#repositories-and-branches" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Repositories and branches
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#environment-and-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environment and commands
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#working-rules-from-the-user" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Working rules (from the user)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-stage-1-port-surviving-review-fixes-onto-reworkv1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Stage 1 — port surviving review fixes onto rework/v1
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-stage-2-fix-the-open-findings-that-survive-then-restructure-the-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Stage 2 — fix the open findings that survive, then restructure the code
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Stage 2 — fix the open findings that survive, then restructure the code">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#2a-fixes-one-commit-per-finding-with-a-regression-test" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2a. Fixes (one commit per finding, with a regression test)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2b-restructure-behaviour-preserving" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2b. Restructure (behaviour-preserving)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-stage-3-metadata-rework-replace-metapy-per-mlarray-spec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Stage 3 — metadata rework (replace meta.py) per MLArray spec
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-stage-4-medvol-v2-and-the-cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Stage 4 — MedVol v2 and the CLI
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-after-the-stages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. After the stages
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-log-decisions-deviations-questions-for-the-user" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Log: decisions, deviations, questions for the user
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="mlarray-medvol-rework-process-and-handoff">MLArray / MedVol rework — process and handoff<a class="headerlink" href="#mlarray-medvol-rework-process-and-handoff" title="Permanent link">&para;</a></h1>
+<p>This document lets any agent or developer continue the rework without prior context. Read it fully before
+touching code. Keep it current: when a stage step is done, tick it and add the commit hash.</p>
+<p>Last update: 2026-11-06 (stages 1-4 done and released; follow-up work in <code>followups.md</code>).</p>
+<h2 id="start-here-current-state">Start here (current state)<a class="headerlink" href="#start-here-current-state" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Released:</strong> mlarray 1.0.0 and MedVol 1.0.0 are on PyPI (2026-11-06). <code>pip install "mlarray[all]"</code> installs
+  both; <code>mlarray_convert</code> delegates to MedVol.</li>
+<li><strong>Branches:</strong> mlarray <code>main</code> == <code>rework/v1</code>; MedVol <code>main</code> == <code>rework/v2</code> (both pushed). Work on <code>main</code> or a new
+  feature branch from now on.</li>
+<li><strong>Next work:</strong> <code>docs/design/followups.md</code>. The most urgent item is nnunetv3, which still uses the v0 API.
+  Open gaps and decisions are in §6 below.</li>
+<li><strong>Envs:</strong> <code>mlarray</code> (mlarray dev; its <code>mlarray</code> editable install points at the old review worktree, so run tests
+  with <code>python -m pytest</code> from the repo root) and <code>medvol-v2</code> (both repos installed editable; use it for MedVol and
+  for mlarray's CLI tests).</li>
+<li><strong>Tests:</strong> <code>cd ~/projects/mlarray &amp;&amp; ~/miniforge3/envs/medvol-v2/bin/python -m pytest -q -p no:cacheprovider</code>
+  (163 passed) and <code>cd ~/projects/medvol &amp;&amp; ~/miniforge3/envs/medvol-v2/bin/python -m pytest -q -p no:cacheprovider tests/</code>
+  (170 passed).</li>
+<li><strong>Releasing (CD):</strong> local push → GitLab (<code>codebase.helmholtz.cloud</code>) → automatic sync to GitHub → GitHub Actions
+  publishes <code>v*</code> tags to PyPI by trusted publishing (mlarray: <code>.github/workflows/workflow.yml</code>; MedVol:
+  <code>test_and_deploy.yml</code>, tests on Python 3.10-3.13 first). Version: mlarray from the git tag (setuptools_scm),
+  MedVol from <code>medvol/__init__.py</code>. Pushing a tag is a public action: ask the user to run <code>git push origin vX.Y.Z</code>
+  themselves. Check on Python 3.10 too: pip resolves blosc2 4.3.3 there, which behaves differently.
+  Docs (GitHub Pages, <code>gh-pages</code>) deploy with each <code>v*</code> tag, or on demand with
+  <code>gh workflow run workflow.yml -R MIC-DKFZ/mlarray --ref main</code>.</li>
+</ul>
+<hr />
+<h2 id="0-orientation">0. Orientation<a class="headerlink" href="#0-orientation" title="Permanent link">&para;</a></h2>
+<h3 id="what-the-rework-is">What the rework is<a class="headerlink" href="#what-the-rework-is" title="Permanent link">&para;</a></h3>
+<ol>
+<li>MLArray gets a new metadata model: domain-neutral core + profiles + readable <code>source</code> + <code>user</code>, plain
+   msgpack, explicit geometry.</li>
+<li>MedVol becomes a faithful N:N converter built on that model.</li>
+<li>Before that, the existing storage and array code is cleaned up and its known bugs are fixed, without
+   changing user-facing behaviour or storage optimisation.</li>
+</ol>
+<h3 id="normative-documents-read-these-first">Normative documents (read these first)<a class="headerlink" href="#normative-documents-read-these-first" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>document</th>
+<th>where</th>
+<th>content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MLArray v1 spec</td>
+<td><code>mlarray</code> repo, branch <code>rework/v1</code>, <code>docs/design/spec.md</code></td>
+<td>format, metadata model, accuracy standard, decisions log (§12)</td>
+</tr>
+<tr>
+<td>MedVol v2 spec</td>
+<td><code>medvol</code> repo, branch <code>rework/v2</code>, <code>docs/design/spec.md</code></td>
+<td>converter architecture, field ownership, policies, per-format rules, decisions log (§10)</td>
+</tr>
+<tr>
+<td>Storage defaults</td>
+<td><code>mlarray</code> <code>rework/v1</code>, <code>docs/optimization.md</code></td>
+<td>why the nnU-Net layout heuristic, LZ4HC-5 and read-ahead are the defaults</td>
+</tr>
+<tr>
+<td>Review findings</td>
+<td>branch <code>review/findings</code>, worktree <code>~/projects/mlarray-review</code>, <code>FINDINGS.md</code></td>
+<td>open and fixed findings against old <code>main</code> (<code>c95290b</code>); finding IDs (C1, H2, M12 …) are used below</td>
+</tr>
+<tr>
+<td>Orientation knowledge base</td>
+<td><code>~/projects/image-orientation-kb</code> (start with <code>README.md</code>, <code>docs/00-pitfall-index.md</code>)</td>
+<td>verified behaviour of DICOM/NIfTI/NRRD, libraries and viewers; the evidence behind many spec rules ("KB")</td>
+</tr>
+</tbody>
+</table>
+<p>The spec is the source of truth. If implementation shows that the spec is wrong or incomplete:
+- stop;
+- write the problem and a proposed change into §6 of this document;
+- ask the user before changing the spec.</p>
+<h3 id="repositories-and-branches">Repositories and branches<a class="headerlink" href="#repositories-and-branches" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>repo</th>
+<th>path</th>
+<th>working branch</th>
+<th>notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>mlarray</td>
+<td><code>~/projects/mlarray</code></td>
+<td><code>rework/v1</code></td>
+<td><strong>all of stages 1–3 happen here</strong> (user decision: no intermediate branch or release)</td>
+</tr>
+<tr>
+<td>mlarray review</td>
+<td><code>~/projects/mlarray-review</code> (worktree)</td>
+<td><code>review/findings</code></td>
+<td>reference only, <strong>never merge it</strong>; cherry-pick or re-implement</td>
+</tr>
+<tr>
+<td>medvol</td>
+<td><code>~/projects/medvol</code></td>
+<td><code>rework/v2</code></td>
+<td>stage 4</td>
+</tr>
+<tr>
+<td>consumers</td>
+<td><code>~/projects/SlicerMLArray</code>, <code>~/projects/napari-mlarray</code></td>
+<td>—</td>
+<td>adapt after stage 3 (§5)</td>
+</tr>
+</tbody>
+</table>
+<p><code>design/metadata-v1</code> (mlarray) holds an earlier proposal that the spec supersedes. Ignore it.</p>
+<h3 id="environment-and-commands">Environment and commands<a class="headerlink" href="#environment-and-commands" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Conda env <code>mlarray</code> (<code>~/miniforge3/envs/mlarray/bin/python</code>): Python 3.12, blosc2 4.14.1, numpy 2.5.4,
+  medvol 0.0.22, nibabel, pynrrd.</li>
+<li>Tests: <code>cd ~/projects/mlarray &amp;&amp; ~/miniforge3/envs/mlarray/bin/python -m pytest -q -p no:cacheprovider</code>.</li>
+<li><strong>Careful:</strong> the env's editable install of <code>mlarray</code> points at <code>~/projects/mlarray-review</code>. <code>python -m pytest</code>
+    from the repo root imports the local package, but scripts run elsewhere import the review code unless
+    <code>PYTHONPATH=~/projects/mlarray</code> is set.</li>
+<li><strong>Baseline on <code>rework/v1</code> @ <code>8f0511c</code> + spec commits: 111 passed, 3038 subtests passed.</strong></li>
+<li>For MedVol work, use the experiment envs of the KB (<code>orient-kb</code> etc., see <code>~/projects/image-orientation-kb/TOOLS.md</code>) to cross-check against other libraries.</li>
+</ul>
+<h3 id="working-rules-from-the-user">Working rules (from the user)<a class="headerlink" href="#working-rules-from-the-user" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Commit after every sensible, complete, working change. Use separate, focused commits per logical change.</li>
+<li>Commit messages and docs <strong>must not</strong> mention AI, Claude or any assistant, and must not contain
+  <code>Co-Authored-By</code> trailers.</li>
+<li>Don't push unless asked.</li>
+<li><strong>No backwards compatibility</strong> with v0 <code>.mla</code> files and no migration code.</li>
+<li><strong>No de-identification</strong> and no other modification of metadata.</li>
+<li>Functionality, user-facing usage and storage optimisation must not change in stages 1–2. Any bug fix that
+  changes observable behaviour must be listed in §6 and confirmed by the user before it lands.</li>
+<li><strong>Invariant through all stages:</strong> <code>tests/test_layout.py</code> and <code>tests/test_read_ahead.py</code> stay unchanged and
+  green (one agreed exception: in stage 3, <code>test_layout.py</code>'s metadata accessors change, see §3). They pin
+  the storage defaults:</li>
+<li>the nnU-Net chunk/block heuristic in <code>mlarray/blosc2_layout_strategies.py</code>;</li>
+<li>LZ4HC level 5 with 4 compression threads, and nnU-Net's per-array filter choice;</li>
+<li>blosc2 read-ahead with 4 threads, switched on by the first <code>MLArray.open</code> (<code>mlarray.set_read_ahead()</code>).</li>
+</ul>
+<hr />
+<h2 id="1-stage-1-port-surviving-review-fixes-onto-reworkv1">1. Stage 1 — port surviving review fixes onto <code>rework/v1</code><a class="headerlink" href="#1-stage-1-port-surviving-review-fixes-onto-reworkv1" title="Permanent link">&para;</a></h2>
+<p>Goal: bring over every fix from <code>review/findings</code> that concerns code surviving the rework, each with its
+tests. Prefer <code>git cherry-pick -x &lt;hash&gt;</code> when it applies cleanly. Otherwise re-implement by hand and copy
+the tests. <code>mlarray/mlarray.py</code> changed on <code>rework/v1</code>, so expect conflicts there. Drop <code>FINDINGS.md</code> hunks.</p>
+<table>
+<thead>
+<tr>
+<th>done</th>
+<th>review commit</th>
+<th>content</th>
+<th>findings</th>
+<th>notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>☑ <code>12dc805</code></td>
+<td><code>6c52edd</code></td>
+<td>atomic <code>save()</code>: write to temp file, write metadata into it, <code>os.replace</code>; never modify the source file; reopen with the same mode when saving onto itself</td>
+<td>C1, H1, M2</td>
+<td>brings <code>tests/test_save.py</code>. Keep the metadata writing behind one function so stage 3 can swap the serialisation</td>
+</tr>
+<tr>
+<td>☑ <code>4ea3528</code></td>
+<td><code>2ce1242</code></td>
+<td><code>flush()</code> and context manager (<code>with MLArray.open(...) as a:</code>)</td>
+<td>M3</td>
+<td></td>
+</tr>
+<tr>
+<td>☑ <code>8e9859b</code></td>
+<td><code>ac433cb</code></td>
+<td><code>arange</code> length via <code>ceil</code>; float detection via <code>np.floating</code></td>
+<td>H2, H3</td>
+<td></td>
+</tr>
+<tr>
+<td>☑ <code>e267669</code></td>
+<td><code>4f6604b</code></td>
+<td>0-d arrays stay 0-d; <code>create(mmap_mode=None)</code> overwrites; <code>__array__(copy=)</code>; opening <code>r+</code>/<code>a</code> doesn't rewrite metadata; int <code>shape</code> in <code>create</code>; <code>patch_size</code> validation; numpy ints in <code>patch_size</code></td>
+<td>M5 (part), M6, L1, L2, L3, L5, M9 (part)</td>
+<td>its <code>tests/test_optimization.py</code> hunk: keep only what still applies to the new layout heuristic</td>
+</tr>
+<tr>
+<td>☑ <code>7bc9eed</code></td>
+<td><code>012c896</code></td>
+<td>packaging and CI: CI on Python 3.10–3.13, real pytest exit code, banner not installed as data files, keywords</td>
+<td>L16, L18, Nit</td>
+<td>the <code>medvol&gt;=0.0.22</code> pin (L17) is obsolete: in stage 4 mlarray's CLI delegates to MedVol v2. Pin the new version then</td>
+</tr>
+<tr>
+<td>☑ <code>b4239a6</code></td>
+<td><code>1ab1641</code></td>
+<td>benchmark measurement fixes</td>
+<td>M19–M22</td>
+<td><strong>only the <code>bench/benchmark_formats.py</code> and <code>bench/README.md</code> parts</strong>. The other two scripts were deleted on <code>rework/v1</code></td>
+</tr>
+<tr>
+<td>☑ <code>efafaf1</code></td>
+<td><code>bed5c54</code></td>
+<td>examples write to a temp dir instead of the cwd</td>
+<td>Nit</td>
+<td>skip the <code>docs/schema.md</code> and <code>docs/optimization.md</code> hunks: schema docs are rewritten in stage 3, and optimisation docs were rewritten on <code>rework/v1</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Not ported</strong> (handled by the redesign instead):
+- <code>45c3ff4</code>, <code>35b613c</code>, <code>1ac9bcc</code> (msgpack storage, lazy source/extra decoding): stage 3 implements the
+  spec's 3-key storage. Reuse their ideas and tests as a reference.
+- <code>33776c6</code>, <code>d7b0daa</code>, <code>f035c55</code> (metadata fixes in <code>meta.py</code>): <code>meta.py</code> is replaced in stage 3. Their
+  findings become stage-3 requirements (§3).</p>
+<p><strong>Moot</strong> (code no longer exists on <code>rework/v1</code>):
+- H9: fixed by the new layout heuristic;
+- M24, L15: old layout strategies, now deleted;
+- H13 remainder, L13, L14: deleted benchmark scripts.</p>
+<p><strong>Done when:</strong> every row is ticked, the full suite is green (baseline tests + ported tests), and each port is
+its own commit.</p>
+<p><strong>Result (2026-11-06):</strong> all 7 ported in the review branch's order (<code>4f6604b</code> before <code>2ce1242</code>, because
+<code>2ce1242</code>'s tests build on it). Suite: 127 passed, 3056 subtests.</p>
+<hr />
+<h2 id="2-stage-2-fix-the-open-findings-that-survive-then-restructure-the-code">2. Stage 2 — fix the open findings that survive, then restructure the code<a class="headerlink" href="#2-stage-2-fix-the-open-findings-that-survive-then-restructure-the-code" title="Permanent link">&para;</a></h2>
+<h3 id="2a-fixes-one-commit-per-finding-with-a-regression-test">2a. Fixes (one commit per finding, with a regression test)<a class="headerlink" href="#2a-fixes-one-commit-per-finding-with-a-regression-test" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>done</th>
+<th>finding</th>
+<th>what to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>☑ <code>28b61ab</code></td>
+<td><strong>M1</strong> not picklable</td>
+<td><code>__getstate__</code>/<code>__setstate__</code>. Opened files store <code>(filepath, mode, mmap_mode, dparams)</code> and reopen; in-memory blosc2 stores serialise via <code>to_cframe()</code>; numpy-backed arrays pickle the array. Test with <code>multiprocessing</code> spawn and a torch-free DataLoader-style worker.</td>
+</tr>
+<tr>
+<td>☑ <code>bc0e993</code></td>
+<td><strong>M4</strong> <code>save()</code> on numpy-backed arrays converts the instance to blosc2 and loses <code>patch_size</code></td>
+<td>save from a temporary blosc2 store; the instance stays unchanged</td>
+</tr>
+<tr>
+<td>☑ <code>9f6a2ba</code></td>
+<td><strong>M5</strong> remainder: empty arrays and zero-length dimensions</td>
+<td>stop using the <code>(0,)</code> placeholder as the "no array" marker; use an explicit flag. Layout: handle zero-length axes without calling the heuristic, or clamp</td>
+</tr>
+<tr>
+<td>☑ <code>549e5b0</code></td>
+<td><strong>M12</strong> machine-specific <code>cparams</code> persisted</td>
+<td>persist only portable settings (codec, level, filters; spec §8 <code>storage</code>). Thread counts come from runtime defaults. Must keep <code>tests/test_layout.py</code>/<code>test_read_ahead.py</code> green</td>
+</tr>
+<tr>
+<td>☑ <code>b94ae9b</code></td>
+<td><strong>L4</strong> <code>load(compressed=False)</code> keeps <code>meta.blosc2</code> while <code>decompress()</code> clears it</td>
+<td>pick one rule (keep the layout record) and apply it in both</td>
+</tr>
+<tr>
+<td>☑ <code>e004e6c</code> <code>b5e87eb</code> <code>a936880</code></td>
+<td>Nits</td>
+<td>consistent optional <code>dtype</code> for <code>empty</code>/<code>zeros</code>; document memory sharing of <code>asarray(compressed=False)</code>; arrays with only non-spatial axes work without <code>patch_size=None</code> (check if the new heuristic already solves this); fix docstrings ("ignored when patch_size is provided")</td>
+</tr>
+</tbody>
+</table>
+<p>Not in stage 2:
+- metadata findings M10, M11, M13, L7, L9: they belong to stage 3;
+- CLI findings H10–H12, M14–M18, M25, L11, L12 and the CLI nits: they belong to stage 4.</p>
+<h3 id="2b-restructure-behaviour-preserving">2b. Restructure (behaviour-preserving)<a class="headerlink" href="#2b-restructure-behaviour-preserving" title="Permanent link">&para;</a></h3>
+<p>Target layout (adjust if the code suggests better boundaries; record deviations here):</p>
+<div class="highlight"><pre><span></span><code>mlarray/
+  __init__.py          public API re-exports (unchanged names)
+  array.py             MLArray class: construction, slicing, numpy interop, constructors (zeros, arange, *_like …)
+  storage.py           blosc2 IO: open/create/load/save (atomic), flush, pickling, compressed/uncompressed backends
+  layout.py            chunk/block heuristic + filter selection (today blosc2_layout_strategies.py; keep the public import path working)
+  readahead.py         set_read_ahead and the default
+  metadata_io.py       the ONLY place that serialises/deserialises metadata (stage 3 swaps its internals)
+  meta.py              current metadata model (replaced in stage 3)
+  cli.py               current CLI (replaced in stage 4)
+</code></pre></div>
+<p>Rules:
+- Keep the public API and import paths, e.g. <code>from mlarray import MLArray, Meta, set_read_ahead</code>. Check
+  <code>mlarray/__init__.py</code> and <code>docs/api.md</code>.
+- Pure moves first (one commit), then internal simplifications (separate commits).
+- The full test suite passes after every commit. Don't edit existing tests except for import paths.</p>
+<p><strong>Result of 2b (2026-11-06)</strong>, commits <code>3a0bce7</code> <code>2c63460</code> <code>da11b87</code> <code>47914c1</code>. The layout above was adjusted
+because the invariant test <code>tests/test_read_ahead.py</code> does <code>import mlarray.mlarray as mlmod</code>, resets
+<code>mlmod._read_ahead_configured</code> and patches <code>mlmod.blosc2</code>:</p>
+<div class="highlight"><pre><span></span><code>mlarray/
+  mlarray.py           MLArray class: __init__, open/create/load/save/close/flush, pickling, numpy interop,
+                       properties, metadata glue; set_read_ahead and its state (pinned here by test_read_ahead.py)
+  constructors.py      MLArrayConstructors mixin: empty, zeros, ones, full, arange, linspace, asarray, *_like
+  storage.py           stateless blosc2 helpers: cparams/dparams, comp_blosc2_meta (layout metadata), whole-file
+                       load, atomic save, pickling helpers; file constants (suffix, version, default patch size)
+  metadata_io.py       the ONLY place that encodes/decodes metadata (stage 3 swaps its internals)
+  blosc2_layout_strategies.py   unchanged (invariant tests and docs/optimization.md reference it; no layout.py)
+  meta.py, cli.py      unchanged until stages 3 and 4
+</code></pre></div>
+<p>Benchmark (<code>bench/benchmark_formats.py</code>, 8 synthetic CT-like int16 NIfTI volumes 256×256×160–216, patch
+128×128×64, 2000 reads, warm cache, 3 alternating rounds per version, blosc2 4.14.1):</p>
+<table>
+<thead>
+<tr>
+<th>version</th>
+<th>mlarray MB/s (3 rounds)</th>
+<th>blosc2 control MB/s</th>
+<th>mlarray disk</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>stage 1 (<code>d853721</code>)</td>
+<td>718, 721, 703</td>
+<td>300, 305, 306</td>
+<td>116.29 MB</td>
+</tr>
+<tr>
+<td>stage 2 (<code>47914c1</code>)</td>
+<td>684, 709, 712</td>
+<td>303, 299, 297</td>
+<td>116.29 MB</td>
+</tr>
+</tbody>
+</table>
+<p>No regression beyond run-to-run noise. Decoded data, metadata, layout and cparams of the written files are
+identical. Compressed chunk bytes differ even between two runs of the same code (multi-threaded blosc2
+compression is not byte-deterministic), which spec §9 allows.</p>
+<p><strong>Done when:</strong>
+- all 2a rows are ticked;
+- <code>mlarray.py</code> is split;
+- metadata serialisation goes through <code>metadata_io.py</code> only;
+- the suite is green;
+- the benchmark (<code>bench/benchmark_formats.py</code>) shows no throughput regression against stage 1. Run it on
+  synthetic data and note the numbers here.</p>
+<hr />
+<h2 id="3-stage-3-metadata-rework-replace-metapy-per-mlarray-spec">3. Stage 3 — metadata rework (replace <code>meta.py</code>) per MLArray spec<a class="headerlink" href="#3-stage-3-metadata-rework-replace-metapy-per-mlarray-spec" title="Permanent link">&para;</a></h2>
+<p>Implement <code>docs/design/spec.md</code> §3–§11. Suggested commit sequence:</p>
+<ol>
+<li>☑ <code>d6feea3</code> JSON Schemas: <code>schemas/mlarray-1.0.json</code>, <code>schemas/profile-medical-1.0.json</code>,
+   <code>schemas/profile-ml-1.0.json</code>, <code>schemas/units-1.0.json</code> (curated unit names + UCUM codes; spec §4.5).</li>
+<li>☑ <code>c70a82e</code> Storage in <code>metadata_io.py</code> (spec §3):</li>
+<li>three vlmeta keys <code>mlarray</code>, <code>mlarray.source</code>, <code>mlarray.user</code>;</li>
+<li>write msgpack;</li>
+<li><strong>read raw bytes and decode with plain msgpack</strong> (never blosc2's vlmeta decoder);</li>
+<li>lazy decoding of <code>source</code>/<code>user</code>;</li>
+<li>reference: review commits <code>45c3ff4</code>, <code>35b613c</code> and <code>tests/test_metadata_storage.py</code>.</li>
+<li>☑ <code>1846be9</code> New model classes: <code>Axis</code>, <code>Space</code> (+ <code>from_array</code>), <code>Values</code>, <code>Profiles</code>, <code>SourceEntry</code>, <code>History</code>,
+   <code>Storage</code>. Validation against the schemas. Unknown keys and unknown profiles are preserved (spec §4.1,
+   §5).</li>
+<li>☑ <code>1846be9</code> <code>c70a82e</code> Derived geometry API (spec §11):</li>
+<li><code>matrix()</code>, read-only <code>spacing</code>/<code>origin</code>/<code>direction</code>, <code>letter_codes()</code>;</li>
+<li>convenience constructor (<code>spacing=, origin=, direction=, space=</code>) composed into a matrix with the
+     documented column convention;</li>
+<li>world geometry without a declared space is refused;</li>
+<li>fixes the affine-derived property nits: return types, division by zero, shear for non-orthogonal
+     matrices.</li>
+<li>☑ <code>1846be9</code> <code>values</code>: <code>kind</code>, <code>unit</code>/<code>unit_code</code>, <code>scale</code>/<code>offset</code>, <code>fill</code>, <code>labels</code>, <code>label_layout</code>. This replaces
+   <code>is_seg</code>.</li>
+<li>☑ <code>1846be9</code> <code>ml</code> profile: <code>statistics</code>, <code>boxes</code> with an explicit <code>frame</code> (replaces <code>stats</code>, <code>bbox</code>), <code>patch_size</code>,
+   <code>split</code>. <code>medical</code> profile skeleton.</li>
+<li>☑ <code>1846be9</code> <code>source</code>: read-only API, <code>index_map</code>, <code>fingerprint</code> (xxh3 data hash; add <code>xxhash</code> as a dependency, or use
+   blosc2/numpy hashing if adequate; decide and record here).</li>
+<li>☑ <code>c70a82e</code> <code>9f612db</code> Constructors, <code>copy=</code> and <code>*_like</code> follow the new rules:</li>
+<li>geometry is copied;</li>
+<li><code>source</code> is <strong>not</strong> inherited unless <code>copy_source=True</code>;</li>
+<li>statistics, boxes and label semantics are not copied by <code>*_like</code> (fixes M13).</li>
+<li>☑ <code>c70a82e</code> <code>mlarray_header</code> prints valid JSON (NaN → <code>null</code> or a string; fixes L12) and shows <code>source</code>/<code>user</code> only on
+   request.</li>
+<li>☑ <code>a79be97</code> Docs: rewrite <code>docs/schema.md</code> and <code>docs/usage.md</code>, update README examples.</li>
+</ol>
+<p><strong>Requirements carried over from the review</strong> (each needs a test in the new model):</p>
+<table>
+<thead>
+<tr>
+<th>from</th>
+<th>requirement</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>H4</td>
+<td>metadata equality compares values</td>
+</tr>
+<tr>
+<td>H5, H6, L8</td>
+<td>copying never shares nested objects; a <code>Meta</code> passed in is copied, never aliased; input lists are copied</td>
+</tr>
+<tr>
+<td>M7, L7</td>
+<td>a failed edit or merge leaves the previous state untouched (transactional)</td>
+</tr>
+<tr>
+<td>H7, H8</td>
+<td>replacing a sub-part (e.g. <code>spaces</code>) is validated against the array shape; derived counts are never stale</td>
+</tr>
+<tr>
+<td>M8</td>
+<td>read-only containers can't be mutated (<code>|=</code>, item assignment)</td>
+</tr>
+<tr>
+<td>M9</td>
+<td>numpy scalars are accepted and converted; <code>bool</code> is not accepted as a number</td>
+</tr>
+<tr>
+<td>M10</td>
+<td>user dicts are never unwrapped or reinterpreted</td>
+</tr>
+<tr>
+<td>M11</td>
+<td>validate: matrix shape and last row, finite values, positive scale, axis-name references, box dimensions, min ≤ max</td>
+</tr>
+<tr>
+<td>L9</td>
+<td>unknown keys are preserved, not rejected</td>
+</tr>
+<tr>
+<td>L10</td>
+<td>unserialisable values give a clear <code>TypeError</code></td>
+</tr>
+<tr>
+<td>M12 rest</td>
+<td>the compression settings recorded in <code>storage</code> can be turned back into blosc2 parameters (stage 2 could not make <code>blosc2.CParams(**meta.blosc2.cparams)</code> work: CParams rewrites the read-only filter list in place)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Agreed change to the invariant test (user decision 2026-11-06):</strong> <code>tests/test_layout.py</code> reads
+<code>arr.meta.blosc2.{cparams,chunk_size,block_size}</code>. In stage 3, change <strong>only</strong> these accessors to the new
+<code>storage</code> section, and check the 4 compression threads on the written store's cparams instead of the
+metadata (spec §8 persists no thread counts). All layout, codec, level, filter and read-ahead assertions stay.</p>
+<p><strong>Result (2026-11-06).</strong> Suite: 159 passed, 3109 subtests. Modules: <code>metadata.py</code> (model), <code>metadata_io.py</code>
+(3 keys, raw msgpack, lazy parts), <code>fingerprint.py</code>, <code>units.py</code>, <code>schemas/</code> (inside the package).
+<code>meta.py</code> and <code>utils.py</code> are removed. Implementation decisions where spec §11 is only a sketch:</p>
+<table>
+<thead>
+<tr>
+<th>topic</th>
+<th>decision</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>model shape</td>
+<td>core parts are frozen dataclasses (<code>Axis</code>, <code>SpaceAxis</code>, <code>FromArray</code>, <code>Space</code>, <code>Values</code>, <code>Storage</code>, <code>SourceEntry</code>); <code>Meta</code> replaces them via validated setters / <code>Meta.update(...)</code> (all-or-nothing). <code>profiles</code> and <code>user</code> are plain dicts (profiles validated on write and on <code>validate()</code>); <code>source</code> and <code>history</code> are read-only (<code>FrozenMap</code>, tuples)</td>
+</tr>
+<tr>
+<td><code>MLArray(...)</code></td>
+<td>keyword-only after <code>array</code>: <code>axes, spaces, values, profiles, user, source, spacing, origin, direction, space, meta, copy, copy_source</code> + layout args. Constructors (<code>asarray</code>, <code>zeros</code>, <code>create</code>, ...) take <code>meta=</code> (a <code>Meta</code> or its dict form)</td>
+</tr>
+<tr>
+<td>default axes</td>
+<td><code>axis_0</code>, <code>axis_1</code>, ... of type <code>space</code> (neutral names; nothing implies a direction)</td>
+</tr>
+<tr>
+<td>convenience geometry</td>
+<td><code>spacing</code>/<code>direction</code> per array space axis in array order (<code>direction[:, c]</code> = unit vector of array axis <code>c</code>), <code>origin</code> = centre of index 0; requires <code>space=</code> (preset <code>"patient"</code> = DICOM LPS, mm) or a space description. If a space of that name exists, values not given are kept. <code>set_geometry(...)</code> does the same after construction</td>
+</tr>
+<tr>
+<td>removed v0 API</td>
+<td><code>affine</code>, <code>translation</code>, <code>scale</code>, <code>rotation</code>, <code>shear</code>, <code>spatial_ndim</code>, geometry setters, <code>axis_labels</code>, <code>is_seg</code>, <code>meta.blosc2</code>, <code>meta.source</code> as free dict (now <code>user</code>)</td>
+</tr>
+<tr>
+<td>derived geometry</td>
+<td><code>spacing</code> = column norms (tuple), <code>origin</code> = translation (tuple), <code>direction</code> = normalised columns (ndarray; unit vectors also for shear), <code>letter_codes()</code> = points-to letters of the dominant space axis, <code>"?"</code> without <code>increases_toward</code>. Zero matrix columns are invalid</td>
+</tr>
+<tr>
+<td>storage</td>
+<td><code>storage.compression</code> records codec/level by name and filters by name, only what was given or chosen; <code>["NOFILTER"]</code> = explicitly no filter. <code>Storage.to_cparams()</code> converts back (4 threads by default)</td>
+</tr>
+<tr>
+<td>fingerprint</td>
+<td>dependency <code>xxhash</code>. <code>data = "xxh3_128:&lt;hex&gt;"</code> of C-order bytes (streamed for blosc2 arrays), <code>geometry = "xxh3_64:&lt;hex&gt;"</code> of msgpack(axes, spaces) with floats rounded to 10 significant digits, <code>dtype</code> = numpy name. <code>mlarray.fingerprint.compute/matches</code>, <code>MLArray.fingerprint()</code></td>
+</tr>
+<tr>
+<td>copy rules</td>
+<td><code>copy=</code>: geometry, values, profiles, user; not history, <code>ml.statistics</code>/<code>ml.boxes</code>, source (unless <code>copy_source=True</code>), storage kept as layout hint. <code>*_like</code>: same and label semantics dropped</td>
+</tr>
+<tr>
+<td>no-array instances</td>
+<td>an <code>MLArray</code> without data is saved as an empty array of shape <code>(0,) * len(axes)</code> (a valid v1 file); it loads as that empty array</td>
+</tr>
+<tr>
+<td>lazy parts</td>
+<td><code>source</code>/<code>user</code> stay undecoded until accessed; unchanged parts are skipped when rewriting their own file and copied as raw bytes otherwise; pickling an opened file re-reads them from the file</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Done when:</strong>
+- the spec examples (§4–§8) round-trip through save/load;
+- the schemas validate the files written;
+- all carried-over requirements have tests;
+- stage-1/2 tests still pass, except tests that assert v0 metadata behaviour. Rewrite or delete those and
+  list them in the commit message;
+- <code>tests/test_layout.py</code> and <code>tests/test_read_ahead.py</code> are unchanged and green.</p>
+<hr />
+<h2 id="4-stage-4-medvol-v2-and-the-cli">4. Stage 4 — MedVol v2 and the CLI<a class="headerlink" href="#4-stage-4-medvol-v2-and-the-cli" title="Permanent link">&para;</a></h2>
+<p>Work in <code>~/projects/medvol</code> on <code>rework/v2</code>, following its <code>docs/design/spec.md</code>.</p>
+<ol>
+<li>☑ medvol <code>84d1626</code> Skeleton:</li>
+<li><code>Image</code>, <code>Report</code>, <code>Policy</code>;</li>
+<li>plugin registry via entry points, with <code>sniff</code>/<code>read</code>/<code>write</code>, capabilities and field tables (spec
+     §3–§5).</li>
+<li>☑ medvol <code>84d1626</code> <code>.mla</code> plugin (via mlarray).</li>
+<li>☑ medvol <code>cc4a9a4</code> Conformance phantom and test harness (spec §9). Port the generators from
+   <code>~/projects/image-orientation-kb/experiments/</code> (e.g. <code>05_python_libraries/synth.py</code>,
+   <code>02_dicom/_synth.py</code>, <code>verify_dicom_real/_data.py</code>).</li>
+<li>☑ NIfTI <code>b54a8c5</code>, MGH/MGZ <code>0b9960a</code>, MetaImage <code>c2d9459</code>, NRRD <code>47bd5b5</code> (medvol); conformance matrix <code>a983099</code>. Each comes with the round-trip suite and the
+   field-ownership regeneration test.</li>
+<li>☑ DICOM read phase 1 <code>54c4403</code>, phases 2–3 <code>d5a251a</code>; write: re-emit <code>b579767</code> (multi-frame re-emit and SEG in <code>d5a251a</code>).</li>
+<li>☑ mlarray <code>d1a626f</code> <code>0626299</code> mlarray CLI (<code>mlarray/cli.py</code>): <code>mlarray_convert</code> delegates to <code>medvol.convert</code>. Rewrite
+   <code>tests/test_cli.py</code> against real MedVol with small nibabel/pynrrd fixtures (fixes M25). CI installs the
+   extras.</li>
+<li>☑ medvol <code>3677dbc</code> (H10, H11, M14, M17, L11) + <code>test_nrrd.py</code> (H12, M15, M16, M18), mlarray <code>0626299</code> (CLI nits), <code>d1a626f</code> (CLI docs): Close the deferred review findings by verifying them against the new code: H10, H11, H12, M14–M18, L11,
+   the CLI nits, and the stale CLI docs (<code>README.md</code>, <code>docs/cli.md</code>).</li>
+<li>☑ mlarray <code>8dd5775</code> Pin <code>medvol&gt;=2</code> (<code>&gt;=2.0.0.dev0</code>) in mlarray's <code>[all]</code> extra.</li>
+</ol>
+<p><strong>Environment for stage 4:</strong> conda env <code>medvol-v2</code> (Python 3.12, blosc2 4.14.1, nibabel 5.4.2, pynrrd 1.1.3,
+pydicom 3.0.2, highdicom 0.28.2; <code>mlarray</code> and <code>medvol</code> installed editable from the rework branches; install
+medvol with <code>--no-deps</code> because mlarray's version is not 1.0 yet). Tests:
+<code>cd ~/projects/medvol &amp;&amp; ~/miniforge3/envs/medvol-v2/bin/python -m pytest -q -p no:cacheprovider tests/</code>.</p>
+<p><strong>Implementation notes (stage 4):</strong>
+- MedVol v1 (RAS canonicalisation, backends, snapping), its tests and examples are deleted; packaging is
+  <code>pyproject.toml</code> with the plugin entry-point group <code>medvol.formats</code>.
+- Phantom (<code>tests/phantom.py</code>): every voxel stores its own Fortran-order file index, so <code>world_error</code> checks the
+  world position of every voxel against an oblique, mirrored LPS truth (KB ch05 geometry).
+- Exactness rule used by all writers: geometry-bound source fields are reused bit-identically while the source
+  fingerprint's geometry hash matches the current core; otherwise they are regenerated from the core (spec §4's
+  regeneration test then holds to float32 rounding, e.g. NIfTI quaternions to 1e-6).
+- NIfTI: header re-read as stored (nibabel moves scaling into the data proxy); header, extensions and data written
+  by MedVol through nibabel's header objects and <code>array_to_file</code>; <code>.hdr/.img</code> need nibabel's <em>Pair</em> header
+  classes (<code>is_single</code> is a class attribute).</p>
+<p><strong>Done when:</strong>
+- every reader × writer pair passes the phantom test (&lt; 1e-4 mm);
+- same-format round trips meet the accuracy standard (MLArray spec §9);
+- the deferred findings are closed with tests.</p>
+<hr />
+<h2 id="5-after-the-stages">5. After the stages<a class="headerlink" href="#5-after-the-stages" title="Permanent link">&para;</a></h2>
+<p>The follow-up work (consumers, MedVol release, CD notes) is tracked in <code>docs/design/followups.md</code>.</p>
+<ul>
+<li>SlicerMLArray and napari-mlarray read the v1 core. napari should use the axis-order recipe from KB ch06
+  §6.3 for correct on-screen orientation.</li>
+<li>Pyramids (spec §4.6, storage still to design) and lazy or streaming IO are later versions.</li>
+<li>Non-medical format plugins (OME-TIFF, FITS, GeoTIFF) are later; the model already covers them (spec
+  §5.3).</li>
+</ul>
+<hr />
+<h2 id="6-log-decisions-deviations-questions-for-the-user">6. Log: decisions, deviations, questions for the user<a class="headerlink" href="#6-log-decisions-deviations-questions-for-the-user" title="Permanent link">&para;</a></h2>
+<p>Append entries; never delete them.</p>
+<table>
+<thead>
+<tr>
+<th>date</th>
+<th>stage</th>
+<th>entry</th>
+<th>status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2026-11-06</td>
+<td>—</td>
+<td>plan written; specs agreed with the user (see spec decision logs)</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2026-11-06</td>
+<td>1</td>
+<td><code>012c896</code> ported with its <code>medvol&gt;=0.0.22</code> pin: the current CLI still needs it; stage 4 step 8 replaces it</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2026-11-06</td>
+<td>1</td>
+<td>stage 1 done, 127 passed / 3056 subtests</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2026-11-06</td>
+<td>2a</td>
+<td>Landed bug fixes that change observable behaviour (listed for review; revert on request): M4 (<code>save()</code> leaves a NumPy-backed instance NumPy-backed, <code>patch_size</code> kept), M5 (empty arrays report their shape instead of <code>None</code>; zero-length axes save, Blosc2 picks their layout and no patch size is recorded), nits (<code>dtype</code> optional for <code>empty</code>/<code>zeros</code>; arrays with only non-spatial axes no longer raise with the implied default patch size, Blosc2 picks the layout)</td>
+<td>landed</td>
+</tr>
+<tr>
+<td>2026-11-06</td>
+<td>2a</td>
+<td><strong>Question L4:</strong> <code>decompress()</code> clears <code>meta.blosc2</code>, documented and asserted by <code>tests/test_compress_decompress.py::test_decompress_in_place_clears_blosc2_and_detaches</code>. The plan's rule "keep the layout record in both" changes that behaviour and needs that test changed.</td>
+<td>asked</td>
+</tr>
+<tr>
+<td>2026-11-06</td>
+<td>2a</td>
+<td><strong>Question M12:</strong> <code>tests/test_layout.py:193</code> (invariant) asserts <code>meta.blosc2.cparams["nthreads"] == 4</code> after save, so "persist no thread counts" (plan, spec §8) cannot land in stage 2 without editing it. Proposal for stage 2: drop only machine-derived fields (<code>typesize</code>, <code>blocksize</code>, and <code>nthreads</code> of <code>blosc2.CParams</code> objects, which blosc2 fills with the core count); keep dict input as given; fix <code>blosc2.CParams(**meta.blosc2.cparams)</code> failing on the frozen filter list.</td>
+<td>asked</td>
+</tr>
+<tr>
+<td>2026-11-06</td>
+<td>3</td>
+<td><strong>Question (spec vs invariant):</strong> <code>tests/test_layout.py</code> reads <code>arr.meta.blosc2.{cparams,chunk_size,block_size}</code>. Spec v1 replaces <code>meta.blosc2</code> with <code>storage</code> without thread counts, so the test cannot stay unchanged through stage 3. Proposal: in stage 3 change only its metadata accessors (<code>meta.blosc2.*</code> → <code>meta.storage.*</code>) and check the 4 compression threads on the written store's cparams instead of the metadata; all layout, codec, level, filter and read-ahead assertions stay.</td>
+<td>asked</td>
+</tr>
+<tr>
+<td>2026-11-06</td>
+<td>2b</td>
+<td>Restructure done with the adjusted layout above; benchmark shows no regression</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2026-11-06</td>
+<td>2a</td>
+<td>User decisions: L4 keep the layout record in both (<code>b94ae9b</code>); M12 drop machine fields only (<code>549e5b0</code>); stage 3 changes only <code>test_layout.py</code>'s metadata accessors; keep the landed M4/M5/nit fixes</td>
+<td>answered</td>
+</tr>
+<tr>
+<td>2026-11-06</td>
+<td>2a</td>
+<td>M12 sub-item <code>blosc2.CParams(**meta.blosc2.cparams)</code> not fixed in stage 2: blosc2 rewrites the filter list in place, which the frozen metadata forbids, and making the stored values enums breaks <code>is_serializable</code>. Moved to the stage-3 requirements (§3)</td>
+<td>deferred</td>
+</tr>
+<tr>
+<td>2026-11-06</td>
+<td>2</td>
+<td>stage 2 done: 147 passed, 3074 subtests; invariant tests unchanged</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2026-11-06</td>
+<td>3</td>
+<td>Implementation decisions recorded in §3 "Result" (API shape, convenience geometry, copy rules, storage record, fingerprint encoding)</td>
+<td>for review</td>
+</tr>
+<tr>
+<td>2026-11-06</td>
+<td>3</td>
+<td><strong>Question (spec text):</strong> the schemas live in <code>mlarray/schemas/</code> (installed with the package; <code>units.py</code> reads the unit list at runtime) instead of a top-level <code>schemas/</code> as spec §4.5/§10 say. Proposal: change the spec's paths</td>
+<td>answered: spec changed</td>
+</tr>
+<tr>
+<td>2026-11-06</td>
+<td>3</td>
+<td><strong>Question (spec gap):</strong> the spec has no metadata-only files (v0 had them). Implemented: an instance without data is saved as an empty array <code>(0,) * len(axes)</code>. Proposal: add one sentence to spec §3</td>
+<td>answered: spec changed</td>
+</tr>
+<tr>
+<td>2026-11-06</td>
+<td>3</td>
+<td><strong>Question (spec text):</strong> spec §1 says mlarray depends on numpy and blosc2 only; v1 adds <code>msgpack</code> (already a blosc2 dependency) and <code>xxhash</code> (fingerprint, as the plan allowed). Proposal: say "numpy, blosc2, msgpack and xxhash"</td>
+<td>answered: spec changed</td>
+</tr>
+<tr>
+<td>2026-11-06</td>
+<td>3</td>
+<td><code>mlarray_convert</code> raises until stage 4 (it was built on MedVol v1 and the v0 metadata); its fake-MedVol tests were removed</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2026-11-06</td>
+<td>3</td>
+<td>blosc2 4.14.1: <code>blosc2.open(p).schunk.vlmeta.get_vlmeta(k)</code> on a temporary array segfaults (array freed while vlmeta is used). The library always keeps the store referenced; tests use helpers that do the same</td>
+<td>note</td>
+</tr>
+<tr>
+<td>2026-11-06</td>
+<td>3</td>
+<td>stage 3 done: 159 passed, 3109 subtests; <code>test_read_ahead.py</code> unchanged, <code>test_layout.py</code> changed only in its metadata accessors (agreed)</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2026-11-06</td>
+<td>4</td>
+<td>stage 4 done. medvol: 127 passed, 213 subtests (reader x writer matrix over nifti, nrrd, metaimage, mgh, dicom, mla); mlarray: 163 passed in env <code>medvol-v2</code> (161 + 2 skipped without MedVol 2). NRRD, MetaImage, MGH and DICOM phases 2-3 were implemented in parallel and reviewed/integrated</td>
+<td>—</td>
+</tr>
+<tr>
+<td>2026-11-06</td>
+<td>4</td>
+<td><strong>Open (not implemented):</strong> policy <code>reorient</code> (accepted, not applied); policy <code>vector_frame</code> and applying the NRRD <code>measurement frame</code> to vector components (spec 7.2 says "applied"; currently kept verbatim, values unchanged); <code>resample</code> options of <code>dicom_tilt</code> / <code>dicom_irregular_spacing</code> (raise NotImplementedError); DICOM phases 4 (RTSTRUCT) and 5 (mosaic); per-slice/per-frame differing DICOM rescale (refused); regenerating geometry when re-emitting enhanced multi-frame DICOM (refused)</td>
+<td>answered: implemented below</td>
+</tr>
+<tr>
+<td>2026-11-06</td>
+<td>4</td>
+<td><strong>Question (spec):</strong> §3.3 says a NIfTI <code>descrip</code> written to NRRD is "kept as a key-value pair", §6/M18 forbid copying fields across formats. Implemented: nothing mapped. Proposal: drop the §3.3 example or define explicit cross-format mappings (e.g. descrip &lt;-&gt; NRRD content)</td>
+<td>answered: example dropped, spec changed (medvol <code>b99327a</code>)</td>
+</tr>
+<tr>
+<td>2026-11-06</td>
+<td>4</td>
+<td>Decisions for review: NRRD <code>space dimension</code> without <code>space</code> -&gt; non-patient space <code>nrrd</code> (ITK assumes LPS); <code>scanner-xyz</code>/<code>3D-*-handed</code> read as LPS (ITK/Slicer) with a warning; NIfTI time series -&gt; NRRD <code>left-posterior-superior-time</code>; MGH shear stored exactly (Mdc non-orthonormal, KB 04 4.4); MetaImage shear written as closest orthonormal direction (reported); MGH goodRASFlag &lt; 0 treated like 0 (only 0 verified in KB); fractional SEG -&gt; values.kind probability with scale 1/MaximumFractionalValue; layout='default' changes only the encoding (all plugins)</td>
+<td>for review</td>
+</tr>
+<tr>
+<td>2026-11-06</td>
+<td>4</td>
+<td>CI note: mlarray CI cannot install MedVol 2 until it is released; its CLI conversion tests skip without it</td>
+<td>note</td>
+</tr>
+<tr>
+<td>2026-11-06</td>
+<td>4</td>
+<td>User: "go with your recommendations, implement what you can". Done in medvol: <code>reorient</code> (<code>85c419f</code>), <code>vector_frame</code> incl. NRRD measurement frame (<code>c1ef2c1</code>), <code>dicom_rescale</code> policy + apply (<code>703cde9</code>, <code>6fef8a0</code>), DICOM tilt/irregular <code>resample</code> (<code>6fef8a0</code>), enhanced multi-frame geometry/rescale rewrite (<code>6fef8a0</code>), RTSTRUCT reading (<code>6fef8a0</code>, <code>medvol.read(..., reference=)</code> <code>c009a56</code>), foreign source headers reported on write (<code>022cea9</code>), spec decisions recorded (<code>b99327a</code>). medvol: 170 passed, 250 subtests</td>
+<td>done</td>
+</tr>
+<tr>
+<td>2026-11-06</td>
+<td>4</td>
+<td><strong>Still open:</strong> Siemens mosaic (needs dcm2niix, not installed); writing RTSTRUCT (out of scope); resampling SEG label maps (refused); RTSTRUCT contour-plane tolerance is a fixed 0.01 mm; MetaImage/MGH writers do not report the vector frame; rotated NRRD measurement frames are applied on read, so they do not round-trip byte-exactly (reported); DICOM DS values whose original text is longer than 16 characters cannot be reproduced</td>
+<td>open</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+    
+  </body>
+</html>

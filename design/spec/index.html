@@ -1,0 +1,1487 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="MLArray documentation">
+      
+      
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.8.0">
+    
+    
+      
+        <title>MLArray v1 — format and metadata specification (draft) - MLArray</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.57a0d79d.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#mlarray-v1-format-and-metadata-specification-draft" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="MLArray" class="md-header__button md-logo" aria-label="MLArray" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            MLArray
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              MLArray v1 — format and metadata specification (draft)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="MLArray" class="md-nav__button md-logo" aria-label="MLArray" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    MLArray
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../why/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why MLArray
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../optimization/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML Optimization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-goals-and-non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Goals and non-goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-terminology-informative" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Terminology (informative)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-container" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Container
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-core-metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Core metadata
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Core metadata">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-version" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 version
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-axes-the-array-axes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 axes — the array axes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-spaces-coordinate-systems-and-how-the-array-sits-in-them" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 spaces — coordinate systems and how the array sits in them
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-values-what-the-numbers-mean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 values — what the numbers mean
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-units" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5 Units
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#46-image-pyramids-geometry-reserved-storage-not-yet-defined" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.6 Image pyramids (geometry reserved, storage not yet defined)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-profiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Profiles
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Profiles">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-medical-profile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 medical profile
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-ml-profile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 ml profile
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-further-profiles-informative-defined-later" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Further profiles (informative, defined later)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-source-the-original-metadata" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Source — the original metadata
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Source — the original metadata">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-purpose-and-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 Purpose and rules
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 Structure
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-fingerprint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 Fingerprint
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-readable-header-representation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.4 Readable header representation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-user" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. user
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-history-and-storage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. history and storage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-accuracy-standard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Accuracy standard
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Validation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-python-api-informative-sketch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Python API (informative sketch)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-decisions-log" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. Decisions log
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#13-open-questions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13. Open questions
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="mlarray-v1-format-and-metadata-specification-draft">MLArray v1 — format and metadata specification (draft)<a class="headerlink" href="#mlarray-v1-format-and-metadata-specification-draft" title="Permanent link">&para;</a></h1>
+<p>Status: <strong>draft for discussion, not implemented.</strong> Branch <code>rework/v1</code>. Last update: 2026-11-06.
+Companion spec: MedVol v2 converter (<code>medvol</code> repo, branch <code>rework/v2</code>, <code>docs/design/spec.md</code>).</p>
+<p>Keywords <strong>MUST</strong>, <strong>SHOULD</strong> and <strong>MAY</strong> are normative. Everything marked <em>informative</em> is explanation.</p>
+<hr />
+<h2 id="1-goals-and-non-goals">1. Goals and non-goals<a class="headerlink" href="#1-goals-and-non-goals" title="Permanent link">&para;</a></h2>
+<p><strong>Goals</strong></p>
+<ol>
+<li>One array format for scientific images of any domain: medical, digital pathology, microscopy, astronomy,
+   earth observation, physics, biology, natural images.</li>
+<li>A metadata model that is <strong>small, explicit and readable</strong>, with optional domain depth and room for
+   arbitrary metadata.</li>
+<li>Geometry that cannot be misread. Every convention that has historically caused bugs is stated in the
+   file, never implied: array axis order, world frame, axis direction, voxel centre. (Evidence:
+   <code>~/projects/image-orientation-kb</code>.)</li>
+<li>Faithful round trips. Converting format X → MLArray → X (via MedVol) reproduces X's metadata and array,
+   to the accuracy expected of a file format (§9).</li>
+<li>Fast access: metadata needed to use the array loads in about a millisecond, and large original metadata
+   loads only on demand (§3).</li>
+</ol>
+<p><strong>Non-goals</strong></p>
+<ul>
+<li>De-identification or any other modification of metadata. Metadata is stored as given.</li>
+<li>Backwards compatibility with v0 files. There is no migration; v0 files must be re-converted from their
+  sources.</li>
+<li>Reading or writing other formats inside <code>mlarray</code>. That is MedVol's job. <code>mlarray</code> depends on numpy,
+  blosc2, msgpack and xxhash only.</li>
+</ul>
+<h2 id="2-terminology-informative">2. Terminology (informative)<a class="headerlink" href="#2-terminology-informative" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>array axis</td>
+<td>one dimension of the stored array, in memory order (<code>array.shape</code> order, C order, last axis fastest)</td>
+</tr>
+<tr>
+<td>index</td>
+<td>integer position along the array axes; index <code>(0,…,0)</code> is the first element</td>
+</tr>
+<tr>
+<td>space</td>
+<td>a named physical or reference coordinate system: patient, microscope stage, slide, sky, map projection, …</td>
+</tr>
+<tr>
+<td>from-array transform</td>
+<td>the mapping from array index to coordinates in one space</td>
+</tr>
+<tr>
+<td>core</td>
+<td>metadata every MLArray reader must understand (§4)</td>
+</tr>
+<tr>
+<td>profile</td>
+<td>optional, versioned domain metadata (§5)</td>
+</tr>
+<tr>
+<td>source</td>
+<td>the original metadata of the file(s) the array was converted from (§6)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Style rules for all keys and vocabulary.</strong> <code>snake_case</code>, full English words, no abbreviations except
+<code>id</code>, and no domain jargon in the core. Terms are chosen so that a pathologist, an astronomer and a
+radiologist read them the same way.</p>
+<h2 id="3-container">3. Container<a class="headerlink" href="#3-container" title="Permanent link">&para;</a></h2>
+<ul>
+<li>An <code>.mla</code> file is a blosc2 NDArray file (the array payload) with metadata in blosc2 variable-length
+  metadata (<code>vlmeta</code>).</li>
+<li>Metadata is stored in <strong>three <code>vlmeta</code> keys</strong>. Each value is a msgpack map, written through blosc2,
+  which serialises with msgpack and compresses each key separately:</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>key</th>
+<th>content</th>
+<th>loaded</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>mlarray</code></td>
+<td><code>version</code>, <code>axes</code>, <code>spaces</code>, <code>values</code>, <code>profiles</code>, <code>history</code>, <code>storage</code></td>
+<td>on open (small)</td>
+</tr>
+<tr>
+<td><code>mlarray.source</code></td>
+<td><code>source</code> (§6), may be very large</td>
+<td>on first access</td>
+</tr>
+<tr>
+<td><code>mlarray.user</code></td>
+<td><code>user</code> (§7), arbitrary, may be very large</td>
+<td>on first access</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Metadata <strong>MUST NOT</strong> use pickle or any other executable serialisation.</li>
+<li>Readers <strong>MUST</strong> read each key as raw bytes and decode them with plain msgpack, never through blosc2's
+  own vlmeta decoder. That decoder can rebuild Python objects and only defaults to a safe mode in recent
+  blosc2 versions (review finding C2, branch <code>review/findings</code>).</li>
+<li>Values <strong>MUST</strong> be msgpack-native types: map, array, string, integer, float, boolean, nil, binary.
+  Map key order is preserved.</li>
+<li>A file always holds an array. Metadata without array data is saved as an empty array of shape
+  <code>(0,) * len(axes)</code>, so <code>len(axes) == array.ndim</code> holds for every file.</li>
+</ul>
+<p><em>Informative. Benchmark (blosc2 4.14.1, 2026-11-06), synthetic DICOM-like headers:</em></p>
+<table>
+<thead>
+<tr>
+<th>original headers</th>
+<th>blosc2 metadata on disk</th>
+<th>open file</th>
+<th>read <code>mlarray</code> key</th>
+<th>read <code>mlarray.source</code> key</th>
+<th>current gzip+pickle</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>300 slice headers, 0.58 MB</td>
+<td>0.30 MB</td>
+<td>0.2 ms</td>
+<td>0.8 ms</td>
+<td>6.5 ms</td>
+<td>155 ms</td>
+</tr>
+<tr>
+<td>3000 slice headers, 5.85 MB</td>
+<td>3.02 MB</td>
+<td>0.5 ms</td>
+<td>0.8 ms</td>
+<td>55 ms</td>
+<td>1793 ms</td>
+</tr>
+</tbody>
+</table>
+<p>Opening the file stays well under 1 ms whatever the size of the source metadata. The test data was
+random, so real headers compress better than the ~2× shown.</p>
+<h2 id="4-core-metadata">4. Core metadata<a class="headerlink" href="#4-core-metadata" title="Permanent link">&para;</a></h2>
+<h3 id="41-version">4.1 <code>version</code><a class="headerlink" href="#41-version" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="s">"1.0"</span><span class="w">            </span><span class="c1"># metadata spec version (semver). Required.</span>
+<span class="nt">writer</span><span class="p">:</span><span class="w"> </span><span class="s">"mlarray</span><span class="nv"> </span><span class="s">1.0.0"</span><span class="w">   </span><span class="c1"># software that wrote the file. Required.</span>
+</code></pre></div>
+<p>Readers <strong>MUST</strong> accept any <code>1.x</code> and <strong>MUST</strong> keep keys they don't know when rewriting a file.</p>
+<h3 id="42-axes-the-array-axes">4.2 <code>axes</code> — the array axes<a class="headerlink" href="#42-axes-the-array-axes" title="Permanent link">&para;</a></h3>
+<p>One entry per array axis, in array order. <code>len(axes) == array.ndim</code>. Required.</p>
+<table>
+<thead>
+<tr>
+<th>field</th>
+<th>required</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>unique name of the array axis, e.g. <code>z</code>, <code>y</code>, <code>x</code>, <code>t</code>, <code>c</code>. A name only: it says nothing about direction in space.</td>
+</tr>
+<tr>
+<td><code>type</code></td>
+<td>yes</td>
+<td><code>space</code> · <code>time</code> · <code>channel</code> · <code>component</code> (vector or tensor components) · <code>other</code> (any other categorical or indexed axis: echo, b-value, batch, …)</td>
+</tr>
+<tr>
+<td><code>labels</code></td>
+<td>no</td>
+<td>one label per index for categorical axes: <code>["T1", "T2", "FLAIR"]</code>, <code>["red", "green", "blue"]</code></td>
+</tr>
+<tr>
+<td><code>start</code>, <code>step</code>, <code>unit</code>, <code>unit_code</code></td>
+<td>no</td>
+<td>uniform sampling of a non-space axis: coordinate of index <em>i</em> = <code>start + i·step</code> in <code>unit</code> (§4.5), e.g. time in seconds</td>
+</tr>
+<tr>
+<td><code>coordinates</code>, <code>unit</code>, <code>unit_code</code></td>
+<td>no</td>
+<td>explicit coordinate per index for non-uniform sampling: timestamps, b-values, wavelengths</td>
+</tr>
+</tbody>
+</table>
+<p>Space axes carry no spacing or unit here. Their geometry lives in <code>spaces</code> (§4.3), so it has exactly one
+source of truth.</p>
+<h3 id="43-spaces-coordinate-systems-and-how-the-array-sits-in-them">4.3 <code>spaces</code> — coordinate systems and how the array sits in them<a class="headerlink" href="#43-spaces-coordinate-systems-and-how-the-array-sits-in-them" title="Permanent link">&para;</a></h3>
+<p>Optional. Without <code>spaces</code> the array lives in index space only, which is valid for photos, ML tensors and
+the like.</p>
+<div class="highlight"><pre><span></span><code><span class="nt">spaces</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">patient</span>
+<span class="w">    </span><span class="nt">reference</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">scheme</span><span class="p">:</span><span class="w"> </span><span class="nv">dicom_frame_of_reference</span><span class="p p-Indicator">,</span><span class="nt"> id</span><span class="p">:</span><span class="w"> </span><span class="s">"1.2.826.0.1.3680043.8.498.1"</span><span class="p p-Indicator">}</span>
+<span class="w">    </span><span class="nt">axes</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="nv">x</span><span class="p p-Indicator">,</span><span class="nt"> unit</span><span class="p">:</span><span class="w"> </span><span class="nv">millimeter</span><span class="p p-Indicator">,</span><span class="nt"> increases_toward</span><span class="p">:</span><span class="w"> </span><span class="nv">left</span><span class="p p-Indicator">}</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="nv">y</span><span class="p p-Indicator">,</span><span class="nt"> unit</span><span class="p">:</span><span class="w"> </span><span class="nv">millimeter</span><span class="p p-Indicator">,</span><span class="nt"> increases_toward</span><span class="p">:</span><span class="w"> </span><span class="nv">posterior</span><span class="p p-Indicator">}</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="nv">z</span><span class="p p-Indicator">,</span><span class="nt"> unit</span><span class="p">:</span><span class="w"> </span><span class="nv">millimeter</span><span class="p p-Indicator">,</span><span class="nt"> increases_toward</span><span class="p">:</span><span class="w"> </span><span class="nv">superior</span><span class="p p-Indicator">}</span>
+<span class="w">    </span><span class="nt">from_array</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">array_axes</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">z</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">y</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">x</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">matrix</span><span class="p">:</span><span class="w">                              </span><span class="c1"># rows: space axes x, y, z (+1)</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="w"> </span><span class="nv">0.0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0.0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0.7</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">-170.1</span><span class="p p-Indicator">]</span><span class="w">         </span><span class="c1"># columns: array_axes z, y, x (+ translation)</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="w"> </span><span class="nv">0.0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0.7</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0.0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">-201.3</span><span class="p p-Indicator">]</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">-2.5</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0.0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0.0</span><span class="p p-Indicator">,</span><span class="w">  </span><span class="nv">-87.0</span><span class="p p-Indicator">]</span>
+<span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="w"> </span><span class="nv">0.0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0.0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0.0</span><span class="p p-Indicator">,</span><span class="w">    </span><span class="nv">1.0</span><span class="p p-Indicator">]</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>field</th>
+<th>required</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>unique space name, chosen freely (<code>patient</code>, <code>stage</code>, <code>slide</code>, <code>sky</code>, <code>atlas</code>, <code>map</code>)</td>
+</tr>
+<tr>
+<td><code>reference</code></td>
+<td>no</td>
+<td>identifies the physical frame, so files can be compared: <code>{scheme, id}</code>. Two spaces are the <strong>same frame iff <code>scheme</code> and <code>id</code> are equal</strong>. Examples: <code>dicom_frame_of_reference</code>, <code>atlas</code> (<code>MNI152NLin2009cAsym</code>), <code>epsg</code> (<code>32632</code>), <code>celestial</code> (<code>ICRS</code>)</td>
+</tr>
+<tr>
+<td><code>axes</code></td>
+<td>yes</td>
+<td>the space's own axes, in order: <code>name</code>, <code>unit</code> (+ <code>unit_code</code>, §4.5), optional <code>increases_toward</code></td>
+</tr>
+<tr>
+<td><code>from_array</code></td>
+<td>yes</td>
+<td>how array indices map into this space (below)</td>
+</tr>
+</tbody>
+</table>
+<p><strong><code>increases_toward</code></strong> gives the direction in which a coordinate grows, as a plain word from a vocabulary:
+- medical: <code>left</code> / <code>right</code> / <code>anterior</code> / <code>posterior</code> / <code>superior</code> / <code>inferior</code>;
+- earth observation: <code>east</code> / <code>west</code> / <code>north</code> / <code>south</code> / <code>up</code> / <code>down</code>;
+- profiles may add more.</p>
+<p>It replaces letter codes such as <code>RAS</code>/<code>LPS</code>/<code>RAI</code>, whose meaning differs between tools. The example above
+is the DICOM patient frame (LPS). Libraries <strong>MAY</strong> derive letter codes for display, but they <strong>MUST NOT</strong>
+store them.</p>
+<p><strong><code>from_array</code></strong> rules:
+1. <code>array_axes</code> lists the array axes that map into this space, by name, in the order of the matrix columns.
+   Each listed axis must have <code>type: space</code>.
+2. <code>matrix</code> is a homogeneous matrix with shape <code>(len(space.axes) + 1) × (len(array_axes) + 1)</code>.
+   - Row <em>r</em> gives space coordinate <em>r</em>.
+   - Column <em>c</em> multiplies array axis <code>array_axes[c]</code>.
+   - The last column is the translation, and the last row is <code>[0, …, 0, 1]</code>.
+   - Rotation, oblique axes, mirrored grids and shear (e.g. gantry-tilted CT kept exactly as acquired) are
+     all allowed.
+3. Shorthand for axis-aligned grids: <code>scale: [...]</code> and <code>translation: [...]</code> (per array axis, in
+   <code>array_axes</code> order) instead of <code>matrix</code>. Exactly one form <strong>MUST</strong> be present.
+4. <strong>An integer index is the centre of its voxel or pixel.</strong> <code>matrix · [index, 1]</code> is the coordinate of the
+   voxel centre.
+5. Profiles <strong>MAY</strong> define non-linear mappings (e.g. astronomy sky projections) under
+   <code>from_array.profile_mapping</code>. A reader that doesn't support it still uses <code>matrix</code> as the linear
+   approximation, which <strong>MUST</strong> then be present.
+6. <code>spacing</code>, <code>origin</code>, <code>direction</code> and letter codes are derived by libraries on request and are never
+   stored.</p>
+<p>Several spaces are allowed, e.g. <code>patient</code> plus <code>atlas</code> after registration, or <code>stage</code> plus <code>slide</code>. The
+first space is the default.</p>
+<h3 id="44-values-what-the-numbers-mean">4.4 <code>values</code> — what the numbers mean<a class="headerlink" href="#44-values-what-the-numbers-mean" title="Permanent link">&para;</a></h3>
+<p>Optional. Defaults to <code>{kind: measurement}</code>.</p>
+<table>
+<thead>
+<tr>
+<th>field</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>kind</code></td>
+<td><code>measurement</code> (physical or intensity values) · <code>label</code> (integer class per element) · <code>instance</code> (integer object id per element) · <code>probability</code> · <code>vector</code> · <code>other</code></td>
+</tr>
+<tr>
+<td><code>unit</code>, <code>unit_code</code></td>
+<td>unit of the physical value (§4.5): <code>hounsfield_unit</code>, <code>counts</code>, <code>kelvin</code>, <code>reflectance</code>, <code>arbitrary</code>, …</td>
+</tr>
+<tr>
+<td><code>scale</code>, <code>offset</code></td>
+<td>physical value = <code>scale · stored + offset</code>. Stored values are never pre-applied (keeps exact round trips, §9).</td>
+</tr>
+<tr>
+<td><code>fill</code></td>
+<td>value meaning "no data / outside the field of view"</td>
+</tr>
+<tr>
+<td><code>labels</code></td>
+<td>for <code>label</code>/<code>instance</code>/<code>probability</code>: map from value (or channel index) to <code>{name, color, code}</code></td>
+</tr>
+<tr>
+<td><code>label_layout</code></td>
+<td><code>index</code> (one label value per element, default) or <code>channel</code> (one channel per label: one-hot or probabilities, using the <code>channel</code> axis)</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><span class="nt">values</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">label</span>
+<span class="w">  </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w">    </span><span class="s">"0"</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="nv">background</span><span class="p p-Indicator">}</span>
+<span class="w">    </span><span class="s">"1"</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="nv">liver</span><span class="p p-Indicator">,</span><span class="nt"> color</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">221</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">130</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">101</span><span class="p p-Indicator">],</span><span class="nt"> code</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">scheme</span><span class="p">:</span><span class="w"> </span><span class="nv">SCT</span><span class="p p-Indicator">,</span><span class="nt"> value</span><span class="p">:</span><span class="w"> </span><span class="s">"10200004"</span><span class="p p-Indicator">,</span><span class="nt"> meaning</span><span class="p">:</span><span class="w"> </span><span class="nv">Liver</span><span class="p p-Indicator">}}</span>
+</code></pre></div>
+<p><code>code</code> is an optional ontology reference: scheme, value and human-readable meaning. For medical
+segmentations it carries the DICOM SEG coded concept.</p>
+<h3 id="45-units">4.5 Units<a class="headerlink" href="#45-units" title="Permanent link">&para;</a></h3>
+<p>Wherever a unit appears (space axes, non-space axes, <code>values</code>), it is given as:</p>
+<table>
+<thead>
+<tr>
+<th>field</th>
+<th>meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>unit</code></td>
+<td>human-readable name. Writers <strong>SHOULD</strong> use a name from the curated list in <code>mlarray/schemas/units-1.0.json</code>; free text is allowed when no listed unit fits.</td>
+</tr>
+<tr>
+<td><code>unit_code</code></td>
+<td>optional machine-readable code in <strong>UCUM</strong> (Unified Code for Units of Measure, also used by DICOM and HL7). Writers <strong>SHOULD</strong> set it whenever it is known. The curated list gives the code for every listed name.</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><span class="p p-Indicator">{</span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="nv">x</span><span class="p p-Indicator">,</span><span class="nt"> unit</span><span class="p">:</span><span class="w"> </span><span class="nv">millimeter</span><span class="p p-Indicator">,</span><span class="nt"> unit_code</span><span class="p">:</span><span class="w"> </span><span class="nv">mm</span><span class="p p-Indicator">,</span><span class="nt"> increases_toward</span><span class="p">:</span><span class="w"> </span><span class="nv">left</span><span class="p p-Indicator">}</span>
+<span class="nt">values</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="nv">measurement</span><span class="p p-Indicator">,</span><span class="nt"> unit</span><span class="p">:</span><span class="w"> </span><span class="nv">hounsfield_unit</span><span class="p p-Indicator">,</span><span class="nt"> unit_code</span><span class="p">:</span><span class="w"> </span><span class="s">"[hnsf'U]"</span><span class="p p-Indicator">}</span>
+</code></pre></div>
+<p>Tools compare units by <code>unit_code</code> when present, otherwise by <code>unit</code>. The curated list starts with:
+- SI lengths (nanometer … kilometer) and time units;
+- angles: degree, radian, arcsecond;
+- hounsfield_unit, counts, percent, kelvin, reflectance, arbitrary.</p>
+<p>It grows through profiles.</p>
+<h3 id="46-image-pyramids-geometry-reserved-storage-not-yet-defined">4.6 Image pyramids (geometry reserved, storage not yet defined)<a class="headerlink" href="#46-image-pyramids-geometry-reserved-storage-not-yet-defined" title="Permanent link">&para;</a></h3>
+<p>One file holds <strong>one image</strong>. The only planned exception is a multi-resolution pyramid of that same image
+(pathology, microscopy). Its storage layout is <strong>not part of v1</strong>. v1 only fixes how a level's geometry is
+described, so that the later storage design cannot reopen geometry questions:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">pyramid</span><span class="p">:</span><span class="w">                      </span><span class="c1"># optional, reserved. v1 readers ignore it, v1 writers do not write it</span>
+<span class="w">  </span><span class="nt">levels</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">level</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w">      </span><span class="nt">shape</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">1</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">4096</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">4096</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">to_base_index</span><span class="p">:</span><span class="w">          </span><span class="c1"># base-array index of each element of this level</span>
+<span class="w">        </span><span class="nt">scale</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">1</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">2</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">2</span><span class="p p-Indicator">]</span><span class="w">      </span><span class="c1">#   base_index = scale * level_index + offset</span>
+<span class="w">        </span><span class="nt">offset</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0.5</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0.5</span><span class="p p-Indicator">]</span><span class="w"> </span><span class="c1">#   0.5 = centre of a 2x2 block (averaging); 0 = nearest-sample decimation</span>
+<span class="w">      </span><span class="nt">storage</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w">           </span><span class="c1"># to be defined (separate blosc2 array, sub-file, ...)</span>
+</code></pre></div>
+<ul>
+<li>Each level's position in every space is the space's <code>from_array</code> composed with <code>to_base_index</code>, so levels
+  never need their own copy of the space geometry.</li>
+<li><code>offset</code> is explicit because producers differ. With averaging, the first level-1 pixel's centre is at
+  base index 0.5, not 0. Ignoring that is the classic half-pixel shift between levels (KB ch07 §3).</li>
+</ul>
+<h2 id="5-profiles">5. Profiles<a class="headerlink" href="#5-profiles" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><span class="nt">profiles</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">medical</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">profile_version</span><span class="p">:</span><span class="w"> </span><span class="s">"1.0"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">...</span><span class="p p-Indicator">}</span>
+<span class="w">  </span><span class="nt">ml</span><span class="p">:</span><span class="w">      </span><span class="p p-Indicator">{</span><span class="nt">profile_version</span><span class="p">:</span><span class="w"> </span><span class="s">"1.0"</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">...</span><span class="p p-Indicator">}</span>
+</code></pre></div>
+<ol>
+<li>A profile adds domain metadata. It <strong>MUST NOT</strong> change the meaning of core fields.</li>
+<li>Profiles are optional, independent and combinable.</li>
+<li>Readers <strong>MUST</strong> keep profiles they don't understand.</li>
+<li>Official profiles are published with the spec as JSON Schemas. Third-party profiles use a reverse-domain
+   name (<code>org_example_cryoem</code>).</li>
+<li><strong>One fact, one place:</strong></li>
+<li>A profile <strong>MUST NOT</strong> copy what the core states (geometry, units, labels).</li>
+<li>It <strong>SHOULD NOT</strong> copy what <code>source</code> already contains verbatim; libraries expose source fields
+     directly instead (§6.4).</li>
+<li>A profile field that does overlap a source field is a deliberate, explicit override. Read precedence is
+     <strong>core &gt; profile &gt; source</strong>.</li>
+</ol>
+<h3 id="51-medical-profile">5.1 <code>medical</code> profile<a class="headerlink" href="#51-medical-profile" title="Permanent link">&para;</a></h3>
+<p>Vocabulary: the <strong>DICOM data dictionary</strong>. Keys are DICOM keywords, values are plain msgpack values.</p>
+<div class="highlight"><pre><span></span><code><span class="nt">medical</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">profile_version</span><span class="p">:</span><span class="w"> </span><span class="s">"1.0"</span>
+<span class="w">  </span><span class="nt">dicom</span><span class="p">:</span><span class="w">                       </span><span class="c1"># DICOM keywords not (or differently) present in source</span>
+<span class="w">    </span><span class="nt">Modality</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">MR</span>
+<span class="w">    </span><span class="nt">BodyPartExamined</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">BRAIN</span>
+<span class="w">    </span><span class="nt">RepetitionTime</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2300</span>
+<span class="w">    </span><span class="nt">EchoTime</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2.98</span>
+</code></pre></div>
+<ul>
+<li>Typical use:</li>
+<li>curated or user-provided medical metadata for files without a DICOM source, e.g. public NIfTI
+    datasets;</li>
+<li>deliberate overrides of DICOM source values.</li>
+<li>Files converted from DICOM normally need no <code>medical.dicom</code> entries: their full DICOM metadata is in
+  <code>source</code>, addressable by keyword.</li>
+<li>Recommended world frame for medical images: the <strong>DICOM patient frame</strong> (x increases toward left, y toward
+  posterior, z toward superior; LPS), with <code>reference.scheme: dicom_frame_of_reference</code> when the
+  FrameOfReferenceUID is known. MedVol writes this by default.</li>
+<li>Recommended array layout: the acquisition grid as stored by the source, in C order (no reorientation).</li>
+</ul>
+<h3 id="52-ml-profile">5.2 <code>ml</code> profile<a class="headerlink" href="#52-ml-profile" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="nt">ml</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">profile_version</span><span class="p">:</span><span class="w"> </span><span class="s">"1.0"</span>
+<span class="w">  </span><span class="nt">statistics</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">min</span><span class="p">:</span><span class="w"> </span><span class="nv">-1024</span><span class="p p-Indicator">,</span><span class="nt"> max</span><span class="p">:</span><span class="w"> </span><span class="nv">3071</span><span class="p p-Indicator">,</span><span class="nt"> mean</span><span class="p">:</span><span class="w"> </span><span class="nv">40.2</span><span class="p p-Indicator">,</span><span class="nt"> standard_deviation</span><span class="p">:</span><span class="w"> </span><span class="nv">410.0</span><span class="p p-Indicator">,</span>
+<span class="nt">               percentiles</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="s">"0.5"</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="nv">-1000</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">"99.5"</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="nv">1500</span><span class="p p-Indicator">}}</span>
+<span class="w">  </span><span class="nt">boxes</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">frame</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">index</span><span class="w">              </span><span class="c1"># "index" (array axes below) or a space name (space coordinates)</span>
+<span class="w">    </span><span class="nt">axes</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">z</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">y</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">x</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">items</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">min</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">10</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">50</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">60</span><span class="p p-Indicator">],</span><span class="nt"> max</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">40</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">90</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">120</span><span class="p p-Indicator">],</span><span class="nt"> label</span><span class="p">:</span><span class="w"> </span><span class="nv">1</span><span class="p p-Indicator">,</span><span class="nt"> score</span><span class="p">:</span><span class="w"> </span><span class="nv">0.97</span><span class="p p-Indicator">}</span>
+<span class="w">  </span><span class="nt">patch_size</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">128</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">128</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">128</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">split</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">train</span>
+</code></pre></div>
+<h3 id="53-further-profiles-informative-defined-later">5.3 Further profiles (informative, defined later)<a class="headerlink" href="#53-further-profiles-informative-defined-later" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>profile</th>
+<th>adds</th>
+<th>geometry usage</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>microscopy</code></td>
+<td>per-channel excitation and emission wavelength, fluorophore, objective (numerical aperture, magnification, immersion)</td>
+<td><code>stage</code> space, micrometer</td>
+</tr>
+<tr>
+<td><code>pathology</code></td>
+<td>stain, objective power, scanner, specimen and slide identifiers</td>
+<td><code>slide</code> space, micrometer; microns per pixel = scale</td>
+</tr>
+<tr>
+<td><code>astronomy</code></td>
+<td>telescope, instrument, exposure, FITS WCS keywords</td>
+<td><code>sky</code> space, non-linear projection via <code>profile_mapping</code></td>
+</tr>
+<tr>
+<td><code>earth_observation</code></td>
+<td>bands (name, centre wavelength), acquisition time, sensor</td>
+<td><code>map</code> space with <code>reference.scheme: epsg</code></td>
+</tr>
+<tr>
+<td><code>natural</code></td>
+<td>camera and lens (EXIF subset), colour space</td>
+<td>usually none</td>
+</tr>
+<tr>
+<td><code>physics</code></td>
+<td>quantity names, solver, per-component units</td>
+<td>SI-unit space, <code>component</code> axis</td>
+</tr>
+</tbody>
+</table>
+<p><strong>How non-medical formats map onto the core</strong> (informative). This is the check that the model covers other
+domains; converters for these formats come later.</p>
+<table>
+<thead>
+<tr>
+<th>format</th>
+<th>geometry</th>
+<th>values</th>
+<th>other</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OME-TIFF / OME-Zarr</td>
+<td><code>PhysicalSizeX/Y/Z</code> (+ unit) → <code>scale</code> of a <code>stage</code> space; NGFF <code>scale</code>/<code>translation</code> → same</td>
+<td>—</td>
+<td>channels → <code>channel</code> axis <code>labels</code>; wavelengths, objective → <code>microscopy</code> profile</td>
+</tr>
+<tr>
+<td>FITS</td>
+<td>linear WCS (<code>CRPIX</code>, <code>CRVAL</code>, <code>CDELT</code>/<code>CD</code>/<code>PC</code>, <code>CUNIT</code>) → <code>matrix</code> of a <code>sky</code> space. FITS pixel indices are 1-based with integer = pixel centre, so <code>CRPIX</code> − 1 gives the 0-based reference index. The projection (<code>CTYPE</code> e.g. <code>RA---TAN</code>) → <code>astronomy</code> <code>profile_mapping</code></td>
+<td><code>BUNIT</code> → <code>unit</code>; <code>BSCALE</code>/<code>BZERO</code> → <code>scale</code>/<code>offset</code>; <code>BLANK</code> → <code>fill</code></td>
+<td>all cards verbatim in <code>source</code></td>
+</tr>
+<tr>
+<td>GeoTIFF / COG</td>
+<td><code>ModelTransformation</code> or <code>ModelPixelScale</code> + <code>ModelTiepoint</code> → <code>matrix</code> of a <code>map</code> space; CRS → <code>reference: {scheme: epsg, id: ...}</code>. <code>PixelIsArea</code> describes the pixel <em>corner</em>, so add half a pixel to reach our centre convention; <code>PixelIsPoint</code> is already a centre</td>
+<td><code>GDAL_NODATA</code> → <code>fill</code>; scale/offset tags → <code>scale</code>/<code>offset</code></td>
+<td>bands → <code>channel</code> axis; band wavelengths → <code>earth_observation</code> profile</td>
+</tr>
+<tr>
+<td>Plain TIFF / PNG / JPEG</td>
+<td>none (index space), or DPI → <code>scale</code> in inch/millimeter</td>
+<td>—</td>
+<td>EXIF → <code>natural</code> profile or <code>source</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="6-source-the-original-metadata">6. Source — the original metadata<a class="headerlink" href="#6-source-the-original-metadata" title="Permanent link">&para;</a></h2>
+<h3 id="61-purpose-and-rules">6.1 Purpose and rules<a class="headerlink" href="#61-purpose-and-rules" title="Permanent link">&para;</a></h3>
+<p><code>source</code> keeps the original metadata <strong>readable, authentic and complete</strong>, so that MedVol can write the
+original format back faithfully and users can inspect everything the source contained.</p>
+<ol>
+<li><code>source</code> is <strong>read-only</strong> in the library API. To change metadata, edit the core or a profile.</li>
+<li><strong>The core owns everything it describes.</strong> When exporting, MedVol regenerates core-owned source fields
+   from the core: geometry, dimensions, data type, value scale/offset, units, labels. They can therefore
+   never contradict the core. On an unchanged round trip they regenerate to the original values (§9).</li>
+<li><strong>Data-dependent fields</strong> (e.g. NIfTI <code>cal_min</code>, DICOM <code>LargestPixelValue</code>, per-slice <code>SliceLocation</code>)
+   are kept only while the array still matches the <code>fingerprint</code> (§6.3). Otherwise MedVol recomputes or
+   drops them and records that in <code>history</code>.</li>
+<li>Images derived from another image (predictions, crops, resamples) <strong>MUST NOT</strong> inherit its <code>source</code>
+   implicitly. Copying source is an explicit opt-in.</li>
+<li>Which fields are core-owned or data-dependent is defined per format in the MedVol spec, not in the file.</li>
+</ol>
+<h3 id="62-structure">6.2 Structure<a class="headerlink" href="#62-structure" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><span class="nt">source</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nifti</span><span class="w">                       </span><span class="c1"># nifti | nrrd | metaimage | mgh | dicom | mla | ...</span>
+<span class="w">    </span><span class="nt">format_version</span><span class="p">:</span><span class="w"> </span><span class="s">"1"</span>
+<span class="w">    </span><span class="nt">files</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"sub-01_T1w.nii.gz"</span><span class="p p-Indicator">]</span><span class="w">        </span><span class="c1"># original file name(s), relative, informative</span>
+<span class="w">    </span><span class="nt">reader</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="nv">medvol</span><span class="p p-Indicator">,</span><span class="nt"> version</span><span class="p">:</span><span class="w"> </span><span class="s">"2.0.0"</span><span class="p p-Indicator">}</span>
+<span class="w">    </span><span class="nt">index_map</span><span class="p">:</span><span class="w">                          </span><span class="c1"># how MLArray indices relate to the source file's own indices</span>
+<span class="w">      </span><span class="nt">axis_order</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">2</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">1</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0</span><span class="p p-Indicator">]</span><span class="w">             </span><span class="c1"># source axis feeding each MLArray axis</span>
+<span class="w">      </span><span class="nt">flipped</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">false</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">false</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">false</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">offset</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">0</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">fingerprint</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">shape</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">176</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">256</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">256</span><span class="p p-Indicator">],</span><span class="nt"> dtype</span><span class="p">:</span><span class="w"> </span><span class="nv">int16</span><span class="p p-Indicator">,</span><span class="nt"> geometry</span><span class="p">:</span><span class="w"> </span><span class="s">"&lt;hash&gt;"</span><span class="p p-Indicator">,</span><span class="nt"> data</span><span class="p">:</span><span class="w"> </span><span class="s">"&lt;xxh3</span><span class="nv"> </span><span class="s">hash&gt;"</span><span class="p p-Indicator">}</span>
+<span class="w">    </span><span class="nt">header</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="w"> </span><span class="nv">... readable original metadata</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">§6.4 ...</span><span class="w"> </span><span class="p p-Indicator">}</span>
+</code></pre></div>
+<p><code>index_map</code> keeps raw geometry fields (NIfTI <code>srow_*</code>, DICOM <code>ImagePositionPatient</code>, NRRD
+<code>space directions</code>) interpretable. They refer to the source's own index order, and <code>index_map</code> says how that
+relates to the stored array.</p>
+<h3 id="63-fingerprint">6.3 Fingerprint<a class="headerlink" href="#63-fingerprint" title="Permanent link">&para;</a></h3>
+<p>Written at conversion time:
+- <code>shape</code> and <code>dtype</code>;
+- a hash of the core geometry (axes and spaces, after rounding to the accuracy of §9);
+- a fast hash of the array data (xxh3).</p>
+<p>MedVol compares it on export to decide whether data-dependent fields are still valid.</p>
+<h3 id="64-readable-header-representation">6.4 Readable header representation<a class="headerlink" href="#64-readable-header-representation" title="Permanent link">&para;</a></h3>
+<p>The header is stored as nested maps with native types, not as raw bytes:</p>
+<ul>
+<li><strong>Numbers are numbers.</strong> Integers stay integers. Floats are stored as the shortest decimal value that
+  converts back to the original binary value: a float32 <code>0.7</code> is stored as <code>0.7</code>, not
+  <code>0.699999988079071</code>.</li>
+<li><strong>Text is text.</strong> Fixed-length or null-padded strings are stored stripped, and MedVol re-pads on export.</li>
+<li><strong>Field order is preserved.</strong></li>
+<li><strong>Binary content</strong> (NIfTI extensions with binary payload, DICOM OB/OW/UN elements) is stored as msgpack
+  binary. Viewers display such values as <code>&lt;binary, N bytes&gt;</code>.</li>
+<li><strong>DICOM:</strong></li>
+<li>Public elements are keyed by keyword (<code>Modality</code>, <code>ImagePositionPatient</code>). Private elements are keyed by
+    tag <code>"(0029,1010)"</code> and carry <code>{vr, value}</code>, because their type is not in the dictionary.</li>
+<li>Sequences are lists of maps.</li>
+<li>A multi-file series is stored as <code>shared</code> (identical in every file, stored once) plus <code>per_file</code> (a list
+    with only the fields that differ, in file order) plus <code>file_names</code>.</li>
+<li><strong>Format-layout fields</strong> (NIfTI <code>vox_offset</code>, NRRD <code>encoding</code>, DICOM transfer syntax) are kept like any
+  other field. MedVol reuses them on export unless told otherwise.</li>
+</ul>
+<h2 id="7-user">7. <code>user</code><a class="headerlink" href="#7-user" title="Permanent link">&para;</a></h2>
+<p>Arbitrary msgpack-compatible metadata, never interpreted or validated by MLArray. It replaces v0's <code>extra</code>
+and lives in its own lazily loaded key.</p>
+<h2 id="8-history-and-storage">8. <code>history</code> and <code>storage</code><a class="headerlink" href="#8-history-and-storage" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><span class="nt">history</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">action</span><span class="p">:</span><span class="w"> </span><span class="nv">converted</span><span class="p p-Indicator">,</span><span class="nt"> tool</span><span class="p">:</span><span class="w"> </span><span class="s">"medvol</span><span class="nv"> </span><span class="s">2.0.0"</span><span class="p p-Indicator">,</span><span class="nt"> time</span><span class="p">:</span><span class="w"> </span><span class="s">"2026-11-06T10:12:00Z"</span><span class="p p-Indicator">,</span>
+<span class="nt">     from</span><span class="p">:</span><span class="w"> </span><span class="nv">nifti</span><span class="p p-Indicator">,</span><span class="nt"> settings</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">nifti_form</span><span class="p">:</span><span class="w"> </span><span class="nv">nibabel</span><span class="p p-Indicator">},</span>
+<span class="nt">     warnings</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"qform</span><span class="nv"> </span><span class="s">and</span><span class="nv"> </span><span class="s">sform</span><span class="nv"> </span><span class="s">disagree</span><span class="nv"> </span><span class="s">by</span><span class="nv"> </span><span class="s">4.9</span><span class="nv"> </span><span class="s">mm;</span><span class="nv"> </span><span class="s">used</span><span class="nv"> </span><span class="s">sform</span><span class="nv"> </span><span class="s">(sform_code=2)"</span><span class="p p-Indicator">]}</span>
+<span class="nt">storage</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">chunk_size</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">1</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">256</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">256</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">block_size</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">1</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">64</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">64</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">patch_size</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">128</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">128</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">128</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">compression</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt">codec</span><span class="p">:</span><span class="w"> </span><span class="nv">LZ4HC</span><span class="p p-Indicator">,</span><span class="nt"> level</span><span class="p">:</span><span class="w"> </span><span class="nv">5</span><span class="p p-Indicator">,</span><span class="nt"> filters</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">SHUFFLE</span><span class="p p-Indicator">]}</span>
+</code></pre></div>
+<p><code>history</code> is an append-only list of conversions and operations with tool, version, settings and warnings.</p>
+<p><code>storage</code> describes the blosc2 layout. It is an implementation detail with no scientific meaning.
+- It <strong>MUST</strong> contain only portable properties of the file: chunk, block and patch size, codec, level and
+  filters.
+- It <strong>MUST NOT</strong> contain runtime or machine-specific settings: thread counts, typesize, internal
+  blocksize, read-ahead (review finding M12). Those are chosen at runtime by the library defaults
+  (<code>docs/optimization.md</code>: nnU-Net layout heuristic, LZ4HC-5 with 4 compression threads, read-ahead with 4
+  threads) or by the user per call.</p>
+<h2 id="9-accuracy-standard">9. Accuracy standard<a class="headerlink" href="#9-accuracy-standard" title="Permanent link">&para;</a></h2>
+<p>The guarantee is "what a careful file format guarantees", not byte identity:</p>
+<table>
+<thead>
+<tr>
+<th>item</th>
+<th>guarantee</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>array values</td>
+<td>bit-identical. Stored values are kept in the original dtype, with no rescaling or reorientation unless explicitly requested.</td>
+</tr>
+<tr>
+<td>integers, strings, booleans, binary</td>
+<td>identical</td>
+</tr>
+<tr>
+<td>floating-point header values</td>
+<td>identical binary value when the source stores binary floats (NIfTI, MGH, DICOM FL/FD). For text-encoded numbers (NRRD, MetaImage, DICOM DS/IS) the numeric value is identical, but the textual spelling may differ (<code>0.69999999999999996</code> ↔ <code>0.7</code>, <code>1.0</code> ↔ <code>1</code>).</td>
+</tr>
+<tr>
+<td>geometry through <code>from_array.matrix</code></td>
+<td>float64; round-trip error ≤ 1e-9 relative. Below every format's own precision (NIfTI srow is float32; DICOM DS has 16 characters).</td>
+</tr>
+<tr>
+<td>field order and set of fields</td>
+<td>identical for same-format round trips, except fields the format itself defines as derived (e.g. NIfTI <code>vox_offset</code> when the extension size changes)</td>
+</tr>
+<tr>
+<td>file bytes</td>
+<td>not guaranteed: compression level, gzip timestamps, padding and whitespace may differ</td>
+</tr>
+</tbody>
+</table>
+<p>Cross-format conversion (X → MLArray → Y, Y ≠ X) preserves the core. MedVol reports which source fields Y
+cannot represent.</p>
+<h2 id="10-validation">10. Validation<a class="headerlink" href="#10-validation" title="Permanent link">&para;</a></h2>
+<p>The normative definitions are JSON Schemas shipped in the repo: <code>mlarray/schemas/mlarray-1.0.json</code>,
+<code>mlarray/schemas/profile-medical-1.0.json</code>, <code>mlarray/schemas/profile-ml-1.0.json</code>. They are installed with the package. They are applied to the msgpack content
+as if it were JSON, with binary allowed in <code>source</code>/<code>user</code>. The Python model implements the schemas.
+Third-party readers (SlicerMLArray, napari-mlarray, future C++/JS) validate against the same files.</p>
+<h2 id="11-python-api-informative-sketch">11. Python API (informative sketch)<a class="headerlink" href="#11-python-api-informative-sketch" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><span class="n">img</span> <span class="o">=</span> <span class="n">MLArray</span><span class="p">(</span><span class="s2">"ct.mla"</span><span class="p">)</span>                       <span class="c1"># opens; loads key "mlarray" only</span>
+<span class="n">img</span><span class="o">.</span><span class="n">axes</span>                                      <span class="c1"># [Axis(name="z", type="space"), ...]</span>
+<span class="n">img</span><span class="o">.</span><span class="n">space</span><span class="p">()</span>                                   <span class="c1"># default space; img.space("atlas")</span>
+<span class="n">img</span><span class="o">.</span><span class="n">matrix</span><span class="p">()</span>                                  <span class="c1"># from-array matrix of the default space</span>
+<span class="n">img</span><span class="o">.</span><span class="n">spacing</span><span class="p">,</span> <span class="n">img</span><span class="o">.</span><span class="n">origin</span><span class="p">,</span> <span class="n">img</span><span class="o">.</span><span class="n">direction</span>        <span class="c1"># derived, read-only</span>
+<span class="n">img</span><span class="o">.</span><span class="n">letter_codes</span><span class="p">()</span>                            <span class="c1"># derived display helper, e.g. ("L","P","S"), points-to</span>
+<span class="n">img</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">kind</span><span class="p">,</span> <span class="n">img</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">labels</span>
+<span class="n">img</span><span class="o">.</span><span class="n">profiles</span><span class="p">[</span><span class="s2">"medical"</span><span class="p">][</span><span class="s2">"dicom"</span><span class="p">]</span>
+<span class="n">img</span><span class="o">.</span><span class="n">source</span>                                    <span class="c1"># lazy; read-only view</span>
+<span class="n">img</span><span class="o">.</span><span class="n">source</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s2">"RepetitionTime"</span><span class="p">]</span>        <span class="c1"># DICOM keyword access</span>
+<span class="n">img</span><span class="o">.</span><span class="n">user</span>                                      <span class="c1"># lazy</span>
+
+<span class="n">MLArray</span><span class="p">(</span><span class="n">array</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">],</span> <span class="n">spaces</span><span class="o">=</span><span class="p">[</span><span class="o">...</span><span class="p">],</span> <span class="n">values</span><span class="o">=...</span><span class="p">)</span>        <span class="c1"># explicit construction</span>
+<span class="n">MLArray</span><span class="p">(</span><span class="n">array</span><span class="p">,</span> <span class="n">spacing</span><span class="o">=...</span><span class="p">,</span> <span class="n">origin</span><span class="o">=...</span><span class="p">,</span> <span class="n">direction</span><span class="o">=...</span><span class="p">,</span> <span class="n">space</span><span class="o">=</span><span class="s2">"patient"</span><span class="p">)</span>  <span class="c1"># convenience; composed into matrix</span>
+</code></pre></div>
+<h2 id="12-decisions-log">12. Decisions log<a class="headerlink" href="#12-decisions-log" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>topic</th>
+<th>decision</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>geometry vocabulary</td>
+<td>own, domain-neutral vocabulary; not NGFF field names</td>
+</tr>
+<tr>
+<td>default world frame (MedVol output)</td>
+<td>DICOM patient frame (LPS)</td>
+</tr>
+<tr>
+<td>array layout</td>
+<td>acquisition grid as stored; reorientation only on request</td>
+</tr>
+<tr>
+<td>metadata encoding</td>
+<td>msgpack maps in three blosc2 <code>vlmeta</code> keys; core loaded on open, <code>source</code> and <code>user</code> lazily</td>
+</tr>
+<tr>
+<td><code>source</code></td>
+<td>kept readable and authentic; core-owned fields regenerated on export; data-dependent fields guarded by a fingerprint; read-only</td>
+</tr>
+<tr>
+<td>round-trip accuracy</td>
+<td>§9: format-level accuracy, not byte identity</td>
+</tr>
+<tr>
+<td>backwards compatibility</td>
+<td>none; no v0 migration</td>
+</tr>
+<tr>
+<td>de-identification</td>
+<td>not done, ever (not MLArray's concern)</td>
+</tr>
+<tr>
+<td>units</td>
+<td>curated readable names + free text + optional UCUM <code>unit_code</code></td>
+</tr>
+<tr>
+<td>files</td>
+<td>one image per file; future exception: pyramid levels of that image</td>
+</tr>
+<tr>
+<td>pyramids</td>
+<td>level geometry reserved in v1 (§4.6); storage designed later</td>
+</tr>
+<tr>
+<td>non-medical domains</td>
+<td>covered by the core and profile mapping (§5.3); converters later</td>
+</tr>
+<tr>
+<td>schema location</td>
+<td><code>mlarray/schemas/</code>, installed with the package (2026-11-06)</td>
+</tr>
+<tr>
+<td>metadata without array data</td>
+<td>saved as an empty array of shape <code>(0,) * len(axes)</code> (2026-11-06)</td>
+</tr>
+<tr>
+<td>dependencies</td>
+<td>numpy, blosc2, msgpack, xxhash (xxh3 for the source fingerprint) (2026-11-06)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="13-open-questions">13. Open questions<a class="headerlink" href="#13-open-questions" title="Permanent link">&para;</a></h2>
+<p>None at the moment.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": [], "search": "../../assets/javascripts/workers/search.a7633da7.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.c21346df.min.js"></script>
+      
+    
+  </body>
+</html>
