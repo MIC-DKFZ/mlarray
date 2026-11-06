@@ -122,6 +122,44 @@ class TestSave(unittest.TestCase):
             self.assertIsNone(loaded.mode)
             self.assertIsNone(loaded.mmap_mode)
 
+    def test_save_numpy_backed_keeps_instance_and_patch_size(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            array = _make_array(seed=7)
+            path = Path(tmpdir) / "numpy.mla"
+            image = MLArray(array, spacing=(1, 2, 3), patch_size=(4, 8, 8), compressed=False)
+            meta_before = image.meta.to_mapping()
+
+            image.save(path)
+
+            self.assertEqual(image._backend, "numpy")
+            self.assertIsInstance(image._store, np.ndarray)
+            self.assertEqual(image.meta.to_mapping(), meta_before)
+            reloaded = MLArray(path)
+            self.assertTrue(np.array_equal(reloaded.to_numpy(), array))
+            self.assertEqual(reloaded.meta.blosc2.patch_size, [4, 8, 8])
+            self.assertEqual(reloaded.meta.blosc2.chunk_size, list(reloaded._store.chunks))
+            self.assertEqual(reloaded.meta.blosc2.block_size, list(reloaded._store.blocks))
+            self.assertEqual(reloaded.spacing, [1.0, 2.0, 3.0])
+
+    def test_save_numpy_backed_matches_compressed_layout(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            array = _make_array(seed=8)
+            MLArray(array, patch_size=(4, 8, 8)).save(Path(tmpdir) / "blosc2.mla")
+            MLArray(array, patch_size=(4, 8, 8), compressed=False).save(Path(tmpdir) / "numpy.mla")
+
+            compressed = MLArray(Path(tmpdir) / "blosc2.mla")
+            uncompressed = MLArray(Path(tmpdir) / "numpy.mla")
+            self.assertEqual(uncompressed.meta.blosc2.to_mapping(), compressed.meta.blosc2.to_mapping())
+            self.assertEqual(uncompressed._store.schunk.cparams, compressed._store.schunk.cparams)
+
+    def test_save_without_array_keeps_instance(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            image = MLArray(spacing=(1, 2, 3), compressed=False)
+            store = image._store
+            image.save(Path(tmpdir) / "meta_only.mla")
+            self.assertIs(image._store, store)
+            self.assertEqual(MLArray(Path(tmpdir) / "meta_only.mla").spacing, [1.0, 2.0, 3.0])
+
 
 if __name__ == "__main__":
     unittest.main()

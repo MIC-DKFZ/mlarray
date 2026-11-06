@@ -1112,17 +1112,16 @@ class MLArray:
             and os.path.samefile(self.filepath, filepath)
         )
 
-        self._ensure_blosc2_store()
-        self._update_blosc2_meta()
+        store, meta = self._blosc2_store_for_save()
 
         target_dir = os.path.dirname(os.path.abspath(str(filepath)))
         fd, tmp_filepath = tempfile.mkstemp(prefix=".", suffix=f".{MLARRAY_SUFFIX}", dir=target_dir)
         os.close(fd)
         os.remove(tmp_filepath)
         try:
-            self._store.save(tmp_filepath)
+            store.save(tmp_filepath)
             saved = blosc2.open(urlpath=tmp_filepath, mode="a")
-            saved.schunk.vlmeta["mlarray"] = self._serialize_metadata()
+            saved.schunk.vlmeta["mlarray"] = self._serialize_metadata(meta)
             del saved
             os.replace(tmp_filepath, str(filepath))
         except BaseException:
@@ -2139,56 +2138,61 @@ class MLArray:
 
         self._store.vlmeta["mlarray"] = self._serialize_metadata()
 
-    def _serialize_metadata(self) -> bytes:
-        """Serialize MLArray metadata into the bytes stored in vlmeta."""
-        meta = self.meta.to_mapping()
+    def _serialize_metadata(self, meta: Optional[Meta] = None) -> bytes:
+        """Serialize MLArray metadata (default: ``self.meta``) into the bytes stored in vlmeta."""
+        meta = (self.meta if meta is None else meta).to_mapping()
         if not is_serializable(meta):
             raise RuntimeError("Metadata is not serializable.")
         return gzip.compress(pickle.dumps(meta, protocol=pickle.HIGHEST_PROTOCOL))
 
-    def _ensure_blosc2_store(self):
-        """Ensure underlying store is Blosc2, converting from NumPy when needed."""
-        if self._store is None:
-            self._store = blosc2.empty((0,))
-            self._backend = "blosc2"
-            return
+    def _blosc2_store_for_save(self) -> Tuple[Any, Meta]:
+        """Return the Blosc2 store and metadata to write, without changing this instance.
+
+        Blosc2-backed arrays are saved as they are. NumPy-backed arrays are
+        compressed into a temporary store whose layout follows the recorded
+        ``meta.blosc2`` (patch size first, then chunk/block size, then the
+        default patch size); the instance stays NumPy-backed.
+        """
+        if self._store is None or not self.meta._has_array.has_array:
+            return blosc2.empty((0,)), self.meta
 
         if self._backend == "blosc2":
-            return
+            self._update_blosc2_meta()
+            return self._store, self.meta
 
-        array = np.asarray(self._store)
-        if not self.meta._has_array.has_array:
-            self._store = blosc2.empty((0,))
-            self._backend = "blosc2"
-            return
-
+        array = np.ascontiguousarray(self._store)
+        meta = deepcopy(self.meta)
         shape = self._normalize_shape(array.shape)
         spatial_axis_mask = (
             [True] * len(shape)
-            if self.meta.spatial.axis_labels is None
-            else _spatial_axis_mask(self.meta.spatial.axis_labels)
+            if meta.spatial.axis_labels is None
+            else _spatial_axis_mask(meta.spatial.axis_labels)
         )
         with _meta_internal_write():
-            self.meta.blosc2 = self._comp_and_validate_blosc2_meta(
-                self.meta.blosc2,
+            meta.blosc2 = self._comp_and_validate_blosc2_meta(
+                meta.blosc2,
                 patch_size="default",
-                chunk_size=self.meta.blosc2.chunk_size,
-                block_size=self.meta.blosc2.block_size,
+                chunk_size=None,
+                block_size=None,
                 shape=shape,
                 dtype_itemsize=np.dtype(array.dtype).itemsize,
                 spatial_axis_mask=spatial_axis_mask,
-                cparams=self.meta.blosc2.cparams,
-                dparams=self.meta.blosc2.dparams,
+                cparams=meta.blosc2.cparams,
+                dparams=meta.blosc2.dparams,
                 array=array,
             )
-        self._store = blosc2.asarray(
-            np.ascontiguousarray(array),
-            chunks=self.meta.blosc2.chunk_size,
-            blocks=self.meta.blosc2.block_size,
-            cparams=MLArray._resolve_cparams(self.meta.blosc2.cparams),
-            dparams=MLArray._resolve_dparams(self.meta.blosc2.dparams),
+        store = blosc2.asarray(
+            array,
+            chunks=meta.blosc2.chunk_size,
+            blocks=meta.blosc2.block_size,
+            cparams=MLArray._resolve_cparams(meta.blosc2.cparams),
+            dparams=MLArray._resolve_dparams(meta.blosc2.dparams),
         )
-        self._backend = "blosc2"
+        with _meta_internal_write():
+            meta.blosc2.chunk_size = list(store.chunks)
+            meta.blosc2.block_size = list(store.blocks)
+            meta.blosc2._validate_and_cast(ndims=len(shape), spatial_ndims=sum(spatial_axis_mask))
+        return store, meta
 
     @staticmethod
     def _normalize_patch_size(patch_size, num_spatial_axes: int) -> Optional[List[int]]:
