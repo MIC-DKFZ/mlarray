@@ -21,12 +21,15 @@ keywords = ["machine learning", "medical imaging", "blosc2", "array", "file form
 dependencies = [
   "blosc2>=3",
   "numpy>=2",
+  "msgpack>=1.0",
+  "xxhash>=3.0",
 ]
 dynamic = ["version"]
 
 [project.optional-dependencies]
 dev = [
   "build>=1.0",
+  "jsonschema>=4.18",
   "pytest>=7.0",
   "twine>=4.0",
   "setuptools_scm[toml]>=8.0",
@@ -53,6 +56,9 @@ mlarray_convert = "mlarray.cli:cli_convert_to_mlarray"
 [tool.setuptools]
 package-dir = { "" = "." }
 include-package-data = true
+
+[tool.setuptools.package-data]
+mlarray = ["schemas/*.json"]
 
 [tool.setuptools.packages.find]
 where = ["."]

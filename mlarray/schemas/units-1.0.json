@@ -1,0 +1,31 @@
+{
+  "$comment": "Curated unit names for MLArray metadata (spec section 4.5). 'name' is the readable unit, 'unit_code' its UCUM code. Free text is allowed when no listed unit fits.",
+  "version": "1.0",
+  "units": [
+    {"name": "nanometer", "unit_code": "nm", "quantity": "length"},
+    {"name": "micrometer", "unit_code": "um", "quantity": "length"},
+    {"name": "millimeter", "unit_code": "mm", "quantity": "length"},
+    {"name": "centimeter", "unit_code": "cm", "quantity": "length"},
+    {"name": "meter", "unit_code": "m", "quantity": "length"},
+    {"name": "kilometer", "unit_code": "km", "quantity": "length"},
+    {"name": "inch", "unit_code": "[in_i]", "quantity": "length"},
+    {"name": "nanosecond", "unit_code": "ns", "quantity": "time"},
+    {"name": "microsecond", "unit_code": "us", "quantity": "time"},
+    {"name": "millisecond", "unit_code": "ms", "quantity": "time"},
+    {"name": "second", "unit_code": "s", "quantity": "time"},
+    {"name": "minute", "unit_code": "min", "quantity": "time"},
+    {"name": "hour", "unit_code": "h", "quantity": "time"},
+    {"name": "day", "unit_code": "d", "quantity": "time"},
+    {"name": "degree", "unit_code": "deg", "quantity": "angle"},
+    {"name": "radian", "unit_code": "rad", "quantity": "angle"},
+    {"name": "arcsecond", "unit_code": "''", "quantity": "angle"},
+    {"name": "hertz", "unit_code": "Hz", "quantity": "frequency"},
+    {"name": "hounsfield_unit", "unit_code": "[hnsf'U]", "quantity": "radiodensity"},
+    {"name": "counts", "unit_code": "{counts}", "quantity": "count"},
+    {"name": "percent", "unit_code": "%", "quantity": "fraction"},
+    {"name": "kelvin", "unit_code": "K", "quantity": "temperature"},
+    {"name": "degree_celsius", "unit_code": "Cel", "quantity": "temperature"},
+    {"name": "reflectance", "unit_code": "1", "quantity": "fraction"},
+    {"name": "arbitrary", "unit_code": "[arb'U]", "quantity": "arbitrary"}
+  ]
+}
