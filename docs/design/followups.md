@@ -58,7 +58,7 @@ remote → a GitHub Actions workflow on a `v*` tag publishes to PyPI.
   `74bdaf9` depends on `napari-bboxes>=0.1`.
 - [x] napari-bboxes 0.1.0 and 0.1.1 released (2026-11-06; 0.1.1: 3-D wireframe, slice-following texts, cut outlines).
 - [x] napari-mlarray 1.0.0 released (trusted publisher; version from the git tag via setuptools_scm).
-- [ ] napari-nifti should reuse `napari_mlarray._display` (the same convention) on top of MedVol.
+- [x] napari-nifti reuses napari-mlarray's display convention on top of MedVol (done in the napari-nifti rework below).
 
 ### SlicerMLArray
 - [x] Rewritten for MLArray 1.0 (2026-11-06; `~/projects/SlicerMLArray`, merged into `main` and pushed to GitLab): Slicer
