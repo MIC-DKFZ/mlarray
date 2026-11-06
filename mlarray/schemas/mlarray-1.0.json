@@ -1,0 +1,204 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/MIC-DKFZ/mlarray/schemas/mlarray-1.0.json",
+  "title": "MLArray metadata 1.0",
+  "description": "Content of the 'mlarray' vlmeta key (spec sections 4, 5, 8). Cross-references (array_axes naming array axes, box axes, lengths matching the array shape) are checked by the library, not by this schema. Unknown keys are allowed everywhere and must be kept by readers.",
+  "type": "object",
+  "required": ["version", "writer", "axes"],
+  "properties": {
+    "version": {"type": "string", "pattern": "^1\\.[0-9]+$"},
+    "writer": {"type": "string", "minLength": 1},
+    "axes": {"type": "array", "items": {"$ref": "#/$defs/axis"}},
+    "spaces": {"type": "array", "items": {"$ref": "#/$defs/space"}},
+    "values": {"$ref": "#/$defs/values"},
+    "profiles": {
+      "type": "object",
+      "properties": {
+        "ml": {"$ref": "profile-ml-1.0.json"},
+        "medical": {"$ref": "profile-medical-1.0.json"}
+      },
+      "additionalProperties": {"type": "object"}
+    },
+    "history": {"type": "array", "items": {"$ref": "#/$defs/history_entry"}},
+    "storage": {"$ref": "#/$defs/storage"},
+    "pyramid": {"description": "Reserved (spec 4.6). v1 writers do not write it; readers keep it.", "type": "object"}
+  },
+  "$defs": {
+    "name": {"type": "string", "minLength": 1},
+    "number": {"type": "number"},
+    "unit_fields": {
+      "properties": {
+        "unit": {"type": "string", "minLength": 1, "description": "Readable unit name; a curated name from units-1.0.json when one fits, otherwise free text."},
+        "unit_code": {"type": "string", "minLength": 1, "description": "UCUM code."}
+      }
+    },
+    "axis": {
+      "type": "object",
+      "required": ["name", "type"],
+      "allOf": [
+        {"$ref": "#/$defs/unit_fields"},
+        {"not": {"required": ["coordinates", "start"]}},
+        {"not": {"required": ["coordinates", "step"]}},
+        {
+          "if": {"properties": {"type": {"const": "space"}}},
+          "then": {"not": {"anyOf": [{"required": ["start"]}, {"required": ["step"]}, {"required": ["coordinates"]}, {"required": ["unit"]}]}}
+        }
+      ],
+      "properties": {
+        "name": {"$ref": "#/$defs/name"},
+        "type": {"enum": ["space", "time", "channel", "component", "other"]},
+        "labels": {"type": "array", "items": {"type": "string"}},
+        "start": {"type": "number"},
+        "step": {"type": "number"},
+        "coordinates": {"type": "array", "items": {"type": "number"}}
+      }
+    },
+    "space_axis": {
+      "type": "object",
+      "required": ["name", "unit"],
+      "allOf": [{"$ref": "#/$defs/unit_fields"}],
+      "properties": {
+        "name": {"$ref": "#/$defs/name"},
+        "increases_toward": {"type": "string", "minLength": 1, "description": "left/right/anterior/posterior/superior/inferior, east/west/north/south/up/down, or a profile's word."}
+      }
+    },
+    "from_array": {
+      "type": "object",
+      "required": ["array_axes"],
+      "oneOf": [
+        {"required": ["matrix"], "not": {"anyOf": [{"required": ["scale"]}, {"required": ["translation"]}]}},
+        {"required": ["scale"], "not": {"required": ["matrix"]}}
+      ],
+      "properties": {
+        "array_axes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/name"}},
+        "matrix": {
+          "description": "Homogeneous matrix: rows = space axes + 1, columns = array_axes + translation, last row [0, ..., 0, 1]. An integer index is a voxel centre.",
+          "type": "array", "minItems": 2,
+          "items": {"type": "array", "minItems": 2, "items": {"type": "number"}}
+        },
+        "scale": {"type": "array", "minItems": 1, "items": {"type": "number", "not": {"const": 0}}},
+        "translation": {"type": "array", "minItems": 1, "items": {"type": "number"}},
+        "profile_mapping": {"type": "object"}
+      }
+    },
+    "space": {
+      "type": "object",
+      "required": ["name", "axes", "from_array"],
+      "properties": {
+        "name": {"$ref": "#/$defs/name"},
+        "reference": {
+          "type": "object",
+          "required": ["scheme", "id"],
+          "properties": {"scheme": {"$ref": "#/$defs/name"}, "id": {"$ref": "#/$defs/name"}}
+        },
+        "axes": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/space_axis"}},
+        "from_array": {"$ref": "#/$defs/from_array"}
+      }
+    },
+    "label": {
+      "type": "object",
+      "properties": {
+        "name": {"type": "string"},
+        "color": {"type": "array", "minItems": 3, "maxItems": 4, "items": {"type": "integer", "minimum": 0, "maximum": 255}},
+        "code": {
+          "type": "object",
+          "required": ["scheme", "value"],
+          "properties": {"scheme": {"$ref": "#/$defs/name"}, "value": {"$ref": "#/$defs/name"}, "meaning": {"type": "string"}}
+        }
+      }
+    },
+    "values": {
+      "type": "object",
+      "allOf": [
+        {"$ref": "#/$defs/unit_fields"},
+        {
+          "if": {"anyOf": [{"required": ["labels"]}, {"required": ["label_layout"]}]},
+          "then": {"properties": {"kind": {"enum": ["label", "instance", "probability"]}}, "required": ["kind"]}
+        }
+      ],
+      "properties": {
+        "kind": {"enum": ["measurement", "label", "instance", "probability", "vector", "other"]},
+        "scale": {"type": "number"},
+        "offset": {"type": "number"},
+        "fill": {"type": "number"},
+        "labels": {
+          "type": "object",
+          "propertyNames": {"pattern": "^-?[0-9]+$"},
+          "additionalProperties": {"$ref": "#/$defs/label"}
+        },
+        "label_layout": {"enum": ["index", "channel"]}
+      }
+    },
+    "history_entry": {
+      "type": "object",
+      "required": ["action"],
+      "properties": {
+        "action": {"$ref": "#/$defs/name"},
+        "tool": {"type": "string"},
+        "time": {"type": "string"},
+        "from": {"type": "string"},
+        "settings": {"type": "object"},
+        "warnings": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "storage": {
+      "description": "Portable blosc2 layout only; never thread counts, typesize, internal blocksize or read-ahead (spec 8).",
+      "type": "object",
+      "properties": {
+        "chunk_size": {"type": "array", "items": {"type": "integer", "minimum": 0}},
+        "block_size": {"type": "array", "items": {"type": "integer", "minimum": 0}},
+        "patch_size": {"type": "array", "items": {"type": "integer", "minimum": 1}},
+        "compression": {
+          "type": "object",
+          "properties": {
+            "codec": {"$ref": "#/$defs/name"},
+            "level": {"type": "integer", "minimum": 0},
+            "filters": {"type": "array", "items": {"$ref": "#/$defs/name"}}
+          },
+          "not": {"anyOf": [{"required": ["nthreads"]}, {"required": ["typesize"]}, {"required": ["blocksize"]}]}
+        }
+      },
+      "not": {"anyOf": [{"required": ["nthreads"]}, {"required": ["typesize"]}, {"required": ["blocksize"]}, {"required": ["read_ahead"]}]}
+    },
+    "source_entry": {
+      "type": "object",
+      "required": ["format", "header"],
+      "properties": {
+        "format": {"$ref": "#/$defs/name"},
+        "format_version": {"type": "string"},
+        "files": {"type": "array", "items": {"type": "string"}},
+        "reader": {"type": "object"},
+        "index_map": {
+          "type": "object",
+          "properties": {
+            "axis_order": {"type": "array", "items": {"type": "integer", "minimum": 0}},
+            "flipped": {"type": "array", "items": {"type": "boolean"}},
+            "offset": {"type": "array", "items": {"type": "integer"}}
+          }
+        },
+        "fingerprint": {
+          "type": "object",
+          "properties": {
+            "shape": {"type": "array", "items": {"type": "integer", "minimum": 0}},
+            "dtype": {"type": "string"},
+            "geometry": {"type": "string", "pattern": "^[a-z0-9_]+:[0-9a-f]+$"},
+            "data": {"type": "string", "pattern": "^[a-z0-9_]+:[0-9a-f]+$"}
+          }
+        },
+        "header": {"type": "object", "description": "Readable original metadata (spec 6.4); binary values allowed."}
+      }
+    },
+    "source_key": {
+      "description": "Content of the 'mlarray.source' vlmeta key.",
+      "type": "object",
+      "required": ["source"],
+      "properties": {"source": {"type": "array", "items": {"$ref": "#/$defs/source_entry"}}}
+    },
+    "user_key": {
+      "description": "Content of the 'mlarray.user' vlmeta key; the user map is never interpreted.",
+      "type": "object",
+      "required": ["user"],
+      "properties": {"user": {"type": "object"}}
+    }
+  }
+}

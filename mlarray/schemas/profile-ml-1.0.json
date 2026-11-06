@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/MIC-DKFZ/mlarray/schemas/profile-ml-1.0.json",
+  "title": "MLArray ml profile 1.0",
+  "description": "profiles.ml (spec 5.2). Box axes must name array axes (frame 'index') or axes of the named space; the library checks that.",
+  "type": "object",
+  "properties": {
+    "profile_version": {"type": "string", "pattern": "^1\\.[0-9]+$"},
+    "statistics": {
+      "type": "object",
+      "properties": {
+        "min": {"type": "number"},
+        "max": {"type": "number"},
+        "mean": {"type": "number"},
+        "median": {"type": "number"},
+        "standard_deviation": {"type": "number"},
+        "percentiles": {"type": "object", "additionalProperties": {"type": "number"}}
+      }
+    },
+    "boxes": {
+      "type": "object",
+      "required": ["frame", "axes"],
+      "properties": {
+        "frame": {"type": "string", "minLength": 1, "description": "'index' or a space name"},
+        "axes": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["min", "max"],
+            "properties": {
+              "min": {"type": "array", "items": {"type": "number"}},
+              "max": {"type": "array", "items": {"type": "number"}},
+              "label": {},
+              "score": {"type": "number"}
+            }
+          }
+        }
+      }
+    },
+    "patch_size": {"type": "array", "items": {"type": "integer", "minimum": 1}},
+    "split": {"type": "string", "minLength": 1}
+  }
+}

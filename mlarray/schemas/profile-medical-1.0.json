@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/MIC-DKFZ/mlarray/schemas/profile-medical-1.0.json",
+  "title": "MLArray medical profile 1.0",
+  "description": "profiles.medical (spec 5.1). Keys of 'dicom' are DICOM keywords; values are plain msgpack values. Entries are curated metadata or deliberate overrides of source values (precedence core > profile > source).",
+  "type": "object",
+  "properties": {
+    "profile_version": {"type": "string", "pattern": "^1\\.[0-9]+$"},
+    "dicom": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[A-Za-z][A-Za-z0-9]*$"}
+    }
+  }
+}
