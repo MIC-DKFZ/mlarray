@@ -24,6 +24,8 @@ Last update: 2026-11-06 (stages 1-4 done and released; follow-up work in `follow
   `test_and_deploy.yml`, tests on Python 3.10-3.13 first). Version: mlarray from the git tag (setuptools_scm),
   MedVol from `medvol/__init__.py`. Pushing a tag is a public action: ask the user to run `git push origin vX.Y.Z`
   themselves. Check on Python 3.10 too: pip resolves blosc2 4.3.3 there, which behaves differently.
+  Docs (GitHub Pages, `gh-pages`) deploy with each `v*` tag, or on demand with
+  `gh workflow run workflow.yml -R MIC-DKFZ/mlarray --ref main`.
 
 ---
 

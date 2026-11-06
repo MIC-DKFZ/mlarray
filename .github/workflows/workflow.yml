@@ -11,6 +11,7 @@ on:
       - "v*"
   pull_request:
     branches: ["main"]
+  workflow_dispatch:  # redeploys the docs from the chosen ref (publishing to PyPI stays tag-only)
 
 jobs:
   tests:
@@ -72,7 +73,7 @@ jobs:
 
   docs:
     needs: tests
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -83,7 +84,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: "3.12"  # mkdocstrings >= 1.0.7 (needed by current pymdown-extensions) needs 3.11+
 
       - name: Install docs dependencies
         run: |
