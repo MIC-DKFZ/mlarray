@@ -3,7 +3,7 @@
 This document lets any agent or developer continue the rework without prior context. Read it fully before
 touching code. Keep it current: when a stage step is done, tick it and add the commit hash.
 
-Last update: 2026-11-06 (stage 1 done; stage 2b done; stage 2a waiting for user decisions on L4 and M12, see §6).
+Last update: 2026-11-06 (stages 1 and 2 done; stage 3 next).
 
 ---
 
@@ -65,7 +65,8 @@ The spec is the source of truth. If implementation shows that the spec is wrong 
 - Functionality, user-facing usage and storage optimisation must not change in stages 1–2. Any bug fix that
   changes observable behaviour must be listed in §6 and confirmed by the user before it lands.
 - **Invariant through all stages:** `tests/test_layout.py` and `tests/test_read_ahead.py` stay unchanged and
-  green. They pin the storage defaults:
+  green (one agreed exception: in stage 3, `test_layout.py`'s metadata accessors change, see §3). They pin
+  the storage defaults:
   - the nnU-Net chunk/block heuristic in `mlarray/blosc2_layout_strategies.py`;
   - LZ4HC level 5 with 4 compression threads, and nnU-Net's per-array filter choice;
   - blosc2 read-ahead with 4 threads, switched on by the first `MLArray.open` (`mlarray.set_read_ahead()`).
@@ -116,8 +117,8 @@ its own commit.
 | ☑ `28b61ab` | **M1** not picklable | `__getstate__`/`__setstate__`. Opened files store `(filepath, mode, mmap_mode, dparams)` and reopen; in-memory blosc2 stores serialise via `to_cframe()`; numpy-backed arrays pickle the array. Test with `multiprocessing` spawn and a torch-free DataLoader-style worker. |
 | ☑ `bc0e993` | **M4** `save()` on numpy-backed arrays converts the instance to blosc2 and loses `patch_size` | save from a temporary blosc2 store; the instance stays unchanged |
 | ☑ `9f6a2ba` | **M5** remainder: empty arrays and zero-length dimensions | stop using the `(0,)` placeholder as the "no array" marker; use an explicit flag. Layout: handle zero-length axes without calling the heuristic, or clamp |
-| ☐ waiting (§6) | **M12** machine-specific `cparams` persisted | persist only portable settings (codec, level, filters; spec §8 `storage`). Thread counts come from runtime defaults. Must keep `tests/test_layout.py`/`test_read_ahead.py` green |
-| ☐ waiting (§6) | **L4** `load(compressed=False)` keeps `meta.blosc2` while `decompress()` clears it | pick one rule (keep the layout record) and apply it in both |
+| ☑ `549e5b0` | **M12** machine-specific `cparams` persisted | persist only portable settings (codec, level, filters; spec §8 `storage`). Thread counts come from runtime defaults. Must keep `tests/test_layout.py`/`test_read_ahead.py` green |
+| ☑ `b94ae9b` | **L4** `load(compressed=False)` keeps `meta.blosc2` while `decompress()` clears it | pick one rule (keep the layout record) and apply it in both |
 | ☑ `e004e6c` `b5e87eb` `a936880` | Nits | consistent optional `dtype` for `empty`/`zeros`; document memory sharing of `asarray(compressed=False)`; arrays with only non-spatial axes work without `patch_size=None` (check if the new heuristic already solves this); fix docstrings ("ignored when patch_size is provided") |
 
 Not in stage 2:
@@ -234,6 +235,12 @@ Implement `docs/design/spec.md` §3–§11. Suggested commit sequence:
 | M11 | validate: matrix shape and last row, finite values, positive scale, axis-name references, box dimensions, min ≤ max |
 | L9 | unknown keys are preserved, not rejected |
 | L10 | unserialisable values give a clear `TypeError` |
+| M12 rest | the compression settings recorded in `storage` can be turned back into blosc2 parameters (stage 2 could not make `blosc2.CParams(**meta.blosc2.cparams)` work: CParams rewrites the read-only filter list in place) |
+
+**Agreed change to the invariant test (user decision 2026-11-06):** `tests/test_layout.py` reads
+`arr.meta.blosc2.{cparams,chunk_size,block_size}`. In stage 3, change **only** these accessors to the new
+`storage` section, and check the 4 compression threads on the written store's cparams instead of the
+metadata (spec §8 persists no thread counts). All layout, codec, level, filter and read-ahead assertions stay.
 
 **Done when:**
 - the spec examples (§4–§8) round-trip through save/load;
@@ -298,3 +305,6 @@ Append entries; never delete them.
 | 2026-11-06 | 2a | **Question M12:** `tests/test_layout.py:193` (invariant) asserts `meta.blosc2.cparams["nthreads"] == 4` after save, so "persist no thread counts" (plan, spec §8) cannot land in stage 2 without editing it. Proposal for stage 2: drop only machine-derived fields (`typesize`, `blocksize`, and `nthreads` of `blosc2.CParams` objects, which blosc2 fills with the core count); keep dict input as given; fix `blosc2.CParams(**meta.blosc2.cparams)` failing on the frozen filter list. | asked |
 | 2026-11-06 | 3 | **Question (spec vs invariant):** `tests/test_layout.py` reads `arr.meta.blosc2.{cparams,chunk_size,block_size}`. Spec v1 replaces `meta.blosc2` with `storage` without thread counts, so the test cannot stay unchanged through stage 3. Proposal: in stage 3 change only its metadata accessors (`meta.blosc2.*` → `meta.storage.*`) and check the 4 compression threads on the written store's cparams instead of the metadata; all layout, codec, level, filter and read-ahead assertions stay. | asked |
 | 2026-11-06 | 2b | Restructure done with the adjusted layout above; benchmark shows no regression | — |
+| 2026-11-06 | 2a | User decisions: L4 keep the layout record in both (`b94ae9b`); M12 drop machine fields only (`549e5b0`); stage 3 changes only `test_layout.py`'s metadata accessors; keep the landed M4/M5/nit fixes | answered |
+| 2026-11-06 | 2a | M12 sub-item `blosc2.CParams(**meta.blosc2.cparams)` not fixed in stage 2: blosc2 rewrites the filter list in place, which the frozen metadata forbids, and making the stored values enums breaks `is_serializable`. Moved to the stage-3 requirements (§3) | deferred |
+| 2026-11-06 | 2 | stage 2 done: 147 passed, 3074 subtests; invariant tests unchanged | — |
