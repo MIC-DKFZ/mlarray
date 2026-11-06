@@ -866,7 +866,7 @@ class MLArray(MLArrayConstructors):
         
         self.support_metadata = True
 
-        dparams = MLArray._resolve_dparams(dparams)
+        dparams = _storage.resolve_dparams(dparams)
         
         _apply_default_read_ahead()
         self._store = blosc2.open(urlpath=str(filepath), dparams=dparams, mode=mode, mmap_mode=mmap_mode)
@@ -943,16 +943,16 @@ class MLArray(MLArrayConstructors):
         if mmap_mode not in ('w+', None):
             raise RuntimeError("mmap_mode must be one of the following: 'w+', None")
     
-        shape = self._normalize_shape(shape)
+        shape = _storage.normalize_shape(shape)
         self._validate_and_add_meta(meta, has_array=True)
         spatial_axis_mask = [True] * len(shape) if self.meta.spatial.axis_labels is None else _spatial_axis_mask(self.meta.spatial.axis_labels)
         with _meta_internal_write():
-            self.meta.blosc2 = self._comp_and_validate_blosc2_meta(self.meta.blosc2, patch_size, chunk_size, block_size, shape, np.dtype(dtype).itemsize, spatial_axis_mask, cparams, dparams)
+            self.meta.blosc2 = _storage.comp_blosc2_meta(self.meta.blosc2, patch_size, chunk_size, block_size, shape, np.dtype(dtype).itemsize, spatial_axis_mask, cparams, dparams)
             self.meta._has_array.has_array = True
         
         self.support_metadata = True
         
-        self._store = blosc2.empty(shape=shape, dtype=np.dtype(dtype), urlpath=str(filepath), chunks=self.meta.blosc2.chunk_size, blocks=self.meta.blosc2.block_size, cparams=MLArray._resolve_cparams(self.meta.blosc2.cparams), dparams=MLArray._resolve_dparams(self.meta.blosc2.dparams), mode=mode, mmap_mode=mmap_mode)
+        self._store = blosc2.empty(shape=shape, dtype=np.dtype(dtype), urlpath=str(filepath), chunks=self.meta.blosc2.chunk_size, blocks=self.meta.blosc2.block_size, cparams=_storage.resolve_cparams(self.meta.blosc2.cparams), dparams=_storage.resolve_dparams(self.meta.blosc2.dparams), mode=mode, mmap_mode=mmap_mode)
         self._backend = "blosc2"
         self.mode = mode
         self.mmap_mode = mmap_mode
@@ -981,7 +981,7 @@ class MLArray(MLArrayConstructors):
         _storage.check_suffix(filepath)
         self.filepath = str(filepath)
         self.support_metadata = True
-        self._store = _storage.load_into_memory(filepath, MLArray._resolve_dparams(dparams))
+        self._store = _storage.load_into_memory(filepath, _storage.resolve_dparams(dparams))
         self._backend = "blosc2"
         self.mode = None
         self.mmap_mode = None
@@ -990,10 +990,6 @@ class MLArray(MLArrayConstructors):
         if not compressed:
             self._store = np.asarray(self._store[...])
             self._backend = "numpy"
-
-    def _comp_and_validate_blosc2_meta(self, meta_blosc2, patch_size, chunk_size, block_size, shape, dtype_itemsize, spatial_axis_mask, cparams, dparams, array=None):
-        """Compute and validate Blosc2 chunk/block metadata (see :func:`mlarray.storage.comp_blosc2_meta`)."""
-        return _storage.comp_blosc2_meta(meta_blosc2, patch_size, chunk_size, block_size, shape, dtype_itemsize, spatial_axis_mask, cparams, dparams, array=array)
 
     def _validate_and_add_meta(
             self,
@@ -1128,14 +1124,14 @@ class MLArray(MLArrayConstructors):
 
         array = np.ascontiguousarray(self._store)
         meta = deepcopy(self.meta)
-        shape = self._normalize_shape(array.shape)
+        shape = _storage.normalize_shape(array.shape)
         spatial_axis_mask = (
             [True] * len(shape)
             if meta.spatial.axis_labels is None
             else _spatial_axis_mask(meta.spatial.axis_labels)
         )
         with _meta_internal_write():
-            meta.blosc2 = self._comp_and_validate_blosc2_meta(
+            meta.blosc2 = _storage.comp_blosc2_meta(
                 meta.blosc2,
                 patch_size="default",
                 chunk_size=None,
@@ -1151,17 +1147,14 @@ class MLArray(MLArrayConstructors):
             array,
             chunks=meta.blosc2.chunk_size,
             blocks=meta.blosc2.block_size,
-            cparams=MLArray._resolve_cparams(meta.blosc2.cparams),
-            dparams=MLArray._resolve_dparams(meta.blosc2.dparams),
+            cparams=_storage.resolve_cparams(meta.blosc2.cparams),
+            dparams=_storage.resolve_dparams(meta.blosc2.dparams),
         )
         with _meta_internal_write():
             meta.blosc2.chunk_size = list(store.chunks)
             meta.blosc2.block_size = list(store.blocks)
             meta.blosc2._validate_and_cast(ndims=len(shape), spatial_ndims=sum(spatial_axis_mask))
         return store, meta
-
-    _normalize_patch_size = staticmethod(_storage.normalize_patch_size)
-    _normalize_shape = staticmethod(_storage.normalize_shape)
 
     def _replace_with_converted(self, other: "MLArray") -> None:
         """Replace in-memory state from another MLArray and detach file state."""
@@ -1174,8 +1167,3 @@ class MLArray(MLArrayConstructors):
         self.mode = None
         self.mmap_mode = None
         del old_store
-
-    _default_cparams = staticmethod(_storage.default_cparams)
-    _is_default_cparams = staticmethod(_storage.is_default_cparams)
-    _resolve_cparams = staticmethod(_storage.resolve_cparams)
-    _resolve_dparams = staticmethod(_storage.resolve_dparams)

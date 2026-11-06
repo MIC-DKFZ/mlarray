@@ -295,7 +295,7 @@ class MLArrayConstructors:
         if shape is None:
             shape = (num,)
         else:
-            shape = cls._normalize_shape(shape)
+            shape = _storage.normalize_shape(shape)
             if math.prod(shape) != num:
                 raise ValueError(
                     "The shape is not consistent with the start, stop and step values"
@@ -386,7 +386,7 @@ class MLArrayConstructors:
                 raise ValueError("Either `shape` or `num` must be specified.")
             shape = (num,)
         else:
-            shape = cls._normalize_shape(shape)
+            shape = _storage.normalize_shape(shape)
             num = math.prod(shape) if num is None else num
 
         if math.prod(shape) != num or num < 0:
@@ -828,14 +828,14 @@ class MLArrayConstructors:
                 raise ValueError(
                     "shape/dtype must not be set when source_array is provided."
                 )
-            shape = self._normalize_shape(source_array.shape)
+            shape = _storage.normalize_shape(source_array.shape)
             dtype = np.dtype(source_array.dtype)
         else:
             if shape is None or dtype is None:
                 raise ValueError(
                     "shape and dtype must be provided when source_array is None."
                 )
-            shape = self._normalize_shape(shape)
+            shape = _storage.normalize_shape(shape)
             dtype = np.dtype(dtype)
 
         self._validate_and_add_meta(meta, has_array=True)
@@ -846,7 +846,7 @@ class MLArrayConstructors:
         )
 
         with _meta_internal_write():
-            self.meta.blosc2 = self._comp_and_validate_blosc2_meta(
+            self.meta.blosc2 = _storage.comp_blosc2_meta(
                 self.meta.blosc2,
                 patch_size,
                 chunk_size,
@@ -953,12 +953,12 @@ class MLArrayConstructors:
         if isinstance(x, MLArrayConstructors):
             if x._store is None or x.meta is None or x.meta._has_array.has_array is False:
                 raise TypeError("Input MLArray has no array data loaded.")
-            shape = self._normalize_shape(x.shape)
+            shape = _storage.normalize_shape(x.shape)
             src_dtype = x.dtype
             if meta is None:
                 meta = deepcopy(x.meta)
         elif hasattr(x, "shape") and hasattr(x, "dtype"):
-            shape = self._normalize_shape(x.shape)
+            shape = _storage.normalize_shape(x.shape)
             src_dtype = x.dtype
         else:
             raise TypeError(
