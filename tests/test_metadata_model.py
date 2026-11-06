@@ -281,6 +281,19 @@ class TestSourceAndStorage(unittest.TestCase):
         with self.assertRaises(MetadataError):
             SourceEntry.from_dict({"format": "nifti", "index_map": {"axis_order": [0, 0, 1]}})
 
+    def test_recorded_compression_turns_back_into_blosc2_parameters(self):  # M12 rest
+        import blosc2
+
+        storage = Storage.from_dict({"compression": {"codec": "LZ4HC", "level": 5, "filters": ["SHUFFLE"]}})
+        cparams = storage.to_cparams()
+        self.assertEqual((cparams.codec, cparams.clevel, cparams.filters[0], cparams.nthreads),
+                         (blosc2.Codec.LZ4HC, 5, blosc2.Filter.SHUFFLE, 4))
+        self.assertEqual(storage.to_cparams(nthreads=2).nthreads, 2)
+        no_filter = Storage.from_dict({"compression": {"codec": "ZSTD", "level": 3, "filters": ["NOFILTER"]}}).to_cparams()
+        self.assertNotIn(blosc2.Filter.SHUFFLE, no_filter.filters)
+        array = np.arange(64, dtype=np.float32).reshape(4, 4, 4)
+        self.assertTrue(np.array_equal(blosc2.asarray(array, cparams=no_filter)[...], array))
+
     def test_storage_holds_only_portable_fields(self):
         storage = Storage.from_dict({"chunk_size": [1, 64, 64], "block_size": [1, 32, 32], "patch_size": [64, 64],
                                      "compression": {"codec": "LZ4HC", "level": 5, "filters": ["SHUFFLE"]}})
