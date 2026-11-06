@@ -326,7 +326,7 @@ def in_memory_state(store) -> Dict[str, Any]:
 
 def restore_in_memory(state: Dict[str, Any]) -> blosc2.NDArray:
     """Rebuild an in-memory Blosc2 array from :func:`in_memory_state`."""
-    store = blosc2.ndarray_from_cframe(state["cframe"])
+    store = blosc2.ndarray_from_cframe(state["cframe"], copy=True)   # own the buffer (needed in older blosc2)
     store.schunk.cparams = state["cparams"]
     store.schunk.dparams = state["dparams"]
     return store
