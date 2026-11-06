@@ -21,7 +21,7 @@ You can install mlarray via [pip](https://pypi.org/project/mlarray/):
 pip install mlarray
 ```
 
-To enable the `mlarray_convert` CLI command (conversion with MedVol 2), install MLArray with the extra dependencies:
+To enable the `mlarray_convert` CLI command (conversion with MedVol 1.0 or newer), install MLArray with the extra dependencies:
 ```bash
 pip install mlarray[all]
 ```
@@ -193,7 +193,7 @@ mlarray_header sample.mla
 ### mlarray_convert
 
 Convert between MLArray and NIfTI, NRRD, MetaImage, MGH/MGZ and DICOM with
-[MedVol 2](https://github.com/MIC-DKFZ/MedVol) (`pip install "mlarray[all]"`). Nothing is reoriented, rescaled or
+[MedVol](https://github.com/MIC-DKFZ/MedVol) 1.0 or newer (`pip install "mlarray[all]"`). Nothing is reoriented, rescaled or
 dropped silently: the array keeps its stored order and dtype, the geometry is taken from the file's own fields,
 the original header is kept in `source` so the file can be written back faithfully, and every choice is reported.
 

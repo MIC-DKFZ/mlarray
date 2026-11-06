@@ -41,7 +41,7 @@ docs = [
   "pymdown-extensions>=10.0",
 ]
 all = [
-  "medvol>=2.0.0.dev0",
+  "medvol>=1.0.0",
 ]
 
 [project.urls]

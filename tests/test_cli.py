@@ -64,12 +64,12 @@ class TestHeader(unittest.TestCase):
                 header(path)
 
 
-def _medvol_2():
+def _medvol_1():
     try:
         import medvol
     except ImportError:
         return False
-    return str(medvol.__version__).split(".")[0].isdigit() and int(str(medvol.__version__).split(".")[0]) >= 2
+    return str(medvol.__version__).split(".")[0].isdigit() and int(str(medvol.__version__).split(".")[0]) >= 1
 
 
 def _nifti(path, qform_shift=0.0):
@@ -102,7 +102,7 @@ def _convert(argv):
     return out.getvalue()
 
 
-@unittest.skipUnless(_medvol_2(), "needs MedVol 2")
+@unittest.skipUnless(_medvol_1(), "needs MedVol 1.0 or newer")
 class TestConvertWithMedVol(unittest.TestCase):
     def test_nifti_round_trip_keeps_data_geometry_and_header(self):
         import nibabel as nib
@@ -137,11 +137,11 @@ class TestConvertWithMedVol(unittest.TestCase):
             self.assertAlmostEqual(MLArray(Path(tmpdir) / "q.mla").origin[2], affine[2, 3] + 5.0, places=5)
 
 
-class TestConvertWithoutMedVol2(unittest.TestCase):
+class TestOldMedVol(unittest.TestCase):
     def test_old_medvol_gives_a_clear_error(self):
         fake = mock.MagicMock(__version__="0.0.22")
         with mock.patch.dict(sys.modules, {"medvol": fake}):
-            with self.assertRaisesRegex(RuntimeError, "MedVol 2"):
+            with self.assertRaisesRegex(RuntimeError, "MedVol 1.0"):
                 convert_image("a.nii.gz", "b.mla")
 
     def test_missing_dependency_of_medvol_is_not_hidden(self):

@@ -23,7 +23,7 @@ The output is strict JSON (`jq` accepts it): non-finite numbers are printed as t
 ## `mlarray_convert`
 
 Convert between MLArray (`.mla`) and NIfTI (`.nii`, `.nii.gz`, `.hdr/.img`), NRRD (`.nrrd`, `.nhdr`), MetaImage
-(`.mha`, `.mhd`), MGH/MGZ and DICOM. Conversion is done by [MedVol 2](https://github.com/MIC-DKFZ/MedVol); install
+(`.mha`, `.mhd`), MGH/MGZ and DICOM. Conversion is done by [MedVol](https://github.com/MIC-DKFZ/MedVol) 1.0 or newer; install
 it with `pip install "mlarray[all]"`.
 
 ```bash

@@ -42,16 +42,16 @@ def print_header(filepath: Union[str, Path], source: bool = False, user: bool = 
 
 
 def _medvol():
-    """MedVol 2, which does all format conversion (MLArray itself reads and writes only .mla)."""
+    """MedVol 1.0 or newer, which does all format conversion (MLArray itself reads and writes only .mla)."""
     try:
         import medvol
     except ImportError as error:
         if error.name != "medvol":   # MedVol is installed but one of its dependencies is missing
             raise
-        raise RuntimeError("mlarray_convert needs MedVol 2: pip install 'mlarray[all]'") from error
+        raise RuntimeError("mlarray_convert needs MedVol 1.0 or newer: pip install 'mlarray[all]'") from error
     major = str(getattr(medvol, "__version__", "0")).split(".")[0]
-    if not major.isdigit() or int(major) < 2:
-        raise RuntimeError(f"mlarray_convert needs MedVol 2 or newer; found {medvol.__version__}. "
+    if not major.isdigit() or int(major) < 1:
+        raise RuntimeError(f"mlarray_convert needs MedVol 1.0 or newer (0.0.x is the old converter); found {medvol.__version__}. "
                            "Upgrade with: pip install -U 'mlarray[all]'")
     return medvol
 
