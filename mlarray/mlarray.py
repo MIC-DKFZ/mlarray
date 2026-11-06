@@ -2013,7 +2013,10 @@ class MLArray:
                 "or let Blosc2 determine the layout."
             )
 
-        if patch_size is not None:
+        if patch_size is not None and 0 in shape:
+            # An array without elements has no layout to optimize; Blosc2 chooses one.
+            chunk_size, block_size, patch_size = None, None, None
+        elif patch_size is not None:
             chunk_size, block_size = MLArray.comp_blosc2_params(shape, patch_size, spatial_axis_mask, bytes_per_pixel=dtype_itemsize)
 
         choose_filter = array is not None and chunk_size is not None and MLArray._is_default_cparams(cparams)
@@ -2100,7 +2103,7 @@ class MLArray:
                 self.meta._has_array.has_array = True
         if self.meta._has_array.has_array:
             with _meta_internal_write():
-                if self._store is not None and self._store.shape != (0,):
+                if self._store is not None:
                     self.meta.spatial.shape = list(self._store.shape)
         if validate:
             with _meta_internal_write():

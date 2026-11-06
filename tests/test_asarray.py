@@ -103,6 +103,43 @@ class TestAsArray(unittest.TestCase):
         self.assertTrue(np.shares_memory(np.asarray(uncompressed, copy=False), uncompressed._store))
         self.assertFalse(np.shares_memory(np.array(uncompressed, copy=True), uncompressed._store))
 
+    def test_empty_arrays_report_their_shape(self):
+        cases = {
+            "asarray": lambda: MLArray.asarray(np.zeros((0,), dtype=np.float32)),
+            "linspace": lambda: MLArray.linspace(0, 1, 0),
+            "arange": lambda: MLArray.arange(5, 0),
+            "uncompressed": lambda: MLArray(np.zeros((0,), dtype=np.float32), compressed=False),
+        }
+        for name, make in cases.items():
+            with self.subTest(case=name):
+                image = make()
+                self.assertEqual(image.shape, (0,))
+                self.assertEqual(image.ndim, 1)
+                self.assertEqual(image.to_numpy().shape, (0,))
+
+    def test_zero_length_axes_save_and_load(self):
+        cases = {
+            "compressed": lambda: MLArray(np.zeros((0, 10, 10), dtype=np.float32), spacing=(1, 2, 3)),
+            "uncompressed": lambda: MLArray(np.zeros((0, 10, 10), dtype=np.float32), spacing=(1, 2, 3), compressed=False),
+        }
+        for name, make in cases.items():
+            with self.subTest(case=name), tempfile.TemporaryDirectory() as tmpdir:
+                path = Path(tmpdir) / "empty.mla"
+                image = make()
+                self.assertIsNone(image.meta.blosc2.patch_size)
+                image.save(path)
+                loaded = MLArray(path)
+                self.assertEqual(loaded.shape, (0, 10, 10))
+                self.assertEqual(loaded.to_numpy().shape, (0, 10, 10))
+                self.assertEqual(loaded.spacing, [1.0, 2.0, 3.0])
+
+    def test_create_with_zero_length_axis(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "created.mla"
+            image = MLArray.create(path, shape=(4, 0, 3), dtype=np.uint8)
+            image.close()
+            self.assertEqual(MLArray.open(path).shape, (4, 0, 3))
+
 
 if __name__ == "__main__":
     unittest.main()
