@@ -344,8 +344,7 @@ class MLArray(MLArrayConstructors):
         Raises:
             TypeError: If no array data is loaded.
         """
-        if self._store is None or self.meta._has_array.has_array is False:
-            raise TypeError("MLArray has no array data loaded.")
+        self._require_array()
 
         source_meta = deepcopy(self.meta)
         converted = MLArray.asarray(
@@ -371,8 +370,7 @@ class MLArray(MLArrayConstructors):
         Raises:
             TypeError: If no array data is loaded.
         """
-        if self._store is None or self.meta._has_array.has_array is False:
-            raise TypeError("MLArray has no array data loaded.")
+        self._require_array()
 
         source_meta = deepcopy(self.meta)
         converted = MLArray.asarray(
@@ -409,8 +407,7 @@ class MLArray(MLArrayConstructors):
         Raises:
             RuntimeError: If the file extension is not ".mla".
         """
-        if not str(filepath).endswith(f".{MLARRAY_SUFFIX}"):
-            raise RuntimeError(f"MLArray requires '.{MLARRAY_SUFFIX}' as extension.")
+        _storage.check_suffix(filepath)
 
         self.support_metadata = True
 
@@ -502,6 +499,15 @@ class MLArray(MLArrayConstructors):
             self._open(self.filepath, payload["mode"], payload["mmap_mode"], payload["dparams"])
             self._meta = meta
 
+    def _has_array_data(self) -> bool:
+        """True when array data is loaded (not a metadata-only instance)."""
+        return self._store is not None and bool(self.meta._has_array.has_array)
+
+    def _require_array(self) -> None:
+        """Raise ``TypeError`` unless array data is loaded."""
+        if not self._has_array_data():
+            raise TypeError("MLArray has no array data loaded.")
+
     def to_numpy(self):
         """Return the underlying data as a NumPy array.
 
@@ -511,8 +517,7 @@ class MLArray(MLArrayConstructors):
         Raises:
             TypeError: If no array data is loaded.
         """
-        if self._store is None or self.meta._has_array.has_array == False:
-            raise TypeError("MLArray has no array data loaded.")
+        self._require_array()
         return self._store[...]
 
     def __array__(self, dtype=None, copy=None):
@@ -527,8 +532,7 @@ class MLArray(MLArrayConstructors):
         Raises:
             TypeError: If no array data is loaded.
         """
-        if self._store is None or self.meta._has_array.has_array == False:
-            raise TypeError("MLArray has no array data loaded.")
+        self._require_array()
         if self._backend == "numpy":
             return np.array(self._store, dtype=dtype, copy=copy)
         if copy is False:
@@ -551,8 +555,7 @@ class MLArray(MLArrayConstructors):
         Raises:
             TypeError: If no array data is loaded.
         """
-        if self._store is None or self.meta._has_array.has_array == False:
-            raise TypeError("MLArray has no array data loaded.")
+        self._require_array()
         return self._store[key]
 
     def __setitem__(self, key, value):
@@ -566,8 +569,7 @@ class MLArray(MLArrayConstructors):
         Raises:
             TypeError: If no array data is loaded.
         """
-        if self._store is None or self.meta._has_array.has_array == False:
-            raise TypeError("MLArray has no array data loaded.")
+        self._require_array()
         self._store[key] = value
 
     def __iter__(self):
@@ -579,8 +581,7 @@ class MLArray(MLArrayConstructors):
         Raises:
             TypeError: If no array data is loaded.
         """
-        if self._store is None or self.meta._has_array.has_array == False:
-            raise TypeError("MLArray has no array data loaded.")
+        self._require_array()
         return iter(self._store)
 
     def __len__(self):
@@ -589,7 +590,7 @@ class MLArray(MLArrayConstructors):
         Returns:
             int: Size of axis 0, or 0 if no array is loaded.
         """
-        if self._store is None or self.meta._has_array.has_array == False:
+        if not self._has_array_data():
             return 0
         return len(self._store)
 
@@ -646,7 +647,7 @@ class MLArray(MLArrayConstructors):
             list: Affine matrix with shape (ndims + 1, ndims + 1), or None if
                 no array is loaded.
         """
-        if self._store is None or self.meta._has_array.has_array == False:
+        if not self._has_array_data():
             return None
         if self.meta.spatial.affine is not None:
             return self.meta.spatial.affine
@@ -670,7 +671,7 @@ class MLArray(MLArrayConstructors):
             list: Translation vector with length equal to the number of spatial
                 dimensions, or None if no array is loaded.
         """
-        if self._store is None or self.meta._has_array.has_array == False:
+        if not self._has_array_data():
             return None
         return np.array(self.affine)[:-1, -1].tolist()
 
@@ -682,7 +683,7 @@ class MLArray(MLArrayConstructors):
             list: Scaling factors per axis with length equal to the number of
                 spatial dimensions, or None if no array is loaded.
         """
-        if self._store is None or self.meta._has_array.has_array == False:
+        if not self._has_array_data():
             return None
         scales = np.linalg.norm(np.array(self.affine)[:-1, :-1], axis=0)
         return scales.tolist()
@@ -695,7 +696,7 @@ class MLArray(MLArrayConstructors):
             list: Rotation matrix with shape (ndims, ndims), or None if no array
                 is loaded.
         """
-        if self._store is None or self.meta._has_array.has_array == False:
+        if not self._has_array_data():
             return None
         rotation_matrix = np.array(self.affine)[:-1, :-1] / np.array(self.scale)
         return rotation_matrix.tolist()
@@ -708,7 +709,7 @@ class MLArray(MLArrayConstructors):
             list: Shear matrix with shape (ndims, ndims), or None if no array is
                 loaded.
         """
-        if self._store is None or self.meta._has_array.has_array == False:
+        if not self._has_array_data():
             return None
         scales = np.array(self.scale)
         rotation_matrix = np.array(self.rotation)
@@ -735,7 +736,7 @@ class MLArray(MLArrayConstructors):
             np.dtype: Dtype of the underlying array, or None if no array is
                 loaded.
         """
-        if self._store is None or self.meta._has_array.has_array == False:
+        if not self._has_array_data():
             return None
         return self._store.dtype
 
@@ -853,8 +854,7 @@ class MLArray(MLArrayConstructors):
         Raises:
             RuntimeError: If the file extension is invalid or if mode/mmap_mode is invalid for opening.
         """
-        if not str(filepath).endswith(f".{MLARRAY_SUFFIX}"):
-            raise RuntimeError(f"MLArray requires '.{MLARRAY_SUFFIX}' as extension.")
+        _storage.check_suffix(filepath)
         self.filepath = str(filepath)
         
         if not Path(filepath).is_file():
@@ -935,8 +935,7 @@ class MLArray(MLArrayConstructors):
         Raises:
             RuntimeError: If the file extension is invalid or if mode/mmap_mode is invalid for creation.
         """
-        if not str(filepath).endswith(f".{MLARRAY_SUFFIX}"):
-            raise RuntimeError(f"MLArray requires '.{MLARRAY_SUFFIX}' as extension.")
+        _storage.check_suffix(filepath)
         self.filepath = str(filepath)
 
         if mode != 'w':
@@ -979,8 +978,7 @@ class MLArray(MLArrayConstructors):
         Raises:
             RuntimeError: If the file extension is not ".mla".
         """
-        if not str(filepath).endswith(f".{MLARRAY_SUFFIX}"):
-            raise RuntimeError(f"MLArray requires '.{MLARRAY_SUFFIX}' as extension.")
+        _storage.check_suffix(filepath)
         self.filepath = str(filepath)
         self.support_metadata = True
         self._store = _storage.load_into_memory(filepath, MLArray._resolve_dparams(dparams))
